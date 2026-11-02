@@ -1,0 +1,125 @@
+:root {
+  color-scheme: light;
+  --brand-blue: #c2e8f5;
+  --brand-lime: #d1f685;
+  --ink-primary: #203039;
+  --ink-secondary: #4a5b63;
+  --ink-muted: #63747c;
+  --action-primary: #006b70;
+  --action-primary-hover: #0b5960;
+  --action-focus: #006b70;
+  --page-surface: #f6fbfc;
+  --card-surface: #ffffff;
+  --surface-muted: #edf5f7;
+  --surface-blue: #eaf7fb;
+  --surface-lime: #f4fbdc;
+  --border-subtle: #d6e2e6;
+  --border-strong: #9aadb4;
+  --success-foreground: #176b3a;
+  --success-surface: #eaf6ee;
+  --warning-foreground: #7a5a00;
+  --warning-surface: #fff4cc;
+  --danger-foreground: #b42318;
+  --danger-surface: #fef3f2;
+  --info-foreground: #1f5e85;
+  --info-surface: #eaf4ff;
+  --overlay: rgb(18 36 43 / 46%);
+  --shadow-soft-value: 0 2px 8px rgb(32 48 57 / 5%);
+  --shadow-raised-value: 0 14px 36px rgb(32 48 57 / 12%);
+  --radius-card-value: 1.25rem;
+  --radius-control-value: 0.75rem;
+  --motion-fast: 140ms;
+  --motion-standard: 220ms;
+}
+
+@theme inline {
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-lime: var(--brand-lime);
+  --color-pastel-blue-ink: var(--ink-primary);
+  --color-pastel-lime-ink: var(--ink-primary);
+  --color-ink-primary: var(--ink-primary);
+  --color-ink-secondary: var(--ink-secondary);
+  --color-ink-muted: var(--ink-muted);
+  --color-action-primary: var(--action-primary);
+  --color-action-primary-hover: var(--action-primary-hover);
+  --color-action-focus: var(--action-focus);
+  --color-page-surface: var(--page-surface);
+  --color-card-surface: var(--card-surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-blue: var(--surface-blue);
+  --color-surface-lime: var(--surface-lime);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-surface: var(--success-surface);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-surface: var(--warning-surface);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-danger-surface: var(--danger-surface);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-surface: var(--info-surface);
+  --color-overlay: var(--overlay);
+  --font-display: 'Manrope Variable', 'Segoe UI', sans-serif;
+  --font-body: 'Source Sans 3 Variable', 'Segoe UI', sans-serif;
+  --font-mono: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
+  --radius-card: var(--radius-card-value);
+  --radius-control: var(--radius-control-value);
+  --shadow-soft: var(--shadow-soft-value);
+  --shadow-raised: var(--shadow-raised-value);
+  --spacing: 0.25rem;
+  --z-index-toast: 90;
+  --z-index-overlay: 70;
+  --z-index-header: 30;
+  --animate-accordion-down: accordion-down 180ms ease-out;
+  --animate-accordion-up: accordion-up 180ms ease-out;
+  --animate-overlay-in: overlay-in 160ms ease-out;
+  --animate-overlay-out: overlay-out 120ms ease-in;
+  --animate-toast-in: toast-in 180ms ease-out;
+}
+
+@keyframes accordion-down {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-accordion-content-height);
+  }
+}
+
+@keyframes accordion-up {
+  from {
+    height: var(--radix-accordion-content-height);
+  }
+  to {
+    height: 0;
+  }
+}
+
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes overlay-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540" fill="none">
+  <defs>
+    <linearGradient id="paper" x1="0" y1="0" x2="960" y2="540" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#EAF7FB"/>
+      <stop offset="1" stop-color="#D1F685"/>
+    </linearGradient>
+    <linearGradient id="ink" x1="350" y1="80" x2="850" y2="460" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#006B70"/>
+      <stop offset="1" stop-color="#203039"/>
+    </linearGradient>
+  </defs>
+  <path d="M0 0h960v540H0z" fill="url(#paper)"/>
+  <circle cx="770" cy="80" r="170" fill="#fff" fill-opacity=".4"/>
+  <path d="M468 78h318c22 0 40 18 40 40v300c0 22-18 40-40 40H468c-22 0-40-18-40-40V118c0-22 18-40 40-40Z" fill="url(#ink)"/>
+  <path d="M88 112h246c10 0 18 8 18 18v16c0 10-8 18-18 18H88c-10 0-18-8-18-18v-16c0-10 8-18 18-18Z" fill="#fff" fill-opacity=".82"/>
+  <text x="82" y="138" fill="#203039" font-family="Georgia,serif" font-size="16" font-weight="700" letter-spacing="2">DEUTSCH · A1.1</text>
+  <text x="78" y="255" fill="#203039" font-family="Georgia,serif" font-size="62" font-weight="700">Guten</text>
+  <text x="78" y="325" fill="#203039" font-family="Georgia,serif" font-size="62" font-weight="700">Tag!</text>
+  <path d="M80 366h245" stroke="#006B70" stroke-width="3" stroke-linecap="round"/>
+  <text x="82" y="408" fill="#4A5B63" font-family="Arial,sans-serif" font-size="20">Học câu đầu tiên bằng tiếng Đức</text>
+  <path d="M491 142c22-20 55-20 77 0l52 48-52 48c-22 20-55 20-77 0-23-21-23-55 0-96Z" fill="#C2E8F5"/>
+  <path d="M699 238c22-20 55-20 77 0l52 48-52 48c-22 20-55 20-77 0-23-21-23-55 0-96Z" fill="#D1F685"/>
+  <circle cx="570" cy="353" r="34" fill="#fff" fill-opacity=".86"/>
+  <path d="M554 353h32M570 337v32" stroke="#006B70" stroke-width="4" stroke-linecap="round"/>
+</svg>

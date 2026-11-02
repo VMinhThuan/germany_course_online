@@ -1,0 +1,926 @@
+import { useEffect } from 'react'
+import { ArrowDown, ArrowLeft, ArrowRight, BookOpenText, LockKeyhole } from 'lucide-react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Container,
+  LinkButton,
+} from '@/shared/ui'
+import { PublicShell } from '@/shared/layouts/shells'
+import type { ReactNode } from 'react'
+import { useDialogs } from '@/shared/ui/dialogs'
+import {
+  CourseDetailHero,
+  CourseCard,
+  CourseGrid,
+  CourseObjectives,
+  CourseOutline,
+  CourseOverview,
+  LandingHero,
+  LearningBenefits,
+} from '@/domains/catalog'
+import { VideoPlayer } from '@/domains/media'
+import { DomainState } from '@/domains/shared/presentation'
+import {
+  usePreviewExperience,
+  usePublicCourse,
+  usePublicCourseCatalog,
+  usePublicPreviewManifest,
+} from '@/data/public-demo'
+import { getPreviewSections } from '@/data/public-demo/use-cases'
+import { useAuthSession } from '@/app/auth/auth-session'
+
+const courseSlug = 'tieng-duc-a1-1'
+
+const publicShellProps = {
+  navItems: [
+    { label: 'Khóa học', href: '/courses' },
+    { label: 'Cách học', href: '/#learning-experience' },
+    { label: 'Học thử', href: `/courses/${courseSlug}/preview` },
+  ],
+  brandHref: '/',
+  brandSubtitle: 'Khóa học tiếng Đức trực tuyến',
+  previewNotice: 'Bản demo sản phẩm · Nội dung và thông tin khóa học đang được cập nhật',
+  showPreviewNotice: true,
+  showLogin: true,
+  primaryAction: { label: 'Xem khóa học', href: '/courses' },
+  footerLink: { label: 'Câu hỏi thường gặp', href: '/#faq' },
+  menuDescription: 'Khám phá khóa học A1.1 và nội dung học thử',
+} as const
+
+function usePageTitle(title: string) {
+  useEffect(() => {
+    document.title = `${title} · Deutsch A1.1`
+  }, [title])
+}
+
+function SitePage({ children }: { children: ReactNode }) {
+  const { session, logout } = useAuthSession()
+  return (
+    <PublicShell
+      {...publicShellProps}
+      {...(session
+        ? {
+            authState: {
+              displayName: session.profile.displayName || session.profile.email,
+              onLogout: logout,
+            },
+          }
+        : {})}
+    >
+      {children}
+    </PublicShell>
+  )
+}
+
+function PageError({ title, retry }: { title: string; retry?: () => void }) {
+  return (
+    <DomainState
+      kind="error"
+      title={title}
+      message="Dữ liệu bản demo chưa tải được. Bạn có thể thử lại sau ít phút."
+    >
+      {retry && (
+        <Button variant="outline" onClick={retry} className="mt-2">
+          Thử tải lại
+        </Button>
+      )}
+    </DomainState>
+  )
+}
+
+export function PublicLandingPage() {
+  const navigate = useNavigate()
+  const catalog = usePublicCourseCatalog()
+  usePageTitle('Học tiếng Đức A1.1')
+
+  return (
+    <SitePage>
+      <div className="space-y-16 pb-16 sm:space-y-20">
+        <Container className="pt-5 sm:pt-8">
+          <LandingHero
+            eyebrow="Khóa học tiếng Đức · A1.1"
+            title="Bắt đầu giao tiếp bằng tiếng Đức, từng bước một."
+            description="Khám phá cấu trúc khóa A1.1 và mở ba chương học thử miễn phí. Nội dung trên website hiện ở chế độ demo."
+            primaryAction={{ label: 'Xem khóa học', onClick: () => navigate('/courses') }}
+            secondaryAction={{
+              label: 'Mở bài học thử',
+              onClick: () => navigate(`/courses/${courseSlug}/preview`),
+            }}
+          />
+        </Container>
+
+        <Container>
+          <section id="course-highlight" className="scroll-mt-28 space-y-6">
+            <div className="max-w-2xl space-y-3">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-action-primary">
+                Khóa học
+              </p>
+              <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
+                Một điểm bắt đầu rõ ràng
+              </h2>
+              <p className="leading-7 text-ink-secondary">
+                Hiện có khóa A1.1 trong bản demo. Học phí và thời hạn truy cập chưa được công bố.
+              </p>
+            </div>
+            {catalog.isError ? (
+              <PageError title="Không tải được khóa học" retry={() => void catalog.refetch()} />
+            ) : (
+              <div className="max-w-xl">
+                <CourseGrid courses={catalog.data ?? []} loading={catalog.isPending} singleColumn />
+              </div>
+            )}
+          </section>
+        </Container>
+
+        <Container>
+          <section id="learning-experience" className="scroll-mt-28 space-y-6">
+            <div className="max-w-2xl space-y-3">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-action-primary">
+                Cách học
+              </p>
+              <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
+                Làm quen qua các tình huống gần gũi
+              </h2>
+              <p className="leading-7 text-ink-secondary">
+                Bản demo sắp xếp nội dung theo chương và bài. Các ví dụ hiện có giúp bạn hình dung
+                cách học; chương trình đầy đủ đang được hoàn thiện.
+              </p>
+            </div>
+            <LearningBenefits
+              benefits={[
+                {
+                  title: 'Theo từng chủ đề',
+                  description: 'Lời chào, giới thiệu tên và quê quán được nhóm thành các chương.',
+                },
+                {
+                  title: 'Bài học ngắn',
+                  description: 'Mỗi chương có danh sách bài để bạn chọn và xem nội dung mẫu.',
+                },
+                {
+                  title: 'Học thử không cần tài khoản',
+                  description: 'Mở ba chương được đánh dấu học thử ngay trên website.',
+                },
+              ]}
+            />
+          </section>
+        </Container>
+
+        <Container>
+          <section className="grid gap-6 rounded-3xl bg-surface-lime p-6 sm:p-9 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+            <div className="max-w-2xl space-y-3">
+              <Badge tone="preview">
+                <BookOpenText aria-hidden="true" className="size-3.5" />
+                Ba chương học thử miễn phí
+              </Badge>
+              <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
+                Thử một bài học trước khi quyết định
+              </h2>
+              <p className="leading-7 text-ink-secondary">
+                Mở lời chào, cách nói tên và câu hỏi về quê quán. Đây là nội dung mẫu; video đang
+                được cập nhật.
+              </p>
+            </div>
+            <LinkButton
+              to={`/courses/${courseSlug}/preview`}
+              size="lg"
+              endIcon={<ArrowRight aria-hidden="true" />}
+            >
+              Vào học thử
+            </LinkButton>
+          </section>
+        </Container>
+
+        <Container>
+          <section id="faq" className="scroll-mt-28 mx-auto max-w-3xl space-y-5">
+            <div className="space-y-2">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-action-primary">
+                Câu hỏi thường gặp
+              </p>
+              <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
+                Trước khi bắt đầu
+              </h2>
+            </div>
+            <div className="divide-y divide-border-subtle rounded-2xl border border-border-subtle bg-card-surface px-5">
+              <details className="group py-4">
+                <summary className="min-h-11 cursor-pointer py-2 font-semibold text-ink-primary focus-visible:outline-2 focus-visible:outline-action-focus">
+                  Học thử có cần đăng nhập không?
+                </summary>
+                <p className="pb-2 leading-6 text-ink-secondary">
+                  Không. Ba chương được đánh dấu học thử có thể mở trực tiếp trên website.
+                </p>
+              </details>
+              <details className="group py-4">
+                <summary className="min-h-11 cursor-pointer py-2 font-semibold text-ink-primary focus-visible:outline-2 focus-visible:outline-action-focus">
+                  Học phí và thời hạn truy cập là bao nhiêu?
+                </summary>
+                <p className="pb-2 leading-6 text-ink-secondary">
+                  Hai thông tin này chưa được công bố. Bản demo không tạo đơn hàng hoặc thanh toán.
+                </p>
+              </details>
+              <details className="group py-4">
+                <summary className="min-h-11 cursor-pointer py-2 font-semibold text-ink-primary focus-visible:outline-2 focus-visible:outline-action-focus">
+                  Video bài học đã có chưa?
+                </summary>
+                <p className="pb-2 leading-6 text-ink-secondary">
+                  Video học thử đang được cập nhật. Nội dung mẫu vẫn có thể xem và điều hướng giữa
+                  các bài.
+                </p>
+              </details>
+            </div>
+          </section>
+        </Container>
+
+        <Container>
+          <section className="flex flex-col gap-5 rounded-3xl border border-brand-blue bg-[linear-gradient(112deg,var(--brand-blue),#f8fdfe_72%)] p-6 text-ink-primary shadow-soft sm:flex-row sm:items-center sm:justify-between sm:p-9">
+            <div className="max-w-2xl space-y-2">
+              <h2 className="font-display text-2xl font-bold">Khám phá khóa A1.1</h2>
+              <p className="leading-6 text-ink-secondary">
+                Xem nội dung hiện có và thử ba chương miễn phí trong bản demo.
+              </p>
+            </div>
+            <LinkButton
+              to="/courses"
+              variant="primary"
+              size="lg"
+              endIcon={<ArrowRight aria-hidden="true" />}
+            >
+              Xem khóa học
+            </LinkButton>
+          </section>
+        </Container>
+      </div>
+    </SitePage>
+  )
+}
+
+export function CourseCatalogPage() {
+  const catalog = usePublicCourseCatalog()
+  usePageTitle('Khóa học')
+
+  return (
+    <SitePage>
+      <Container className="space-y-10 py-10 sm:py-14">
+        <header className="max-w-3xl space-y-4">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-action-primary">
+            Khóa học tiếng Đức
+          </p>
+          <h1 className="font-display text-3xl font-extrabold tracking-tight sm:text-4xl">
+            Chọn điểm bắt đầu của bạn
+          </h1>
+          <p className="text-lg leading-7 text-ink-secondary">
+            Danh mục hiện hiển thị khóa A1.1 duy nhất trong bản demo. Học phí và điều kiện đăng ký
+            đang được cập nhật.
+          </p>
+        </header>
+        {catalog.isError ? (
+          <PageError
+            title="Không tải được danh mục khóa học"
+            retry={() => void catalog.refetch()}
+          />
+        ) : catalog.isPending ? (
+          <CourseGrid courses={[]} loading singleColumn />
+        ) : catalog.data?.[0] ? (
+          <section
+            id="catalog"
+            aria-label="Khóa học nổi bật"
+            className="scroll-mt-28 grid items-stretch gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]"
+          >
+            <CourseCard
+              course={catalog.data[0]}
+              href={`/courses/${catalog.data[0].slug}`}
+              access={{
+                kind: 'customer-preview',
+                label: 'Có chương học thử',
+                source: 'customer-requested-demo',
+              }}
+            />
+            <Card className="flex flex-col justify-between bg-surface-blue/75">
+              <CardHeader>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-action-primary">
+                  Khóa học nổi bật
+                </p>
+                <CardTitle className="text-2xl">{catalog.data[0].title}</CardTitle>
+                <p className="text-sm leading-6 text-ink-secondary">
+                  Xem cấu trúc khóa học và thử những chương đang được mở công khai.
+                </p>
+              </CardHeader>
+              <CardContent className="grid gap-5">
+                <dl className="grid grid-cols-2 gap-3">
+                  {catalog.data[0].chapterCount !== undefined && (
+                    <div className="rounded-xl border border-white/80 bg-white/75 p-3">
+                      <dt className="text-xs text-ink-muted">Chương</dt>
+                      <dd className="mt-1 font-display text-xl font-extrabold">
+                        {catalog.data[0].chapterCount}
+                      </dd>
+                    </div>
+                  )}
+                  {catalog.data[0].lessonCount !== undefined && (
+                    <div className="rounded-xl border border-white/80 bg-white/75 p-3">
+                      <dt className="text-xs text-ink-muted">Bài học</dt>
+                      <dd className="mt-1 font-display text-xl font-extrabold">
+                        {catalog.data[0].lessonCount}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+                <div className="grid gap-3">
+                  <LinkButton
+                    to={`/courses/${catalog.data[0].slug}/preview`}
+                    className="w-full justify-center"
+                  >
+                    Mở bài học thử <ArrowRight aria-hidden="true" />
+                  </LinkButton>
+                  <LinkButton
+                    to={`/courses/${catalog.data[0].slug}`}
+                    variant="outline"
+                    className="w-full justify-center"
+                  >
+                    Xem thông tin khóa học
+                  </LinkButton>
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+        ) : (
+          <CourseGrid courses={[]} emptyMessage="Danh mục demo chưa có khóa học." singleColumn />
+        )}
+        <p className="max-w-xl text-sm leading-6 text-ink-muted">
+          Đây là danh mục mẫu để xem bố cục. Chương trình, học phí và thông tin truy cập chính thức
+          sẽ được xác nhận trước khi mở đăng ký.
+        </p>
+      </Container>
+    </SitePage>
+  )
+}
+
+export function CourseDetailPage() {
+  const { slug = '' } = useParams()
+  const navigate = useNavigate()
+  const dialogs = useDialogs()
+  const courseQuery = usePublicCourse(slug)
+  const manifestQuery = usePublicPreviewManifest(slug)
+  usePageTitle(courseQuery.data?.title ?? 'Chi tiết khóa học')
+
+  if (courseQuery.isPending || manifestQuery.isPending) {
+    return (
+      <SitePage>
+        <Container className="py-12">
+          <DomainState kind="loading" title="Đang tải thông tin khóa học" />
+        </Container>
+      </SitePage>
+    )
+  }
+  if (courseQuery.isError || manifestQuery.isError) {
+    return (
+      <SitePage>
+        <Container className="py-12">
+          <PageError
+            title="Không tải được thông tin khóa học"
+            retry={() => {
+              void courseQuery.refetch()
+              void manifestQuery.refetch()
+            }}
+          />
+        </Container>
+      </SitePage>
+    )
+  }
+  if (!courseQuery.data) return <PublicNotFoundPage />
+
+  const course = courseQuery.data
+  const manifest = manifestQuery.data
+  const previewSections = manifest ? getPreviewSections(course, manifest) : null
+  const previewSectionIds = previewSections?.map((section) => section.id) ?? []
+  const detailPreviewHref = `/courses/${course.slug}/preview`
+  const showUnavailablePurchase = () =>
+    dialogs.info(
+      'Đăng ký khóa học chưa mở',
+      'Bản demo chưa nhận đăng ký hoặc thanh toán. Học phí và thời hạn truy cập sẽ được công bố khi chương trình chính thức sẵn sàng.',
+    )
+
+  return (
+    <SitePage>
+      <Container className="space-y-12 py-8 sm:py-12">
+        <nav aria-label="Đường dẫn" className="flex items-center gap-2 text-sm text-ink-secondary">
+          <Link
+            to="/courses"
+            className="underline-offset-4 hover:text-action-primary hover:underline"
+          >
+            Khóa học
+          </Link>
+          <span aria-hidden="true">/</span>
+          <span aria-current="page" className="truncate text-ink-primary">
+            {course.level}
+          </span>
+        </nav>
+
+        <CourseDetailHero
+          course={course}
+          access={{
+            kind: 'customer-preview',
+            label: 'Có 3 chương học thử miễn phí',
+            source: 'customer-requested-demo',
+          }}
+          primaryAction={{
+            label: 'Học thử miễn phí',
+            onClick: () => navigate(detailPreviewHref),
+          }}
+          secondaryAction={{ label: 'Thông tin mua khóa học', onClick: showUnavailablePurchase }}
+          accessNote="Học phí và thời hạn truy cập chưa được công bố."
+        />
+
+        <div className="grid gap-12 lg:grid-cols-[minmax(0,1.2fr)_minmax(17rem,0.8fr)] lg:items-start">
+          <div className="min-w-0 space-y-12">
+            <CourseOverview description={course.description} />
+            <CourseObjectives
+              title="Mục tiêu minh họa trong bản demo"
+              objectives={course.objectives}
+            />
+            <section aria-labelledby="course-outline-heading" className="space-y-4">
+              <div className="space-y-2">
+                <h2 id="course-outline-heading" className="font-display text-2xl font-bold">
+                  Chương trình học
+                </h2>
+                <p className="text-sm leading-6 text-ink-secondary">
+                  Mở một chương để xem danh sách bài. Chỉ các chương được đánh dấu mới có nội dung
+                  học thử.
+                </p>
+              </div>
+              <CourseOutline
+                sections={course.sections}
+                previewSectionIds={previewSectionIds}
+                previewLabel="Học thử miễn phí"
+                {...(previewSections ? { previewHref: detailPreviewHref } : {})}
+                onLessonSelect={(lessonId) => {
+                  const section = course.sections.find((item) =>
+                    item.lessons.some((lesson) => lesson.id === lessonId),
+                  )
+                  if (!section) return
+                  if (!previewSectionIds.includes(section.id)) {
+                    showUnavailablePurchase()
+                    return
+                  }
+                  navigate(
+                    `${detailPreviewHref}?sectionId=${encodeURIComponent(section.id)}&lessonId=${encodeURIComponent(lessonId)}`,
+                  )
+                }}
+              />
+            </section>
+          </div>
+
+          <aside className="space-y-4 lg:sticky lg:top-28">
+            <Card className="p-5 sm:p-6">
+              <div className="flex items-center gap-2">
+                <LockKeyhole aria-hidden="true" className="size-5 text-action-primary" />
+                <h2 className="font-display text-lg font-bold">Quyền truy cập</h2>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-ink-secondary">
+                Ba chương đầu được mở học thử. Các chương và phần ôn tập còn lại thuộc khóa học đầy
+                đủ và cần quyền truy cập.
+              </p>
+              <p className="mt-3 text-sm leading-6 text-ink-muted">
+                Đăng ký, học phí và thời hạn truy cập chưa sẵn sàng trong bản demo.
+              </p>
+              <Button className="mt-5 w-full" variant="outline" onClick={showUnavailablePurchase}>
+                Tìm hiểu khi mở đăng ký
+              </Button>
+            </Card>
+            <Card className="bg-surface-blue p-5">
+              <p className="text-sm font-semibold text-pastel-blue-ink">Nội dung demo</p>
+              <p className="mt-2 text-sm leading-6 text-ink-secondary">
+                Tên chương và bài học đang chờ xác nhận. Video chưa được kết nối.
+              </p>
+            </Card>
+          </aside>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 border-t border-border-subtle pt-6">
+          <LinkButton to={detailPreviewHref} endIcon={<ArrowRight aria-hidden="true" />}>
+            Mở ba chương học thử
+          </LinkButton>
+          <Link
+            to="/courses"
+            className="inline-flex min-h-11 items-center gap-2 px-2 font-semibold text-ink-secondary hover:text-action-primary"
+          >
+            <ArrowLeft aria-hidden="true" className="size-4" />
+            Về danh mục
+          </Link>
+        </div>
+      </Container>
+    </SitePage>
+  )
+}
+
+function previewHref(slug: string, sectionId: string, lessonId?: string) {
+  const query = new URLSearchParams({ sectionId })
+  if (lessonId) query.set('lessonId', lessonId)
+  return `/courses/${slug}/preview?${query.toString()}`
+}
+
+function PreviewStateMessage({
+  title,
+  message,
+  courseSlug,
+}: {
+  title: string
+  message: string
+  courseSlug: string
+}) {
+  return (
+    <div className="space-y-4">
+      <DomainState kind="empty" title={title} message={message} />
+      <LinkButton
+        to={`/courses/${courseSlug}`}
+        variant="outline"
+        startIcon={<ArrowLeft aria-hidden="true" />}
+      >
+        Về thông tin khóa học
+      </LinkButton>
+    </div>
+  )
+}
+
+export function FreePreviewPage() {
+  const { slug = '' } = useParams()
+  const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const sectionId = searchParams.get('sectionId') ?? undefined
+  const lessonId = searchParams.get('lessonId') ?? undefined
+  const experienceQuery = usePreviewExperience(slug, sectionId, lessonId)
+  const experience = experienceQuery.data
+  const course = experience && experience.kind !== 'course-not-found' ? experience.course : null
+  usePageTitle(course ? `Học thử · ${course.title}` : 'Học thử miễn phí')
+
+  useEffect(() => {
+    if (!experience || experience.kind !== 'available') return
+    if (!sectionId || !lessonId) {
+      const next = new URLSearchParams(searchParams)
+      next.set('sectionId', experience.section.id)
+      next.set('lessonId', experience.lesson.id)
+      setSearchParams(next, { replace: true })
+    }
+  }, [experience, lessonId, searchParams, sectionId, setSearchParams])
+
+  const selectSection = (nextSectionId: string) => {
+    const nextSection =
+      experience && 'sections' in experience
+        ? experience.sections.find((section) => section.id === nextSectionId)
+        : undefined
+    const nextLessonId = nextSection?.lessons[0]?.id
+    if (nextLessonId) navigate(previewHref(slug, nextSectionId, nextLessonId))
+    else navigate(previewHref(slug, nextSectionId))
+  }
+
+  if (experienceQuery.isPending) {
+    return (
+      <SitePage>
+        <Container className="py-12">
+          <DomainState kind="loading" title="Đang mở nội dung học thử" />
+        </Container>
+      </SitePage>
+    )
+  }
+  if (experienceQuery.isError) {
+    return (
+      <SitePage>
+        <Container className="py-12">
+          <PageError
+            title="Không tải được nội dung học thử"
+            retry={() => void experienceQuery.refetch()}
+          />
+        </Container>
+      </SitePage>
+    )
+  }
+  if (!experience || experience.kind === 'course-not-found') return <PublicNotFoundPage />
+
+  if (
+    experience.kind === 'preview-not-configured' ||
+    experience.kind === 'invalid-preview-manifest'
+  ) {
+    return (
+      <SitePage>
+        <Container className="py-12">
+          <PreviewStateMessage
+            title="Chưa có nội dung học thử"
+            message="Khóa học hiện chưa có chương học thử được cấu hình."
+            courseSlug={experience.course.slug}
+          />
+        </Container>
+      </SitePage>
+    )
+  }
+
+  const sections = experience.sections
+  const activeSection =
+    experience.kind === 'available' ||
+    experience.kind === 'empty-section' ||
+    experience.kind === 'lesson-not-found' ||
+    experience.kind === 'content-missing'
+      ? experience.section
+      : experience.kind === 'restricted-section'
+        ? {
+            id: experience.requestedSection.id,
+            title: experience.requestedSection.title,
+            lessons: experience.requestedSection.lessons,
+          }
+        : undefined
+  const currentLessonId =
+    experience.kind === 'available' || experience.kind === 'content-missing'
+      ? experience.lesson.id
+      : undefined
+
+  return (
+    <SitePage>
+      <Container className="space-y-6 py-8 sm:py-10">
+        <nav
+          aria-label="Đường dẫn"
+          className="flex flex-wrap items-center gap-2 text-sm text-ink-secondary"
+        >
+          <Link
+            to="/courses"
+            className="underline-offset-4 hover:text-action-primary hover:underline"
+          >
+            Khóa học
+          </Link>
+          <span aria-hidden="true">/</span>
+          <Link
+            to={`/courses/${experience.course.slug}`}
+            className="underline-offset-4 hover:text-action-primary hover:underline"
+          >
+            {experience.course.level}
+          </Link>
+          <span aria-hidden="true">/</span>
+          <span aria-current="page" className="text-ink-primary">
+            Học thử
+          </span>
+        </nav>
+
+        <header className="flex flex-col gap-4 border-b border-border-subtle pb-6 sm:flex-row sm:items-end sm:justify-between">
+          <div className="space-y-2">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-action-primary">
+              Học thử miễn phí · Không cần đăng nhập
+            </p>
+            <h1 className="font-display text-2xl font-extrabold tracking-tight sm:text-3xl">
+              {experience.course.title}
+            </h1>
+            <p className="max-w-2xl text-sm leading-6 text-ink-secondary">
+              {experience.manifest.notice}
+            </p>
+          </div>
+          <Link
+            to={`/courses/${experience.course.slug}`}
+            className="inline-flex min-h-11 shrink-0 items-center gap-2 font-semibold text-action-primary underline-offset-4 hover:underline"
+          >
+            <ArrowLeft aria-hidden="true" className="size-4" />
+            Thông tin khóa học
+          </Link>
+        </header>
+
+        <div className="lg:hidden">
+          <label
+            htmlFor="preview-chapter-select"
+            className="mb-2 block text-sm font-semibold text-ink-primary"
+          >
+            Chọn chương học thử
+          </label>
+          <select
+            id="preview-chapter-select"
+            value={
+              sections.some((section) => section.id === activeSection?.id) ? activeSection?.id : ''
+            }
+            onChange={(event) => selectSection(event.currentTarget.value)}
+            className="min-h-12 w-full rounded-control border border-border-strong bg-card-surface px-3 text-ink-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-focus"
+          >
+            <option value="">Chọn một trong ba chương miễn phí</option>
+            {sections.map((section, index) => (
+              <option
+                key={section.id}
+                value={section.id}
+              >{`${index + 1}. ${section.title}`}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="grid min-w-0 gap-6 lg:grid-cols-[17rem_minmax(0,1fr)] lg:gap-8">
+          <aside className="hidden min-w-0 lg:block">
+            <div className="sticky top-28 rounded-2xl border border-border-subtle bg-card-surface p-4">
+              <h2 className="px-2 pb-3 font-display text-base font-bold">Chương học thử</h2>
+              <nav aria-label="Chương học thử" className="grid gap-1">
+                {sections.map((section, index) => (
+                  <Link
+                    key={section.id}
+                    to={previewHref(experience.course.slug, section.id, section.lessons[0]?.id)}
+                    aria-current={activeSection?.id === section.id ? 'page' : undefined}
+                    className={`flex min-h-11 items-start gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors hover:bg-surface-muted ${activeSection?.id === section.id ? 'bg-surface-blue font-semibold text-pastel-blue-ink' : 'text-ink-secondary'}`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-card-surface text-xs font-bold text-action-primary"
+                    >
+                      {index + 1}
+                    </span>
+                    <span className="min-w-0 leading-5">{section.title}</span>
+                  </Link>
+                ))}
+              </nav>
+            </div>
+          </aside>
+
+          <div className="min-w-0 space-y-6">
+            {activeSection && sections.some((section) => section.id === activeSection.id) && (
+              <section
+                aria-labelledby="preview-lessons-heading"
+                className="rounded-2xl border border-border-subtle bg-card-surface p-4 sm:p-5"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.12em] text-action-primary">
+                      Chương học thử
+                    </p>
+                    <h2
+                      id="preview-lessons-heading"
+                      className="mt-1 font-display text-lg font-bold"
+                    >
+                      {activeSection.title}
+                    </h2>
+                  </div>
+                  <Badge tone="preview">Miễn phí</Badge>
+                </div>
+                <nav aria-label="Bài học trong chương" className="mt-4 grid gap-2 sm:grid-cols-2">
+                  {activeSection.lessons.map((lesson) => (
+                    <Link
+                      key={lesson.id}
+                      to={previewHref(experience.course.slug, activeSection.id, lesson.id)}
+                      aria-current={currentLessonId === lesson.id ? 'page' : undefined}
+                      className={`flex min-h-12 items-center justify-between gap-3 rounded-xl border px-3 py-2 text-sm transition-colors hover:border-action-primary/50 hover:bg-surface-muted ${currentLessonId === lesson.id ? 'border-action-primary/40 bg-surface-blue font-semibold text-pastel-blue-ink' : 'border-border-subtle text-ink-secondary'}`}
+                    >
+                      <span className="min-w-0">{lesson.title}</span>
+                      <span className="shrink-0 text-xs text-ink-secondary">
+                        {lesson.estimatedMinutes
+                          ? `${lesson.estimatedMinutes} phút`
+                          : lesson.lessonType}
+                      </span>
+                    </Link>
+                  ))}
+                </nav>
+              </section>
+            )}
+
+            {experience.kind === 'available' ? (
+              <article className="min-w-0 space-y-6 rounded-2xl border border-border-subtle bg-card-surface p-5 sm:p-8">
+                <div className="space-y-2">
+                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-action-primary">
+                    Bài học mẫu
+                  </p>
+                  <h2 className="font-display text-2xl font-bold tracking-tight">
+                    {experience.lesson.title}
+                  </h2>
+                </div>
+                <div className="space-y-4 leading-7 text-ink-secondary">
+                  {experience.content.paragraphs.map((paragraph) => (
+                    <p key={paragraph}>{paragraph}</p>
+                  ))}
+                </div>
+                {experience.content.keyPhrases.length > 0 && (
+                  <section
+                    aria-labelledby="preview-phrases-heading"
+                    className="rounded-2xl bg-surface-lime p-4 sm:p-5"
+                  >
+                    <h3 id="preview-phrases-heading" className="font-display font-bold">
+                      Cụm từ trong bài
+                    </h3>
+                    <dl className="mt-3 divide-y divide-ink-primary/10">
+                      {experience.content.keyPhrases.map((phrase) => (
+                        <div
+                          key={phrase.german}
+                          className="grid gap-1 py-3 sm:grid-cols-2 sm:gap-4"
+                        >
+                          <dt lang="de" className="font-semibold text-ink-primary">
+                            {phrase.german}
+                          </dt>
+                          <dd className="text-sm text-ink-secondary">{phrase.vietnamese}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </section>
+                )}
+                <section aria-label="Video bài học" className="space-y-3">
+                  {experience.content.media.length > 0 ? (
+                    experience.content.media.map((media) => (
+                      <VideoPlayer key={media.id} media={media} />
+                    ))
+                  ) : (
+                    <DomainState kind="empty" title="Video học thử đang được cập nhật" />
+                  )}
+                </section>
+                <p className="border-t border-border-subtle pt-4 text-xs leading-5 text-ink-muted">
+                  Nội dung minh họa cho giao diện demo; chưa phải phiên bản bài giảng chính thức.
+                </p>
+              </article>
+            ) : experience.kind === 'restricted-section' ? (
+              <div className="space-y-4">
+                <DomainState
+                  kind="empty"
+                  title="Chương này thuộc khóa học đầy đủ"
+                  message="Chỉ ba chương được đánh dấu học thử có thể mở miễn phí. Truy cập nội dung khác chưa được bật trong bản demo."
+                >
+                  <LockKeyhole aria-hidden="true" className="size-5 text-ink-muted" />
+                </DomainState>
+                <LinkButton to={`/courses/${experience.course.slug}`} variant="outline">
+                  Xem thông tin khóa học
+                </LinkButton>
+              </div>
+            ) : experience.kind === 'invalid-section' ? (
+              <div className="space-y-4">
+                <DomainState
+                  kind="error"
+                  title="Không tìm thấy chương học thử"
+                  message="Đường dẫn chương không hợp lệ. Hãy chọn một trong ba chương được mở miễn phí."
+                />
+                <LinkButton
+                  to={previewHref(
+                    experience.course.slug,
+                    sections[0]!.id,
+                    sections[0]!.lessons[0]?.id,
+                  )}
+                >
+                  Mở chương đầu tiên
+                </LinkButton>
+              </div>
+            ) : experience.kind === 'empty-section' ? (
+              <PreviewStateMessage
+                title="Chương này chưa có bài học"
+                message="Danh sách bài học đang được cập nhật."
+                courseSlug={experience.course.slug}
+              />
+            ) : experience.kind === 'lesson-not-found' ? (
+              <PreviewStateMessage
+                title="Không tìm thấy bài học"
+                message="Bài học này không thuộc chương đã chọn."
+                courseSlug={experience.course.slug}
+              />
+            ) : (
+              <PreviewStateMessage
+                title="Nội dung bài học đang được chuẩn bị"
+                message="Bài này nằm trong chương học thử nhưng nội dung chưa sẵn sàng. Bạn vẫn có thể chọn bài khác hoặc chuyển chương."
+                courseSlug={experience.course.slug}
+              />
+            )}
+
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border-subtle pt-4">
+              <Link
+                to={`/courses/${experience.course.slug}`}
+                className="inline-flex min-h-11 items-center gap-2 px-2 font-semibold text-ink-secondary hover:text-action-primary"
+              >
+                <ArrowLeft aria-hidden="true" className="size-4" />
+                Về thông tin khóa học
+              </Link>
+              <a
+                href="#main-content"
+                className="inline-flex min-h-11 items-center gap-2 px-2 text-sm font-semibold text-action-primary hover:underline"
+              >
+                Lên đầu trang <ArrowDown aria-hidden="true" className="size-4 rotate-180" />
+              </a>
+            </div>
+          </div>
+        </div>
+      </Container>
+    </SitePage>
+  )
+}
+
+export function PublicNotFoundPage() {
+  usePageTitle('Không tìm thấy trang')
+  return (
+    <SitePage>
+      <Container className="grid min-h-[60vh] place-items-center py-12">
+        <div className="max-w-xl space-y-5 text-center">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-action-primary">
+            404 · Trang không tồn tại
+          </p>
+          <h1 className="font-display text-3xl font-extrabold tracking-tight">
+            Không tìm thấy nội dung này
+          </h1>
+          <p className="leading-7 text-ink-secondary">
+            Đường dẫn có thể đã thay đổi hoặc không thuộc website khóa học.
+          </p>
+          <div className="flex flex-wrap justify-center gap-3">
+            <LinkButton to="/" startIcon={<ArrowLeft aria-hidden="true" />}>
+              Về trang chủ
+            </LinkButton>
+            <LinkButton to="/courses" variant="outline" endIcon={<ArrowRight aria-hidden="true" />}>
+              Xem khóa học
+            </LinkButton>
+          </div>
+        </div>
+      </Container>
+    </SitePage>
+  )
+}
