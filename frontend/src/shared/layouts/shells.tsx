@@ -146,12 +146,20 @@ export function PublicShell({
               </>
             ) : (
               showLogin && (
-                <Link
-                  to="/login"
-                  className="text-sm font-semibold text-ink-secondary underline-offset-4 hover:text-ink-primary hover:underline"
-                >
-                  Đăng nhập
-                </Link>
+                <>
+                  <Link
+                    to="/login"
+                    className="text-sm font-semibold text-ink-secondary underline-offset-4 hover:text-ink-primary hover:underline"
+                  >
+                    Đăng nhập
+                  </Link>
+                  <Link
+                    to="/register"
+                    className="text-sm font-semibold text-ink-secondary underline-offset-4 hover:text-ink-primary hover:underline"
+                  >
+                    Tạo tài khoản demo
+                  </Link>
+                </>
               )
             )}
             <LinkButton to={primaryAction.href} size="sm">
@@ -216,13 +224,22 @@ export function PublicShell({
               </>
             ) : (
               showLogin && (
-                <Link
-                  to="/login"
-                  onClick={() => setMenuOpen(false)}
-                  className="flex min-h-11 items-center px-3 font-semibold text-ink-secondary"
-                >
-                  Đăng nhập
-                </Link>
+                <>
+                  <Link
+                    to="/login"
+                    onClick={() => setMenuOpen(false)}
+                    className="flex min-h-11 items-center px-3 font-semibold text-ink-secondary"
+                  >
+                    Đăng nhập
+                  </Link>
+                  <Link
+                    to="/register"
+                    onClick={() => setMenuOpen(false)}
+                    className="flex min-h-11 items-center px-3 font-semibold text-ink-secondary"
+                  >
+                    Tạo tài khoản demo
+                  </Link>
+                </>
               )
             )}
             <LinkButton
@@ -343,13 +360,17 @@ export function CheckoutShell({
 type StudentNavItem = { label: string; id: string; icon: LucideIcon }
 type ProductStudentNavItem = {
   label: string
-  href: '/student' | '/student/courses'
+  href:
+    '/student' | '/student/courses' | '/student/progress' | '/student/orders' | '/student/profile'
   icon: LucideIcon
 }
 
 const productStudentItems: ProductStudentNavItem[] = [
   { label: 'Tổng quan', href: '/student', icon: LayoutDashboard },
   { label: 'Khóa học của tôi', href: '/student/courses', icon: GraduationCap },
+  { label: 'Tiến độ', href: '/student/progress', icon: ClipboardList },
+  { label: 'Đơn hàng', href: '/student/orders', icon: ShoppingBag },
+  { label: 'Tài khoản', href: '/student/profile', icon: UserRound },
 ]
 
 const studentItems: StudentNavItem[] = [
@@ -421,7 +442,10 @@ export function StudentShell({
             }
           />
         </header>
-        <aside className="sticky top-0 hidden h-screen flex-col border-r border-border-subtle bg-card-surface lg:flex">
+        <aside
+          aria-label="Điều hướng học viên chính"
+          className="sticky top-0 hidden h-screen flex-col border-r border-border-subtle bg-card-surface lg:flex"
+        >
           <div className="flex h-[4.75rem] items-center border-b border-border-subtle px-5">
             <BrandMark
               compact
@@ -449,7 +473,7 @@ export function StudentShell({
               </p>
               <p className="mt-1 text-xs leading-5 text-ink-secondary">
                 {productMode
-                  ? 'Bài học đầy đủ và thanh toán chưa được triển khai.'
+                  ? 'Nội dung và giao dịch trong khu vực này được mô phỏng.'
                   : 'Một lối đi gọn cho bài học, ghi chú và tiến độ.'}
               </p>
             </div>
@@ -481,7 +505,17 @@ export function StudentShell({
                 items={[
                   { label: 'Bảng điều khiển', onSelect: () => navigate('/student') },
                   { label: 'Khóa học của tôi', onSelect: () => navigate('/student/courses') },
-                  { label: 'Đăng xuất', onSelect: () => void onLogout?.(), destructive: true },
+                  { label: 'Đơn hàng', onSelect: () => navigate('/student/orders') },
+                  { label: 'Tài khoản', onSelect: () => navigate('/student/profile') },
+                  { label: 'Trợ giúp', onSelect: () => navigate('/help') },
+                  {
+                    label: 'Đăng xuất',
+                    onSelect: () =>
+                      void Promise.resolve(onLogout?.()).then(() =>
+                        navigate(`/login?returnTo=${encodeURIComponent(currentRoute)}`),
+                      ),
+                    destructive: true,
+                  },
                 ]}
               />
             ) : (
@@ -558,7 +592,10 @@ function ProductStudentNavigation({
     <nav aria-label="Khu vực học viên" className={cn('grid gap-1', className)}>
       {productStudentItems.map((item) => {
         const Icon = item.icon
-        const active = activeHref === item.href
+        const active =
+          activeHref === item.href ||
+          (item.href === '/student/orders' && activeHref.startsWith('/student/orders/')) ||
+          (item.href === '/student/profile' && activeHref.startsWith('/student/security/'))
         return (
           <Link
             key={item.href}

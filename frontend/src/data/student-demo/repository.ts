@@ -1,5 +1,6 @@
 import type { StudentProfileViewModel } from '@/domains/account/models'
-import { DEMO_ACCOUNTS, DEMO_COURSE_BY_PERSONA, DEMO_NOW } from './fixtures'
+import { DEMO_ACCOUNTS } from './fixtures'
+import { createStudentProductRepositories, getPersistedDemoProfile } from './product-repository'
 import {
   DemoRepositoryError,
   type DemoPersona,
@@ -9,6 +10,7 @@ import {
 
 const SESSION_STORAGE_KEY = 'deutsch-a11.demo-session-user'
 const DEMO_RESET_TOKEN = 'demo-reset-token-v1'
+const DEFAULT_DEMO_PASSWORD = 'DemoPass123!'
 
 type DevFailureMode =
   'invalid' | 'forbidden' | 'conflict' | 'unprocessable' | 'rate-limit' | 'network' | 'service'
@@ -134,6 +136,28 @@ export function createStudentDemoRepositories(
     return activeSession
   }
 
+  const productRepositories = createStudentProductRepositories({
+    sessionForId,
+    ...(storage ? { storage } : {}),
+    ...(options.now ? { now: options.now } : {}),
+    latencyMs,
+    ...(options.devScenarios !== undefined ? { devScenarios: options.devScenarios } : {}),
+    onProfileUpdated(userId, profile) {
+      const record = accountByEmail.get(normalizeEmail(profile.email))
+      if (record?.userId === userId) record.profile = structuredClone(profile)
+      if (activeSession?.userId === userId) activeSession.profile = structuredClone(profile)
+    },
+    getPassword(email) {
+      return passwords.get(normalizeEmail(email)) ?? DEFAULT_DEMO_PASSWORD
+    },
+    setPassword(email, password) {
+      passwords.set(normalizeEmail(email), password)
+    },
+    revokeSession(sessionId) {
+      revokedSessionIds.add(sessionId)
+    },
+  })
+
   if (import.meta.env.DEV && options.devScenarios && typeof window !== 'undefined') {
     window.addEventListener('student-demo:scenario', (event) => {
       const detail = (
@@ -165,7 +189,14 @@ export function createStudentDemoRepositories(
         await wait()
         const userId = readStoredUserId(storage)
         if (!userId) return null
-        const record = [...accountByPersona.values()].find((item) => item.userId === userId)
+        let record = [...accountByEmail.values()].find((item) => item.userId === userId)
+        if (!record) {
+          const profile = getPersistedDemoProfile(storage, userId)
+          if (profile) {
+            record = { userId, profile, persona: 'registered-account' }
+            accountByEmail.set(normalizeEmail(profile.email), record)
+          }
+        }
         if (!record) {
           persistUserId(null)
           return null
@@ -188,7 +219,7 @@ export function createStudentDemoRepositories(
         takeFailure('login')
         const normalized = normalizeEmail(email)
         const record = accountByEmail.get(normalized)
-        const knownPassword = passwords.get(normalized)
+        const knownPassword = passwords.get(normalized) ?? DEFAULT_DEMO_PASSWORD
         if (!record || !knownPassword || knownPassword !== password) {
           throw new DemoRepositoryError({ status: 401, message: 'Demo credentials did not match' })
         }
@@ -255,32 +286,7 @@ export function createStudentDemoRepositories(
         persistUserId(null)
       },
     },
-    student: {
-      async getDashboard(sessionId) {
-        await wait()
-        takeFailure('student')
-        const session = sessionForId(sessionId)
-        const courses =
-          session.persona === 'registered-account' ? [] : DEMO_COURSE_BY_PERSONA[session.persona]
-        const expired = courses.map((course) => {
-          if (course.enrollment.status !== 'ACTIVE') return course
-          const isExpired =
-            new Date(course.enrollment.expiresAt).getTime() <=
-            new Date(options.now ?? DEMO_NOW).getTime()
-          return isExpired
-            ? {
-                ...course,
-                enrollment: { ...course.enrollment, accessState: 'expired-display' as const },
-              }
-            : course
-        })
-        return { profile: structuredClone(session.profile), courses: structuredClone(expired) }
-      },
-      async listCourses(sessionId) {
-        const dashboard = await repositories.student.getDashboard(sessionId)
-        return dashboard.courses
-      },
-    },
+    ...productRepositories,
   }
 
   return repositories

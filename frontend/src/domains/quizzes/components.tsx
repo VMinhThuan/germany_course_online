@@ -1,6 +1,7 @@
 import { Check, ChevronLeft, ChevronRight, RotateCcw, Send } from 'lucide-react'
 import { useState } from 'react'
-import { Button, Card, InlineAlert, Progress } from '@/shared/ui'
+import { Button, Card, ConfirmDialog, InlineAlert, Progress } from '@/shared/ui'
+import type { DialogRequest } from '@/shared/ui'
 import { DomainState } from '@/domains/shared/presentation'
 import type {
   QuizAttemptViewModel,
@@ -165,6 +166,7 @@ export function QuizRunner({
   onAnswer,
   onSubmit,
   onRetry,
+  confirmBeforeSubmit = false,
 }: {
   attempt: QuizAttemptViewModel
   currentQuestionIndex: number
@@ -172,10 +174,12 @@ export function QuizRunner({
   onAnswer: (questionId: string, optionId: string) => void
   onSubmit: () => Promise<QuizResultViewModel>
   onRetry?: () => void
+  confirmBeforeSubmit?: boolean
 }) {
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string>()
   const [result, setResult] = useState<QuizResultViewModel>()
+  const [confirmOpen, setConfirmOpen] = useState(false)
   const currentIndex = Math.max(0, Math.min(currentQuestionIndex, attempt.questions.length - 1))
   const question = attempt.questions[currentIndex]
   const selectedOptionId = question ? attempt.selectedAnswers[question.id] : undefined
@@ -198,56 +202,71 @@ export function QuizRunner({
       setPending(false)
     }
   }
+  const confirmation: DialogRequest = {
+    kind: 'confirm',
+    title: 'Nộp bài kiểm tra?',
+    description: 'Sau khi nộp, lượt làm này sẽ được lưu và kết quả do repository demo trả về.',
+    confirmLabel: 'Nộp bài',
+    onConfirm: submit,
+  }
   if (result) return <QuizResult result={result} {...(onRetry ? { onRetry } : {})} />
   return (
-    <Card className="mx-auto grid w-full max-w-3xl gap-5 p-5 sm:p-7">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="font-semibold">
-          Câu {currentIndex + 1} / {attempt.questions.length}
-        </p>
-        <QuizProgress answered={answeredCount} total={attempt.questions.length} />
-      </div>
-      <QuizQuestionNavigator
-        questions={attempt.questions}
-        selectedAnswers={attempt.selectedAnswers}
-        {...(question ? { currentId: question.id } : {})}
-        onNavigate={(id) => onNavigate(attempt.questions.findIndex((item) => item.id === id))}
-      />
-      {question && (
-        <QuizQuestion
-          question={question}
-          {...(selectedOptionId ? { selectedOptionId } : {})}
-          onSelect={onAnswer}
-          disabled={pending || attempt.status === 'SUBMITTED'}
+    <>
+      <Card className="mx-auto grid w-full max-w-3xl gap-5 p-5 sm:p-7">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="font-semibold">
+            Câu {currentIndex + 1} / {attempt.questions.length}
+          </p>
+          <QuizProgress answered={answeredCount} total={attempt.questions.length} />
+        </div>
+        <QuizQuestionNavigator
+          questions={attempt.questions}
+          selectedAnswers={attempt.selectedAnswers}
+          {...(question ? { currentId: question.id } : {})}
+          onNavigate={(id) => onNavigate(attempt.questions.findIndex((item) => item.id === id))}
         />
+        {question && (
+          <QuizQuestion
+            question={question}
+            {...(selectedOptionId ? { selectedOptionId } : {})}
+            onSelect={onAnswer}
+            disabled={pending || attempt.status === 'SUBMITTED'}
+          />
+        )}
+        <div className="flex justify-between gap-3">
+          <Button
+            variant="outline"
+            disabled={currentIndex === 0}
+            onClick={() => onNavigate(currentIndex - 1)}
+            startIcon={<ChevronLeft aria-hidden="true" />}
+          >
+            Câu trước
+          </Button>
+          <Button
+            variant="outline"
+            disabled={currentIndex >= attempt.questions.length - 1}
+            onClick={() => onNavigate(currentIndex + 1)}
+            endIcon={<ChevronRight aria-hidden="true" />}
+          >
+            Câu tiếp
+          </Button>
+        </div>
+        {error && (
+          <InlineAlert tone="danger" title={error}>
+            Kiểm tra kết nối rồi thử lại.
+          </InlineAlert>
+        )}
+        {attempt.capabilities.canSubmit && attempt.status === 'IN_PROGRESS' && (
+          <QuizSubmissionPanel
+            loading={pending}
+            onSubmit={() => (confirmBeforeSubmit ? setConfirmOpen(true) : void submit())}
+          />
+        )}
+      </Card>
+      {confirmBeforeSubmit && (
+        <ConfirmDialog open={confirmOpen} request={confirmation} onOpenChange={setConfirmOpen} />
       )}
-      <div className="flex justify-between gap-3">
-        <Button
-          variant="outline"
-          disabled={currentIndex === 0}
-          onClick={() => onNavigate(currentIndex - 1)}
-          startIcon={<ChevronLeft aria-hidden="true" />}
-        >
-          Câu trước
-        </Button>
-        <Button
-          variant="outline"
-          disabled={currentIndex >= attempt.questions.length - 1}
-          onClick={() => onNavigate(currentIndex + 1)}
-          endIcon={<ChevronRight aria-hidden="true" />}
-        >
-          Câu tiếp
-        </Button>
-      </div>
-      {error && (
-        <InlineAlert tone="danger" title={error}>
-          Kiểm tra kết nối rồi thử lại.
-        </InlineAlert>
-      )}
-      {attempt.capabilities.canSubmit && attempt.status === 'IN_PROGRESS' && (
-        <QuizSubmissionPanel loading={pending} onSubmit={() => void submit()} />
-      )}
-    </Card>
+    </>
   )
 }
 

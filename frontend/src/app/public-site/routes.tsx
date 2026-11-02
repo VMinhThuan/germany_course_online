@@ -5,6 +5,7 @@ import {
   CourseDetailPage,
   FreePreviewPage,
   PublicLandingPage,
+  PublicHelpPage,
   PublicNotFoundPage,
 } from './pages'
 import { authRoutes, studentRoutes } from '@/app/auth/routes'
@@ -14,6 +15,7 @@ export const publicSiteRoutes: RouteObject[] = [
   { path: '/courses', element: <CourseCatalogPage /> },
   { path: '/courses/:slug', element: <CourseDetailPage /> },
   { path: '/courses/:slug/preview', element: <FreePreviewPage /> },
+  { path: '/help', element: <PublicHelpPage /> },
 ]
 
 export const publicNotFoundRoute: RouteObject = { path: '*', element: <PublicNotFoundPage /> }

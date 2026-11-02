@@ -17,7 +17,6 @@ import {
 import type { CourseAccessViewModel } from '@/domains/catalog/models'
 import {
   Badge,
-  Button,
   Card,
   CardContent,
   CardHeader,
@@ -73,7 +72,7 @@ function getAccessView(record: StudentCourseRecord): CourseAccessViewModel {
   return { kind: 'available', label: 'Đang hoạt động · dữ liệu demo' }
 }
 
-function ProductStudentLayout({ children }: { children: ReactNode }) {
+export function ProductStudentLayout({ children }: { children: ReactNode }) {
   const { session, logout } = useAuthSession()
   return (
     <StudentShell
@@ -153,9 +152,22 @@ export function StudentDashboardPage() {
                     />
                     <ContinueLearningCard
                       courseTitle="Tiếng Đức A1.1"
-                      lessonTitle="Mở chương học thử · Guten Tag!"
-                      lastAccessedLabel="Bài học đầy đủ chưa được triển khai."
-                      href={`/courses/${firstRecord.courseSlug}/preview`}
+                      lessonTitle={
+                        getAccessView(firstRecord).kind === 'available'
+                          ? 'Tiếp tục bài học gần nhất'
+                          : 'Mở chương học thử · Guten Tag!'
+                      }
+                      lastAccessedLabel={
+                        getAccessView(firstRecord).kind === 'available'
+                          ? 'Bài học và tiến độ được đồng bộ trong demo.'
+                          : 'Nội dung trả phí cần enrollment còn hạn.'
+                      }
+                      href={
+                        getAccessView(firstRecord).kind === 'available' &&
+                        firstRecord.continueLessonId
+                          ? `/learn/lessons/${firstRecord.continueLessonId}`
+                          : `/courses/${firstRecord.courseSlug}/preview`
+                      }
                     />
                     <InlineAccessNote record={firstRecord} />
                   </section>
@@ -274,12 +286,12 @@ function InlineAccessNote({ record }: { record: StudentCourseRecord }) {
       <Card className="border-warning-foreground/20 bg-warning-surface/40">
         <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
           <p className="text-sm leading-6 text-ink-secondary">
-            Hạn truy cập mẫu: {formatDateTimeInTimezone(record.enrollment.expiresAt)}. Gia hạn chưa
-            được triển khai.
+            Hạn truy cập mẫu: {formatDateTimeInTimezone(record.enrollment.expiresAt)}. Giá và thời
+            hạn gia hạn chỉ là giả định demo.
           </p>
-          <Button variant="outline" disabled>
-            Gia hạn chưa khả dụng
-          </Button>
+          <LinkButton to={`/student/courses/${record.courseId}/renew`} variant="outline">
+            Xem gói gia hạn demo
+          </LinkButton>
         </CardContent>
       </Card>
     )
@@ -296,8 +308,7 @@ function InlineAccessNote({ record }: { record: StudentCourseRecord }) {
   return (
     <Card className="border-info-foreground/15 bg-info-surface/50">
       <CardContent className="p-4 text-sm leading-6 text-ink-secondary">
-        Quyền học đầy đủ chưa có route trong phase này. Tiến độ bên dưới chỉ là dữ liệu mẫu từ
-        repository.
+        Quyền học và tiến độ demo được lấy từ cùng repository. Video/audio chưa được nối nguồn phát.
       </CardContent>
     </Card>
   )
@@ -370,6 +381,11 @@ export function StudentCoursesPage() {
                   href={`/courses/${record.courseSlug}`}
                 />
                 <div className="grid content-start gap-4">
+                  {record.enrollment.accessState === 'available' && (
+                    <LinkButton to={`/learn/courses/${record.courseId}`}>
+                      Vào không gian học
+                    </LinkButton>
+                  )}
                   <AccessStatePanel access={getAccessView(record)} />
                   <EnrollmentStatusCard enrollment={record.enrollment} />
                   {record.progress ? (

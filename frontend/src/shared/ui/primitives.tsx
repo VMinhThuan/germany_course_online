@@ -314,23 +314,27 @@ export function AccordionItem({
 export function AccordionTrigger({
   className,
   children,
+  headingLevel = 3,
   ...props
-}: ComponentProps<typeof AccordionPrimitive.Trigger>) {
+}: ComponentProps<typeof AccordionPrimitive.Trigger> & { headingLevel?: 2 | 3 | 4 | 5 | 6 }) {
+  const HeadingTag = `h${headingLevel}` as `h${2 | 3 | 4 | 5 | 6}`
   return (
-    <AccordionPrimitive.Header className="flex">
-      <AccordionPrimitive.Trigger
-        {...props}
-        className={cn(
-          'group flex min-h-12 flex-1 items-center justify-between gap-4 py-3 text-left font-semibold text-ink-primary focus-visible:outline-offset-2',
-          className,
-        )}
-      >
-        {children}
-        <ChevronDown
-          aria-hidden="true"
-          className="size-4 shrink-0 text-ink-secondary transition-transform group-data-[state=open]:rotate-180 motion-reduce:transition-none"
-        />
-      </AccordionPrimitive.Trigger>
+    <AccordionPrimitive.Header asChild>
+      <HeadingTag className="flex">
+        <AccordionPrimitive.Trigger
+          {...props}
+          className={cn(
+            'group flex min-h-12 flex-1 items-center justify-between gap-4 py-3 text-left font-semibold text-ink-primary focus-visible:outline-offset-2',
+            className,
+          )}
+        >
+          {children}
+          <ChevronDown
+            aria-hidden="true"
+            className="size-4 shrink-0 text-ink-secondary transition-transform group-data-[state=open]:rotate-180 motion-reduce:transition-none"
+          />
+        </AccordionPrimitive.Trigger>
+      </HeadingTag>
     </AccordionPrimitive.Header>
   )
 }

@@ -3,6 +3,10 @@ import { ArrowDown, ArrowLeft, ArrowRight, BookOpenText, LockKeyhole } from 'luc
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import {
   Badge,
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
   Button,
   Card,
   CardContent,
@@ -39,9 +43,10 @@ const courseSlug = 'tieng-duc-a1-1'
 
 const publicShellProps = {
   navItems: [
+    { label: 'Trang chủ', href: '/' },
     { label: 'Khóa học', href: '/courses' },
-    { label: 'Cách học', href: '/#learning-experience' },
     { label: 'Học thử', href: `/courses/${courseSlug}/preview` },
+    { label: 'Trợ giúp', href: '/help' },
   ],
   brandHref: '/',
   brandSubtitle: 'Khóa học tiếng Đức trực tuyến',
@@ -49,7 +54,7 @@ const publicShellProps = {
   showPreviewNotice: true,
   showLogin: true,
   primaryAction: { label: 'Xem khóa học', href: '/courses' },
-  footerLink: { label: 'Câu hỏi thường gặp', href: '/#faq' },
+  footerLink: { label: 'Câu hỏi thường gặp', href: '/help' },
   menuDescription: 'Khám phá khóa học A1.1 và nội dung học thử',
 } as const
 
@@ -363,6 +368,7 @@ export function CourseDetailPage() {
   const { slug = '' } = useParams()
   const navigate = useNavigate()
   const dialogs = useDialogs()
+  const { session } = useAuthSession()
   const courseQuery = usePublicCourse(slug)
   const manifestQuery = usePublicPreviewManifest(slug)
   usePageTitle(courseQuery.data?.title ?? 'Chi tiết khóa học')
@@ -398,6 +404,9 @@ export function CourseDetailPage() {
   const previewSections = manifest ? getPreviewSections(course, manifest) : null
   const previewSectionIds = previewSections?.map((section) => section.id) ?? []
   const detailPreviewHref = `/courses/${course.slug}/preview`
+  const checkoutHref = `/checkout/purchase-course-a11-demo`
+  const openDemoCheckout = () =>
+    navigate(session ? checkoutHref : `/login?returnTo=${encodeURIComponent(checkoutHref)}`)
   const showUnavailablePurchase = () =>
     dialogs.info(
       'Đăng ký khóa học chưa mở',
@@ -431,8 +440,8 @@ export function CourseDetailPage() {
             label: 'Học thử miễn phí',
             onClick: () => navigate(detailPreviewHref),
           }}
-          secondaryAction={{ label: 'Thông tin mua khóa học', onClick: showUnavailablePurchase }}
-          accessNote="Học phí và thời hạn truy cập chưa được công bố."
+          secondaryAction={{ label: 'Thử quy trình mua demo', onClick: openDemoCheckout }}
+          accessNote="Giá và thời hạn checkout chỉ là giả định demo."
         />
 
         <div className="grid gap-12 lg:grid-cols-[minmax(0,1.2fr)_minmax(17rem,0.8fr)] lg:items-start">
@@ -485,10 +494,10 @@ export function CourseDetailPage() {
                 đủ và cần quyền truy cập.
               </p>
               <p className="mt-3 text-sm leading-6 text-ink-muted">
-                Đăng ký, học phí và thời hạn truy cập chưa sẵn sàng trong bản demo.
+                Giá và thời hạn trong checkout là giả định; đây không phải giao dịch thật.
               </p>
-              <Button className="mt-5 w-full" variant="outline" onClick={showUnavailablePurchase}>
-                Tìm hiểu khi mở đăng ký
+              <Button className="mt-5 w-full" variant="outline" onClick={openDemoCheckout}>
+                Thử checkout demo
               </Button>
             </Card>
             <Card className="bg-surface-blue p-5">
@@ -501,6 +510,13 @@ export function CourseDetailPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 border-t border-border-subtle pt-6">
+          <LinkButton
+            to={checkoutHref}
+            variant="outline"
+            endIcon={<ArrowRight aria-hidden="true" />}
+          >
+            Thử quy trình mua demo
+          </LinkButton>
           <LinkButton to={detailPreviewHref} endIcon={<ArrowRight aria-hidden="true" />}>
             Mở ba chương học thử
           </LinkButton>
@@ -919,6 +935,98 @@ export function PublicNotFoundPage() {
               Xem khóa học
             </LinkButton>
           </div>
+        </div>
+      </Container>
+    </SitePage>
+  )
+}
+
+export function PublicHelpPage() {
+  usePageTitle('Trợ giúp và câu hỏi thường gặp')
+  return (
+    <SitePage>
+      <Container className="grid gap-8 py-8 sm:py-12">
+        <header className="max-w-3xl space-y-3">
+          <Badge tone="info">Hỗ trợ sử dụng bản demo</Badge>
+          <h1 className="font-display text-3xl font-extrabold tracking-tight sm:text-4xl">
+            Trợ giúp & câu hỏi thường gặp
+          </h1>
+          <p className="text-base leading-7 text-ink-secondary">
+            Hướng dẫn điều hướng website, phần học thử, tài khoản và các giới hạn của mô phỏng hiện
+            tại.
+          </p>
+        </header>
+        <Accordion type="single" collapsible className="grid gap-3">
+          <AccordionItem
+            value="navigation"
+            className="rounded-2xl border border-border-subtle bg-card-surface px-4"
+          >
+            <AccordionTrigger headingLevel={2}>Điều hướng website như thế nào?</AccordionTrigger>
+            <AccordionContent>
+              Mở Khóa học để xem mô tả và cấu trúc A1.1. Chọn Học thử để vào các bài được manifest
+              demo cho phép. Sau khi đăng nhập, thanh điều hướng học viên dẫn tới khóa học, tiến độ,
+              đơn hàng và tài khoản.
+            </AccordionContent>
+          </AccordionItem>
+          <AccordionItem
+            value="preview"
+            className="rounded-2xl border border-border-subtle bg-card-surface px-4"
+          >
+            <AccordionTrigger headingLevel={2}>Phần học thử có nội dung gì?</AccordionTrigger>
+            <AccordionContent>
+              Bản demo hiển thị những mục được đánh dấu trong preview manifest. Đây là dữ liệu trình
+              diễn của website; nội dung, chương trình và quyền học chính thức cần được xác nhận
+              riêng.
+            </AccordionContent>
+          </AccordionItem>
+          <AccordionItem
+            value="account"
+            className="rounded-2xl border border-border-subtle bg-card-surface px-4"
+          >
+            <AccordionTrigger headingLevel={2}>
+              Tôi có thể thử khu vực học viên bằng cách nào?
+            </AccordionTrigger>
+            <AccordionContent>
+              Tạo tài khoản demo bằng địa chỉ giả lập kết thúc bằng .test hoặc dùng một trong các
+              persona demo ở trang đăng nhập. Đây không phải tài khoản dịch vụ thật và mật khẩu demo
+              không được lưu trong browser storage.
+            </AccordionContent>
+          </AccordionItem>
+          <AccordionItem
+            value="payment"
+            className="rounded-2xl border border-border-subtle bg-card-surface px-4"
+          >
+            <AccordionTrigger headingLevel={2}>
+              Checkout và thanh toán có thu tiền không?
+            </AccordionTrigger>
+            <AccordionContent>
+              Không. Giá và thời hạn trong checkout được ghi rõ là giả định demo. Cổng thanh toán
+              demo chỉ tạo kết quả mô phỏng để thử trạng thái đơn và quyền học; không nhập thông tin
+              thẻ hoặc chuyển tiền.
+            </AccordionContent>
+          </AccordionItem>
+          <AccordionItem
+            value="media"
+            className="rounded-2xl border border-border-subtle bg-card-surface px-4"
+          >
+            <AccordionTrigger headingLevel={2}>
+              Vì sao video hoặc audio chưa phát được?
+            </AccordionTrigger>
+            <AccordionContent>
+              Media chưa có nguồn được cấp quyền sẽ hiển thị trạng thái chưa sẵn sàng. Một số PDF
+              mẫu nội bộ được dùng để kiểm tra bố cục; không có nội dung private hoặc tài sản được
+              sao chép từ bên thứ ba.
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+        <div className="flex flex-wrap gap-3">
+          <LinkButton to="/courses" variant="outline">
+            Xem khóa học
+          </LinkButton>
+          <LinkButton to={`/courses/${courseSlug}/preview`}>Mở phần học thử</LinkButton>
+          <LinkButton to="/login" variant="outline">
+            Đăng nhập demo
+          </LinkButton>
         </div>
       </Container>
     </SitePage>

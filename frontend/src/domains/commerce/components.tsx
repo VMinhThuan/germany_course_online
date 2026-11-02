@@ -6,7 +6,6 @@ import {
   Card,
   CardContent,
   CardHeader,
-  CardTitle,
   FormField,
   InlineAlert,
   TextInput,
@@ -141,9 +140,11 @@ export function RenewalPlanCard({
 export function CouponField({
   onValidate,
   onResult,
+  onCodeChange,
 }: {
   onValidate: (code: string) => Promise<CouponValidationViewModel>
   onResult?: (result: CouponValidationViewModel) => void
+  onCodeChange?: (code: string) => void
 }) {
   const fieldId = `coupon-code-${useId().replaceAll(':', '')}`
   const [code, setCode] = useState('')
@@ -175,6 +176,7 @@ export function CouponField({
               onChange={(event) => {
                 setCode(event.target.value)
                 setResult(undefined)
+                onCodeChange?.(event.target.value)
               }}
               autoComplete="off"
               aria-invalid={invalid || undefined}
@@ -226,7 +228,7 @@ export function OrderSummary({ order }: { order: OrderSummaryViewModel }) {
     <Card className="grid gap-4 p-5">
       <CardHeader className="p-0">
         <p className="text-sm text-ink-secondary">Đơn hàng {order.orderCode}</p>
-        <CardTitle>{order.itemTitle}</CardTitle>
+        <h2 className="font-display text-lg font-semibold tracking-tight">{order.itemTitle}</h2>
       </CardHeader>
       <CardContent className="grid gap-3 p-0">
         <div className="flex flex-wrap items-center justify-between gap-3">

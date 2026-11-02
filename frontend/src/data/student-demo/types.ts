@@ -1,6 +1,7 @@
 import type { StudentProfileViewModel } from '@/domains/account/models'
 import type { EnrollmentSummaryViewModel } from '@/domains/enrollment/models'
 import type { CourseProgressViewModel } from '@/domains/progress/models'
+import type { StudentProductRepositories } from './product-types'
 
 export const demoPersonas = [
   'registered-without-enrollment',
@@ -32,6 +33,7 @@ export interface StudentCourseRecord {
   courseSlug: string
   enrollment: EnrollmentSummaryViewModel
   progress?: CourseProgressViewModel
+  continueLessonId?: string
 }
 
 export interface StudentDashboardViewModel {
@@ -65,7 +67,7 @@ export interface StudentRepository {
   listCourses(sessionId: string): Promise<readonly StudentCourseRecord[]>
 }
 
-export interface StudentDemoRepositories {
+export interface StudentDemoRepositories extends StudentProductRepositories {
   auth: AuthRepository
   student: StudentRepository
 }

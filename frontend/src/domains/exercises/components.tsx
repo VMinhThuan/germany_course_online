@@ -1,6 +1,6 @@
 import { CheckCircle2, FileQuestion, LockKeyhole } from 'lucide-react'
 import { useState } from 'react'
-import { Badge, Button, Card, CardHeader, CardTitle, InlineAlert } from '@/shared/ui'
+import { Badge, Button, Card, CardHeader, InlineAlert } from '@/shared/ui'
 import { MediaFallbackLink } from '@/domains/media/components'
 import type { ExerciseViewModel } from './models'
 import { SemanticHeading, type HeadingLevel } from '@/domains/shared/heading'
@@ -85,7 +85,7 @@ export function FileExercisePanel({
   return (
     <Card className="grid gap-5 p-5 sm:p-6">
       <CardHeader className="p-0">
-        <CardTitle>{exercise.title}</CardTitle>
+        <h2 className="font-display text-lg font-semibold tracking-tight">{exercise.title}</h2>
         <p className="text-sm leading-6 text-ink-secondary">{exercise.description}</p>
       </CardHeader>
       <ExerciseInstruction>{exercise.instructions}</ExerciseInstruction>

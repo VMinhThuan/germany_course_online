@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: /(foundation|lms-kit|public-site|auth-student)\.spec\.ts$/,
+  testMatch: /(foundation|lms-kit|public-site|auth-student|student-product)\.spec\.ts$/,
   outputDir: './test-results/development',
   timeout: 60_000,
   workers: 3,

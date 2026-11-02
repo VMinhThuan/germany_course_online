@@ -37,7 +37,7 @@ export const DEMO_ACCOUNTS: readonly DemoAccountOption[] = [
 ]
 
 export const DEMO_NOW = '2026-11-02T08:00:00.000Z'
-export const DEMO_COURSE_ID = 'public-demo-a11'
+export const DEMO_COURSE_ID = 'course-a11-demo'
 export const DEMO_COURSE_SLUG = 'tieng-duc-a1-1'
 
 const enrollment = (

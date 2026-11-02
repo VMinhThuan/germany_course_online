@@ -148,7 +148,9 @@ test('supports chapter and lesson URL state, reload, Back and Forward', async ({
   await expect(page.getByRole('heading', { name: 'Tên của tôi là …' })).toBeVisible()
 })
 
-test('keeps paid sections guarded and shows honest not-ready purchase dialog', async ({ page }) => {
+test('keeps paid sections guarded and sends the guest purchase CTA through demo login', async ({
+  page,
+}) => {
   await page.goto(`${preview}?sectionId=a11-chapter-04&lessonId=a11-lesson-06`)
   await expect(
     page.getByRole('status').filter({ hasText: 'Chương này thuộc khóa học đầy đủ' }),
@@ -158,15 +160,18 @@ test('keeps paid sections guarded and shows honest not-ready purchase dialog', a
   await capture(page, 'preview-paid-section-restricted.png')
 
   await page.goto(course)
-  const purchase = page.getByRole('button', { name: 'Thông tin mua khóa học' })
+  const purchase = page.getByRole('button', { name: 'Thử quy trình mua demo' })
   await purchase.focus()
   await page.keyboard.press('Enter')
-  const dialog = page.getByRole('dialog', { name: 'Đăng ký khóa học chưa mở' })
-  await expect(dialog).toBeVisible()
-  await expect(dialog).toContainText('chưa nhận đăng ký hoặc thanh toán')
-  await expect(page.getByRole('link', { name: /checkout|thanh toán/i })).toHaveCount(0)
-  await page.keyboard.press('Escape')
-  await expect(purchase).toBeFocused()
+  await expect(page).toHaveURL(/\/login\?returnTo=.*checkout/)
+  await page.getByRole('combobox', { name: 'Tài khoản demo' }).click()
+  await page.getByRole('option', { name: /Linh Nguyễn/ }).click()
+  await page.getByRole('button', { name: 'Tiếp tục với tài khoản demo' }).click()
+  await expect(page).toHaveURL('/checkout/purchase-course-a11-demo')
+  await expect(page.getByText('Giá và thời hạn này chỉ dùng để thử giao diện.')).toBeVisible()
+  await page.getByRole('button', { name: 'Tạo đơn demo · trạng thái chờ' }).click()
+  await expect(page).toHaveURL(/\/orders\/demo-order-.*\/pending/)
+  await expect(page.getByText(/Quyền truy cập khóa học chưa được cấp/)).toBeVisible()
 })
 
 test('restores the landing scroll position after browser Back and supports keyboard routes', async ({

@@ -22,7 +22,7 @@ interface AuthSessionContextValue {
   sessionEndReason: SessionEndReason | null
   acceptSession: (session: DemoSession) => void
   refreshSession: () => Promise<DemoSession | null>
-  logout: () => Promise<void>
+  logout: (reason?: SessionEndReason) => Promise<void>
 }
 
 const AuthSessionContext = createContext<AuthSessionContextValue | null>(null)
@@ -44,21 +44,25 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
 
   const acceptSession = useCallback(
     (nextSession: DemoSession) => {
-      queryClient.removeQueries({ predicate: (query) => query.queryKey[0] === 'student' })
+      if (session?.id !== nextSession.id)
+        queryClient.removeQueries({ predicate: (query) => query.queryKey[0] === 'student' })
       setSession(nextSession)
       setStatus('authenticated')
       setSessionEndReason(null)
     },
-    [queryClient],
+    [queryClient, session?.id],
   )
 
-  const logout = useCallback(async () => {
-    await studentDemoRepositories.auth.logout()
-    queryClient.removeQueries({ predicate: (query) => query.queryKey[0] === 'student' })
-    setSession(null)
-    setStatus('anonymous')
-    setSessionEndReason(null)
-  }, [queryClient])
+  const logout = useCallback(
+    async (reason?: SessionEndReason) => {
+      await studentDemoRepositories.auth.logout()
+      queryClient.removeQueries({ predicate: (query) => query.queryKey[0] === 'student' })
+      setSession(null)
+      setStatus('anonymous')
+      setSessionEndReason(reason ?? null)
+    },
+    [queryClient],
+  )
 
   useEffect(() => {
     let active = true

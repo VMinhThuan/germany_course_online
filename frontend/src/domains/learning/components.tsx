@@ -1,6 +1,6 @@
 import { BookOpenText, Check, ChevronLeft, ChevronRight, FileLock, Clock3 } from 'lucide-react'
 import type { PropsWithChildren } from 'react'
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Progress } from '@/shared/ui'
+import { Badge, Button, Card, CardContent, CardHeader, Progress } from '@/shared/ui'
 import type {
   CourseAccessViewModel,
   CourseSectionModel,
@@ -58,12 +58,14 @@ export function ChapterItem({
   section,
   currentLessonId,
   onSelectLesson,
+  onSelectSection,
   preview = false,
   headingLevel = 2,
 }: {
   section: CourseSectionModel
   currentLessonId?: string
   onSelectLesson?: (id: string) => void
+  onSelectSection?: (id: string) => void
   preview?: boolean
   headingLevel?: HeadingLevel
 }) {
@@ -80,6 +82,15 @@ export function ChapterItem({
         <BookOpenText aria-hidden="true" className="size-4 text-action-primary" />
         {section.title}
         {preview && <Badge tone="info">Học thử</Badge>}
+        {onSelectSection && (
+          <button
+            type="button"
+            className="ml-auto inline-flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold text-action-primary hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-action-focus"
+            onClick={() => onSelectSection(section.id)}
+          >
+            Mở chương
+          </button>
+        )}
       </SemanticHeading>
       <ul className="grid gap-1">
         {section.lessons.map((lesson) => (
@@ -100,11 +111,13 @@ export function CourseTree({
   tree,
   previewSectionIds = [],
   onSelectLesson,
+  onSelectSection,
   headingLevel = 2,
 }: {
   tree: CourseTreeViewModel
   previewSectionIds?: readonly string[]
   onSelectLesson?: (id: string) => void
+  onSelectSection?: (id: string) => void
   headingLevel?: HeadingLevel
 }) {
   if (tree.sections.length === 0)
@@ -122,6 +135,7 @@ export function CourseTree({
           section={section}
           {...(tree.currentLessonId ? { currentLessonId: tree.currentLessonId } : {})}
           {...(onSelectLesson ? { onSelectLesson } : {})}
+          {...(onSelectSection ? { onSelectSection } : {})}
           headingLevel={(headingLevel + 1) as HeadingLevel}
           preview={section.sectionType === 'CHAPTER' && previewSectionIds.includes(section.id)}
         />
@@ -294,11 +308,22 @@ export function LessonContent({
   )
 }
 
-export function LearningProgressSummary({ progress }: { progress: CourseProgressViewModel }) {
+export function LearningProgressSummary({
+  progress,
+  headingLevel = 3,
+}: {
+  progress: CourseProgressViewModel
+  headingLevel?: HeadingLevel
+}) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Tiến độ khóa học</CardTitle>
+        <SemanticHeading
+          level={headingLevel}
+          className="font-display text-lg font-semibold tracking-tight"
+        >
+          Tiến độ khóa học
+        </SemanticHeading>
       </CardHeader>
       <CardContent>
         <Progress
