@@ -99,7 +99,7 @@ export function PublicShell({
   const [menuOpen, setMenuOpen] = useState(false)
   const navigate = useNavigate()
   return (
-    <div className="min-h-screen bg-page-surface">
+    <div className="flex min-h-screen flex-col bg-page-surface">
       <SkipLink />
       <header className="sticky top-0 z-header border-b border-border-subtle/80 bg-card-surface/95 backdrop-blur-sm">
         {showPreviewNotice && <PreviewNotice text={previewNotice} />}
@@ -240,7 +240,7 @@ export function PublicShell({
           </div>
         </div>
       </Sheet>
-      <main id="main-content" tabIndex={-1} className={cn('outline-none', className)}>
+      <main id="main-content" tabIndex={-1} className={cn('flex-1 outline-none', className)}>
         {children}
       </main>
       {footerContent ?? (
