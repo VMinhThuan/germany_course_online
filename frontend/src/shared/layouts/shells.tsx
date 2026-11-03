@@ -43,18 +43,26 @@ type PublicNavItem = { label: string; href: string }
 function PublicMenu({
   items = publicItems,
   onNavigate,
+  desktop = false,
 }: {
   items?: readonly PublicNavItem[]
   onNavigate?: () => void
+  desktop?: boolean
 }) {
   return (
-    <nav aria-label="Điều hướng chính" className="grid gap-1 sm:flex sm:items-center sm:gap-5">
+    <nav
+      aria-label="Điều hướng chính"
+      className={cn('grid gap-1', desktop && 'flex items-center justify-center gap-7')}
+    >
       {items.map((item) => (
         <Link
           key={item.href}
           to={item.href}
           onClick={onNavigate}
-          className="flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold text-ink-secondary underline-offset-4 hover:bg-surface-muted hover:text-ink-primary hover:underline sm:min-h-10 sm:px-0 sm:hover:bg-transparent"
+          className={cn(
+            'flex min-h-11 items-center rounded-lg px-3 text-base font-semibold text-ink-secondary underline-offset-4 hover:bg-surface-muted hover:text-ink-primary hover:underline',
+            desktop && 'justify-center px-0 hover:bg-transparent',
+          )}
         >
           {item.label}
         </Link>
@@ -103,16 +111,20 @@ export function PublicShell({
       <SkipLink />
       <header className="sticky top-0 z-header border-b border-border-subtle/80 bg-card-surface/95 backdrop-blur-sm">
         {showPreviewNotice && <PreviewNotice text={previewNotice} />}
-        <Container className="flex h-[4.25rem] items-center justify-between gap-4">
+        <Container className="grid h-[4.25rem] grid-cols-[minmax(max-content,1fr)_auto_minmax(max-content,1fr)] items-center gap-4">
           <Link
             to={brandHref}
             aria-label={brandConfig.name}
-            className="inline-flex min-h-11 items-center rounded-lg font-display text-lg font-extrabold tracking-tight text-action-primary hover:text-action-primary-hover sm:text-xl"
+            className="inline-flex min-h-11 items-center justify-self-start rounded-lg font-display text-lg font-extrabold tracking-tight text-action-primary hover:text-action-primary-hover sm:text-xl"
           >
             {brandConfig.name}
           </Link>
-          <div className={`hidden items-center gap-7 ${wideNavigation ? 'lg:flex' : 'md:flex'}`}>
-            <PublicMenu items={navItems} />
+          <div className={`hidden justify-self-center ${wideNavigation ? 'xl:block' : 'lg:block'}`}>
+            <PublicMenu items={navItems} desktop />
+          </div>
+          <div
+            className={`hidden items-center justify-self-end gap-4 ${wideNavigation ? 'xl:flex' : 'lg:flex'}`}
+          >
             {authState ? (
               <>
                 <Link
@@ -157,7 +169,12 @@ export function PublicShell({
               {primaryAction.label}
             </LinkButton>
           </div>
-          <div className={wideNavigation ? 'lg:hidden' : 'md:hidden'}>
+          <div
+            className={cn(
+              'col-start-3 justify-self-end',
+              wideNavigation ? 'xl:hidden' : 'lg:hidden',
+            )}
+          >
             <IconButton
               label={menuOpen ? 'Đóng điều hướng chính' : 'Mở điều hướng chính'}
               icon={
