@@ -61,7 +61,7 @@ test.describe('public website responsive routes', () => {
   const routes = [
     {
       path: '/',
-      heading: 'Bắt đầu giao tiếp bằng tiếng Đức, từng bước một.',
+      heading: 'Nói tiếng Đức bắt đầu từ lời chào.',
       title: 'Học tiếng Đức A1.1 · Deutsch A1.1',
     },
     {
@@ -180,7 +180,9 @@ test('restores the landing scroll position after browser Back and supports keybo
   await page.goto('/')
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight - innerHeight))
   const savedScroll = await page.evaluate(() => window.scrollY)
-  const catalogLink = page.getByRole('link', { name: 'Xem khóa học' }).last()
+  const catalogLink = page
+    .getByRole('navigation', { name: 'Điều hướng cuối trang' })
+    .getByRole('link', { name: 'Khóa học', exact: true })
   await catalogLink.focus()
   await page.keyboard.press('Enter')
   await expect(page).toHaveURL(/\/courses$/)

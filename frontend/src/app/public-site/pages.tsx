@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { ArrowDown, ArrowLeft, ArrowRight, BookOpenText, LockKeyhole } from 'lucide-react'
+import { ArrowDown, ArrowLeft, ArrowRight, LockKeyhole } from 'lucide-react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import {
   Badge,
@@ -25,8 +25,6 @@ import {
   CourseObjectives,
   CourseOutline,
   CourseOverview,
-  LandingHero,
-  LearningBenefits,
 } from '@/domains/catalog'
 import { VideoPlayer } from '@/domains/media'
 import { DomainState } from '@/domains/shared/presentation'
@@ -38,6 +36,16 @@ import {
 } from '@/data/public-demo'
 import { getPreviewSections } from '@/data/public-demo/use-cases'
 import { useAuthSession } from '@/app/auth/auth-session'
+import {
+  FAQSection,
+  HeroSection,
+  LearningIntroSection,
+  PricingSection,
+  QuickEntrySection,
+  ValuePropositionSection,
+  homepageFooterLinks,
+} from '@/features/homepage'
+import '@/features/homepage/homepage.css'
 
 const courseSlug = 'tieng-duc-a1-1'
 
@@ -64,11 +72,19 @@ function usePageTitle(title: string) {
   }, [title])
 }
 
-function SitePage({ children }: { children: ReactNode }) {
+function SitePage({ children, homepage = false }: { children: ReactNode; homepage?: boolean }) {
   const { session, logout } = useAuthSession()
   return (
     <PublicShell
       {...publicShellProps}
+      {...(homepage
+        ? {
+            primaryAction: { label: 'Học thử miễn phí', href: `/courses/${courseSlug}/preview` },
+            footerNavItems: homepageFooterLinks,
+            footerCopyright: `© ${new Date().getFullYear()} · Bản demo Deutsch A1.1`,
+            wideNavigation: true,
+          }
+        : {})}
       {...(session
         ? {
             authState: {
@@ -100,165 +116,25 @@ function PageError({ title, retry }: { title: string; retry?: () => void }) {
 }
 
 export function PublicLandingPage() {
-  const navigate = useNavigate()
   const catalog = usePublicCourseCatalog()
   usePageTitle('Học tiếng Đức A1.1')
 
   return (
-    <SitePage>
-      <div className="space-y-16 pb-16 sm:space-y-20">
-        <Container className="pt-5 sm:pt-8">
-          <LandingHero
-            eyebrow="Khóa học tiếng Đức · A1.1"
-            title="Bắt đầu giao tiếp bằng tiếng Đức, từng bước một."
-            description="Khám phá cấu trúc khóa A1.1 và mở ba chương học thử miễn phí. Nội dung trên website hiện ở chế độ demo."
-            primaryAction={{ label: 'Xem khóa học', onClick: () => navigate('/courses') }}
-            secondaryAction={{
-              label: 'Mở bài học thử',
-              onClick: () => navigate(`/courses/${courseSlug}/preview`),
-            }}
-          />
-        </Container>
-
-        <Container>
-          <section id="course-highlight" className="scroll-mt-28 space-y-6">
-            <div className="max-w-2xl space-y-3">
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-action-primary">
-                Khóa học
-              </p>
-              <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
-                Một điểm bắt đầu rõ ràng
-              </h2>
-              <p className="leading-7 text-ink-secondary">
-                Hiện có khóa A1.1 trong bản demo. Học phí và thời hạn truy cập chưa được công bố.
-              </p>
-            </div>
-            {catalog.isError ? (
-              <PageError title="Không tải được khóa học" retry={() => void catalog.refetch()} />
-            ) : (
-              <div className="max-w-xl">
-                <CourseGrid courses={catalog.data ?? []} loading={catalog.isPending} singleColumn />
-              </div>
-            )}
-          </section>
-        </Container>
-
-        <Container>
-          <section id="learning-experience" className="scroll-mt-28 space-y-6">
-            <div className="max-w-2xl space-y-3">
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-action-primary">
-                Cách học
-              </p>
-              <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
-                Làm quen qua các tình huống gần gũi
-              </h2>
-              <p className="leading-7 text-ink-secondary">
-                Bản demo sắp xếp nội dung theo chương và bài. Các ví dụ hiện có giúp bạn hình dung
-                cách học; chương trình đầy đủ đang được hoàn thiện.
-              </p>
-            </div>
-            <LearningBenefits
-              benefits={[
-                {
-                  title: 'Theo từng chủ đề',
-                  description: 'Lời chào, giới thiệu tên và quê quán được nhóm thành các chương.',
-                },
-                {
-                  title: 'Bài học ngắn',
-                  description: 'Mỗi chương có danh sách bài để bạn chọn và xem nội dung mẫu.',
-                },
-                {
-                  title: 'Học thử không cần tài khoản',
-                  description: 'Mở ba chương được đánh dấu học thử ngay trên website.',
-                },
-              ]}
-            />
-          </section>
-        </Container>
-
-        <Container>
-          <section className="grid gap-6 rounded-3xl bg-surface-lime p-6 sm:p-9 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-            <div className="max-w-2xl space-y-3">
-              <Badge tone="preview">
-                <BookOpenText aria-hidden="true" className="size-3.5" />
-                Ba chương học thử miễn phí
-              </Badge>
-              <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
-                Thử một bài học trước khi quyết định
-              </h2>
-              <p className="leading-7 text-ink-secondary">
-                Mở lời chào, cách nói tên và câu hỏi về quê quán. Đây là nội dung mẫu; video đang
-                được cập nhật.
-              </p>
-            </div>
-            <LinkButton
-              to={`/courses/${courseSlug}/preview`}
-              size="lg"
-              endIcon={<ArrowRight aria-hidden="true" />}
-            >
-              Vào học thử
-            </LinkButton>
-          </section>
-        </Container>
-
-        <Container>
-          <section id="faq" className="scroll-mt-28 mx-auto max-w-3xl space-y-5">
-            <div className="space-y-2">
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-action-primary">
-                Câu hỏi thường gặp
-              </p>
-              <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
-                Trước khi bắt đầu
-              </h2>
-            </div>
-            <div className="divide-y divide-border-subtle rounded-2xl border border-border-subtle bg-card-surface px-5">
-              <details className="group py-4">
-                <summary className="min-h-11 cursor-pointer py-2 font-semibold text-ink-primary focus-visible:outline-2 focus-visible:outline-action-focus">
-                  Học thử có cần đăng nhập không?
-                </summary>
-                <p className="pb-2 leading-6 text-ink-secondary">
-                  Không. Ba chương được đánh dấu học thử có thể mở trực tiếp trên website.
-                </p>
-              </details>
-              <details className="group py-4">
-                <summary className="min-h-11 cursor-pointer py-2 font-semibold text-ink-primary focus-visible:outline-2 focus-visible:outline-action-focus">
-                  Học phí và thời hạn truy cập là bao nhiêu?
-                </summary>
-                <p className="pb-2 leading-6 text-ink-secondary">
-                  Hai thông tin này chưa được công bố. Bản demo không tạo đơn hàng hoặc thanh toán.
-                </p>
-              </details>
-              <details className="group py-4">
-                <summary className="min-h-11 cursor-pointer py-2 font-semibold text-ink-primary focus-visible:outline-2 focus-visible:outline-action-focus">
-                  Video bài học đã có chưa?
-                </summary>
-                <p className="pb-2 leading-6 text-ink-secondary">
-                  Video học thử đang được cập nhật. Nội dung mẫu vẫn có thể xem và điều hướng giữa
-                  các bài.
-                </p>
-              </details>
-            </div>
-          </section>
-        </Container>
-
-        <Container>
-          <section className="flex flex-col gap-5 rounded-3xl border border-brand-blue bg-[linear-gradient(112deg,var(--brand-blue),#f8fdfe_72%)] p-6 text-ink-primary shadow-soft sm:flex-row sm:items-center sm:justify-between sm:p-9">
-            <div className="max-w-2xl space-y-2">
-              <h2 className="font-display text-2xl font-bold">Khám phá khóa A1.1</h2>
-              <p className="leading-6 text-ink-secondary">
-                Xem nội dung hiện có và thử ba chương miễn phí trong bản demo.
-              </p>
-            </div>
-            <LinkButton
-              to="/courses"
-              variant="primary"
-              size="lg"
-              endIcon={<ArrowRight aria-hidden="true" />}
-            >
-              Xem khóa học
-            </LinkButton>
-          </section>
-        </Container>
+    <SitePage homepage>
+      <div>
+        <HeroSection />
+        <QuickEntrySection />
+        <LearningIntroSection />
+        <PricingSection
+          courses={catalog.data ?? []}
+          loading={catalog.isPending}
+          {...(catalog.isError
+            ? { error: 'Dữ liệu bản demo chưa tải được. Bạn có thể thử lại sau ít phút.' }
+            : {})}
+          onRetry={() => void catalog.refetch()}
+        />
+        <ValuePropositionSection />
+        <FAQSection />
       </div>
     </SitePage>
   )
@@ -296,6 +172,7 @@ export function CourseCatalogPage() {
             aria-label="Khóa học nổi bật"
             className="scroll-mt-28 grid items-stretch gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]"
           >
+            <h2 className="sr-only">Khóa học hiện có</h2>
             <CourseCard
               course={catalog.data[0]}
               href={`/courses/${catalog.data[0].slug}`}

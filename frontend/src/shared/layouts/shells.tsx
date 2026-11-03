@@ -99,6 +99,9 @@ export function PublicShell({
   showLogin = true,
   primaryAction = { label: 'Xem khóa học', href: '/courses' },
   footerLink = { label: 'Câu hỏi thường gặp', href: '/#faq' },
+  footerNavItems,
+  footerCopyright,
+  wideNavigation = false,
   menuDescription = 'Bản xem trước A1.1',
   authState,
 }: ShellProps & {
@@ -110,6 +113,9 @@ export function PublicShell({
   showLogin?: boolean
   primaryAction?: { label: string; href: string }
   footerLink?: { label: string; href: string }
+  footerNavItems?: readonly PublicNavItem[]
+  footerCopyright?: string
+  wideNavigation?: boolean
   menuDescription?: string
   authState?: { displayName: string; onLogout: () => void | Promise<void> }
 }) {
@@ -122,7 +128,7 @@ export function PublicShell({
         {showPreviewNotice && <PreviewNotice text={previewNotice} />}
         <Container className="flex h-[4.25rem] items-center justify-between gap-4">
           <BrandMark to={brandHref} subtitle={brandSubtitle} />
-          <div className="hidden items-center gap-7 md:flex">
+          <div className={`hidden items-center gap-7 ${wideNavigation ? 'lg:flex' : 'md:flex'}`}>
             <PublicMenu items={navItems} />
             {authState ? (
               <>
@@ -166,7 +172,7 @@ export function PublicShell({
               {primaryAction.label}
             </LinkButton>
           </div>
-          <div className="md:hidden">
+          <div className={wideNavigation ? 'lg:hidden' : 'md:hidden'}>
             <IconButton
               label={menuOpen ? 'Đóng điều hướng chính' : 'Mở điều hướng chính'}
               icon={
@@ -256,17 +262,57 @@ export function PublicShell({
       <main id="main-content" tabIndex={-1} className={cn('outline-none', className)}>
         {children}
       </main>
-      <footer className="border-t border-border-subtle bg-card-surface py-8">
-        <Container className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <BrandMark compact to={brandHref} subtitle={brandSubtitle} />
-          <p className="text-sm text-ink-secondary">Tiếng Đức, từng bước rõ ràng.</p>
-          <Link
-            to={footerLink.href}
-            className="inline-flex min-h-10 items-center rounded-lg text-sm font-semibold underline-offset-4 hover:underline"
-          >
-            {footerLink.label}
-          </Link>
-        </Container>
+      <footer className="border-t border-border-subtle bg-card-surface py-8 sm:py-10">
+        {footerNavItems ? (
+          <>
+            <Container className="grid gap-6 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+              <div>
+                <BrandMark to={brandHref} subtitle={brandSubtitle} />
+                <p className="mt-3 max-w-sm text-sm leading-6 text-ink-secondary">
+                  Làm quen với tiếng Đức A1.1 qua lộ trình và bài học mẫu.
+                </p>
+              </div>
+              <div className="grid gap-4 sm:justify-items-end">
+                <nav aria-label="Điều hướng cuối trang" className="flex flex-wrap gap-x-5 gap-y-2">
+                  {footerNavItems.map((item) => (
+                    <Link
+                      key={item.href}
+                      to={item.href}
+                      className="inline-flex min-h-10 items-center rounded-sm text-sm font-semibold text-ink-secondary underline-offset-4 hover:text-ink-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-focus"
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+                  <Link
+                    to={authState ? '/student/courses' : '/login'}
+                    className="inline-flex min-h-10 items-center rounded-sm text-sm font-semibold text-ink-secondary underline-offset-4 hover:text-ink-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-focus"
+                  >
+                    {authState ? 'Khu vực học viên' : 'Đăng nhập'}
+                  </Link>
+                </nav>
+                <LinkButton to={primaryAction.href} size="sm">
+                  {primaryAction.label}
+                </LinkButton>
+              </div>
+            </Container>
+            {footerCopyright && (
+              <Container className="mt-6 border-t border-border-subtle pt-4 text-xs text-ink-muted">
+                {footerCopyright}
+              </Container>
+            )}
+          </>
+        ) : (
+          <Container className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <BrandMark compact to={brandHref} subtitle={brandSubtitle} />
+            <p className="text-sm text-ink-secondary">Tiếng Đức, từng bước rõ ràng.</p>
+            <Link
+              to={footerLink.href}
+              className="inline-flex min-h-10 items-center rounded-lg text-sm font-semibold underline-offset-4 hover:underline"
+            >
+              {footerLink.label}
+            </Link>
+          </Container>
+        )}
       </footer>
     </div>
   )

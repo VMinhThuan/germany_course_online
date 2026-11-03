@@ -49,7 +49,7 @@ test('Flow A: public landing → demo login → dashboard', async ({ page }) => 
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
   await page.goto('/')
-  await page.getByRole('link', { name: 'Đăng nhập' }).click()
+  await page.getByRole('banner').getByRole('link', { name: 'Đăng nhập' }).click()
   await chooseDemoAccount(page, /An Trần/)
   await expect(page).toHaveURL(/\/student$/)
   await expect(
@@ -113,7 +113,12 @@ test('Flow E: new student explores the course and opens the free preview', async
   await page.getByRole('link', { name: 'Mở bài học thử' }).click()
   await expect(page).toHaveURL(/\/courses\/tieng-duc-a1-1\/preview/)
   await expect(
-    page.getByRole('heading', { name: 'Tiếng Đức A1.1 · Bắt đầu giao tiếp' }),
+    page
+      .getByRole('heading', {
+        name: 'Tiếng Đức A1.1 · Bắt đầu giao tiếp',
+        exact: true,
+      })
+      .first(),
   ).toBeVisible()
 })
 
@@ -127,7 +132,12 @@ test('Flow F: active student views supplied progress and public course detail', 
   await page.getByRole('link', { name: 'Thông tin khóa học' }).click()
   await expect(page).toHaveURL('/courses/tieng-duc-a1-1')
   await expect(
-    page.getByRole('heading', { name: 'Tiếng Đức A1.1 · Bắt đầu giao tiếp' }),
+    page
+      .getByRole('heading', {
+        name: 'Tiếng Đức A1.1 · Bắt đầu giao tiếp',
+        exact: true,
+      })
+      .first(),
   ).toBeVisible()
 })
 
@@ -227,9 +237,9 @@ test('axe checks and screenshot evidence cover auth, empty, populated, and expir
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/')
   await expect(
-    page.getByRole('heading', { name: 'Bắt đầu giao tiếp bằng tiếng Đức, từng bước một.' }),
+    page.getByRole('heading', { name: 'Nói tiếng Đức bắt đầu từ lời chào.' }),
   ).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Mở bài học thử' }).first()).toBeVisible()
+  await expect(page.locator('#hero').getByRole('link', { name: 'Học thử miễn phí' })).toBeVisible()
   await expect(
     page.getByRole('heading', { name: 'Tiếng Đức A1.1 · Bắt đầu giao tiếp' }),
   ).toBeVisible()
@@ -238,9 +248,9 @@ test('axe checks and screenshot evidence cover auth, empty, populated, and expir
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/')
   await expect(
-    page.getByRole('heading', { name: 'Bắt đầu giao tiếp bằng tiếng Đức, từng bước một.' }),
+    page.getByRole('heading', { name: 'Nói tiếng Đức bắt đầu từ lời chào.' }),
   ).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Mở bài học thử' }).first()).toBeVisible()
+  await expect(page.locator('#hero').getByRole('link', { name: 'Học thử miễn phí' })).toBeVisible()
   await expect(
     page.getByRole('heading', { name: 'Tiếng Đức A1.1 · Bắt đầu giao tiếp' }),
   ).toBeVisible()

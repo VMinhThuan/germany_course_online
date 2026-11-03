@@ -14,7 +14,7 @@ test('production build serves public routes, deep links and excludes development
   })
   await page.goto('/')
   await expect(
-    page.getByRole('heading', { name: 'Bắt đầu giao tiếp bằng tiếng Đức, từng bước một.' }),
+    page.getByRole('heading', { name: 'Nói tiếng Đức bắt đầu từ lời chào.' }),
   ).toBeVisible()
   await expect(
     page.getByText('Bản demo sản phẩm · Nội dung và thông tin khóa học đang được cập nhật'),

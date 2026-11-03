@@ -1,0 +1,42 @@
+/* A single diagonal layer gives the A1.1 hero its own silhouette without a new theme. */
+.homepage-hero {
+  isolation: isolate;
+}
+
+.homepage-hero__shape {
+  position: absolute;
+  inset: 0 0 0 54%;
+  z-index: -1;
+  background: var(--brand-blue);
+  clip-path: polygon(18% 0, 100% 0, 100% 100%, 0 100%);
+}
+
+.homepage-hero-art {
+  isolation: isolate;
+  padding: 1.25rem 0.75rem 2.25rem;
+}
+
+.homepage-hero-art__backdrop {
+  position: absolute;
+  inset: 5% -1% 5% 8%;
+  z-index: -1;
+  border-radius: 2.5rem;
+  background: var(--brand-lime);
+  clip-path: polygon(17% 0, 100% 8%, 92% 100%, 0 88%);
+  transform: rotate(2deg);
+}
+
+@media (max-width: 767px) {
+  .homepage-hero__shape {
+    inset: 61% 0 0;
+    clip-path: polygon(0 10%, 100% 0, 100% 100%, 0 100%);
+  }
+
+  .homepage-hero-art {
+    padding: 1rem 0.35rem 1.5rem;
+  }
+
+  .homepage-hero-art__backdrop {
+    inset: 4% -2% 4% 7%;
+  }
+}
