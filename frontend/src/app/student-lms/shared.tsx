@@ -4,6 +4,7 @@ import { Link } from 'react-router'
 import { DomainState } from '@/domains/shared/presentation'
 import { Container, ErrorState, LinkButton, PageHeader, Skeleton } from '@/shared/ui'
 import { ProductStudentLayout } from '@/app/student/pages'
+import { setBrandPageTitle } from '@/config/brand'
 
 export function ProductPage({
   title,
@@ -18,7 +19,7 @@ export function ProductPage({
   backTo?: string
 }>) {
   useEffect(() => {
-    document.title = `${title} · Deutsch A1.1`
+    setBrandPageTitle(title)
   }, [title])
 
   return (

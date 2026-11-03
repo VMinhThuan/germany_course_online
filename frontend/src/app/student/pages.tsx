@@ -30,10 +30,11 @@ import {
   Skeleton,
 } from '@/shared/ui'
 import { formatDateTimeInTimezone } from '@/shared/lib/format'
+import { setBrandPageTitle } from '@/config/brand'
 
 function usePageTitle(title: string) {
   useEffect(() => {
-    document.title = `${title} · Deutsch A1.1`
+    setBrandPageTitle(title)
   }, [title])
 }
 

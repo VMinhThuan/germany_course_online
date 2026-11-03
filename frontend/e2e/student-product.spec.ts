@@ -1,34 +1,10 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
-import { mkdirSync } from 'node:fs'
 import path from 'node:path'
 
-const phase2cShots = path.resolve(
-  process.cwd(),
-  '..',
-  'docs',
-  'ui-implementation',
-  'phase-2c',
-  'screenshots',
-)
-const phase2dShots = path.resolve(
-  process.cwd(),
-  '..',
-  'docs',
-  'ui-implementation',
-  'phase-2d',
-  'screenshots',
-)
-const phase2eShots = path.resolve(
-  process.cwd(),
-  '..',
-  'docs',
-  'ui-implementation',
-  'phase-2e',
-  'screenshots',
-)
-for (const directory of [phase2cShots, phase2dShots, phase2eShots])
-  mkdirSync(directory, { recursive: true })
+const phase2cShots = 'phase-2c'
+const phase2dShots = 'phase-2d'
+const phase2eShots = 'phase-2e'
 
 async function login(page: Page, persona: RegExp) {
   await page.goto('/login')
@@ -54,7 +30,7 @@ async function expectNoOverflow(page: Page) {
 
 async function captureProductScreenshot(page: Page, directory: string, filename: string) {
   await page.screenshot({
-    path: path.join(directory, filename),
+    path: test.info().outputPath(`${path.basename(directory)}-${filename}`),
     fullPage: true,
     style: '[data-dev-controls] { display: none !important; }',
   })

@@ -1,5 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { brandConfig, formatDocumentTitle } from '@/config/brand'
 import '@/index.css'
 
 const rootElement = document.getElementById('root')
@@ -13,7 +14,7 @@ const application = import.meta.env.DEV
   : import('@/app/ProductionApp').then(({ ProductionApp }) => ProductionApp)
 
 void application.then((RootApp) => {
-  document.title = import.meta.env.VITE_APP_NAME?.trim() || 'Deutsch · UI foundation'
+  document.title = formatDocumentTitle(brandConfig.courseName)
   createRoot(rootElement).render(
     <StrictMode>
       <RootApp />

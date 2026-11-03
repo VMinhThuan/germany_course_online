@@ -1,15 +1,5 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
-import path from 'node:path'
-
-const screenshotDir = path.resolve(
-  process.cwd(),
-  '..',
-  'docs',
-  'ui-implementation',
-  'phase-1b',
-  'screenshots',
-)
 const viewports = [
   { label: '1440x900', width: 1440, height: 900 },
   { label: '768x1024', width: 768, height: 1024 },
@@ -26,7 +16,7 @@ async function expectNoHorizontalOverflow(page: Page) {
 
 async function capture(page: Page, name: string) {
   await page.screenshot({
-    path: path.join(screenshotDir, name),
+    path: test.info().outputPath(name),
     fullPage: true,
     animations: 'disabled',
   })

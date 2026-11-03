@@ -3,28 +3,32 @@ import axe from 'axe-core'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import { PUBLIC_DEMO_COURSE } from '@/data/public-demo/fixtures'
-import { PricingSection } from './PricingSection'
+import { CoursePricingSection } from './CoursePricingSection'
 
-function renderPricing(props: Partial<Parameters<typeof PricingSection>[0]> = {}) {
+function renderPricing(props: Partial<Parameters<typeof CoursePricingSection>[0]> = {}) {
   return render(
     <MemoryRouter>
-      <PricingSection courses={props.courses ?? [PUBLIC_DEMO_COURSE]} {...props} />
+      <CoursePricingSection courses={props.courses ?? [PUBLIC_DEMO_COURSE]} {...props} />
     </MemoryRouter>,
   )
 }
 
-describe('PricingSection', () => {
-  it('shows actual course details without filling a missing tuition with a placeholder price', () => {
-    renderPricing()
+describe('CoursePricingSection', () => {
+  it('shows the catalog course without inventing a price or access duration', () => {
+    const { container } = renderPricing()
 
     expect(screen.getByRole('article')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('Tiếng Đức A1.1')
     expect(screen.getByText('Học phí đang cập nhật')).toBeInTheDocument()
-    expect(screen.getByText('Thời hạn truy cập đang được cập nhật')).toBeInTheDocument()
+    expect(screen.getByText('Thời hạn truy cập đang cập nhật')).toBeInTheDocument()
     expect(screen.getByText('4 chương · 7 bài học')).toBeInTheDocument()
+    expect(
+      container.querySelector('img[src="/assets/homepage/course-banner-a11.webp"]'),
+    ).not.toBeNull()
     expect(screen.queryByText(/EUR|Lifetime|€|\b\d+\.\d{2}\b/)).not.toBeInTheDocument()
   })
 
-  it('formats a price and access duration only when the course model supplies them', () => {
+  it('formats only the supplied course price and access duration', () => {
     renderPricing({
       courses: [{ ...PUBLIC_DEMO_COURSE, priceVnd: '1290000', accessDurationMonths: 12 }],
     })
@@ -34,7 +38,7 @@ describe('PricingSection', () => {
     expect(screen.queryByText('Học phí đang cập nhật')).not.toBeInTheDocument()
   })
 
-  it('renders separate cards when the catalog supplies more than one course', () => {
+  it('renders one card for each catalog result and exposes real course and preview routes', () => {
     renderPricing({
       courses: [
         PUBLIC_DEMO_COURSE,
@@ -51,9 +55,13 @@ describe('PricingSection', () => {
     })
 
     expect(screen.getAllByRole('article')).toHaveLength(2)
-    expect(screen.getByText('Xem nội dung theo 8 chương')).toBeInTheDocument()
+    expect(screen.getByText('Nội dung theo 8 chương')).toBeInTheDocument()
     expect(screen.getByText('Khám phá 15 bài học')).toBeInTheDocument()
-    expect(screen.getAllByText('Mở ba chương học thử không cần đăng nhập')).toHaveLength(1)
+    expect(screen.getByRole('link', { name: /Tiếng Đức A2/ })).toHaveAttribute(
+      'href',
+      '/courses/tieng-duc-a2',
+    )
+    expect(screen.getAllByRole('link', { name: 'Mở nội dung học thử' })).toHaveLength(2)
   })
 
   it('renders loading, error and empty states from repository state', () => {
@@ -63,7 +71,7 @@ describe('PricingSection', () => {
 
     rerender(
       <MemoryRouter>
-        <PricingSection courses={[]} error="Danh mục chưa tải được." onRetry={retry} />
+        <CoursePricingSection courses={[]} error="Danh mục chưa tải được." onRetry={retry} />
       </MemoryRouter>,
     )
     expect(screen.getByRole('alert')).toHaveTextContent('Danh mục chưa tải được.')
@@ -72,7 +80,7 @@ describe('PricingSection', () => {
 
     rerender(
       <MemoryRouter>
-        <PricingSection courses={[]} />
+        <CoursePricingSection courses={[]} />
       </MemoryRouter>,
     )
     expect(screen.getByRole('status')).toHaveTextContent('Chưa có khóa học')

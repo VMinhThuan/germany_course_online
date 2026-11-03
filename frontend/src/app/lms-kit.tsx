@@ -1,4 +1,5 @@
 import { BookOpenText, CircleHelp, ExternalLink, ShieldAlert, TriangleAlert } from 'lucide-react'
+import { brandConfig } from '@/config/brand'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { BaseDialog } from '@/shared/ui/dialogs'
 import { Badge, Button, Card, Container, PageHeader, SelectField } from '@/shared/ui'
@@ -271,7 +272,7 @@ export function LmsKitPage() {
             </span>
             <div className="min-w-0">
               <p className="text-xs font-bold uppercase tracking-[0.15em] text-action-primary">
-                Deutsch · Lernspur
+                {brandConfig.name}
               </p>
               <p className="truncate font-display text-lg font-extrabold">LMS domain kit</p>
             </div>

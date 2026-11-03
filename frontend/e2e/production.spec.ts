@@ -14,12 +14,13 @@ test('production build serves public routes, deep links and excludes development
   })
   await page.goto('/')
   await expect(
-    page.getByRole('heading', { name: 'Nói tiếng Đức bắt đầu từ lời chào.' }),
+    page.getByRole('heading', { name: 'Học tiếng Đức từ những bước đầu tiên.' }),
   ).toBeVisible()
+  await expect(page.locator('#footer-contact')).toBeAttached()
   await expect(
-    page.getByText('Bản demo sản phẩm · Nội dung và thông tin khóa học đang được cập nhật'),
-  ).toBeVisible()
-  await expect(page).toHaveTitle(/Học tiếng Đức A1.1/)
+    page.getByText('Bản demo sản phẩm · Nội dung minh họa, chưa kết nối dữ liệu thật'),
+  ).toHaveCount(0)
+  await expect(page).toHaveTitle('Học tiếng Đức A1.1 | PAniverseDeutsch')
 
   await page.goto('/courses')
   await expect(page.getByRole('heading', { name: 'Chọn điểm bắt đầu của bạn' })).toBeVisible()

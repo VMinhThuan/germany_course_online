@@ -1,15 +1,5 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
-import path from 'node:path'
-
-const screenshotDir = path.resolve(
-  process.cwd(),
-  '..',
-  'docs',
-  'ui-implementation',
-  'phase-2a',
-  'screenshots',
-)
 const course = '/courses/tieng-duc-a1-1'
 const preview = `${course}/preview`
 const viewports = [
@@ -21,7 +11,7 @@ const viewports = [
 
 async function capture(page: Page, name: string) {
   await page.screenshot({
-    path: path.join(screenshotDir, name),
+    path: test.info().outputPath(name),
     fullPage: true,
     animations: 'disabled',
   })
@@ -61,23 +51,23 @@ test.describe('public website responsive routes', () => {
   const routes = [
     {
       path: '/',
-      heading: 'Nói tiếng Đức bắt đầu từ lời chào.',
-      title: 'Học tiếng Đức A1.1 · Deutsch A1.1',
+      heading: 'Học tiếng Đức từ những bước đầu tiên.',
+      title: 'Học tiếng Đức A1.1 | PAniverseDeutsch',
     },
     {
       path: '/courses',
       heading: 'Chọn điểm bắt đầu của bạn',
-      title: 'Khóa học · Deutsch A1.1',
+      title: 'Khóa học | PAniverseDeutsch',
     },
     {
       path: course,
       heading: 'Tiếng Đức A1.1 · Bắt đầu giao tiếp',
-      title: 'Tiếng Đức A1.1 · Bắt đầu giao tiếp · Deutsch A1.1',
+      title: 'Tiếng Đức A1.1 · Bắt đầu giao tiếp | PAniverseDeutsch',
     },
     {
       path: `${preview}?sectionId=a11-chapter-01`,
       heading: 'Tiếng Đức A1.1 · Bắt đầu giao tiếp',
-      title: 'Học thử · Tiếng Đức A1.1 · Bắt đầu giao tiếp · Deutsch A1.1',
+      title: 'Học thử · Tiếng Đức A1.1 · Bắt đầu giao tiếp | PAniverseDeutsch',
     },
   ]
 
@@ -94,8 +84,9 @@ test.describe('public website responsive routes', () => {
         ).toBeVisible()
         await expect(page).toHaveTitle(route.title)
         await expect(
-          page.getByText('Bản demo sản phẩm · Nội dung và thông tin khóa học đang được cập nhật'),
-        ).toBeVisible()
+          page.getByText('Bản demo sản phẩm · Nội dung minh họa, chưa kết nối dữ liệu thật'),
+        ).toHaveCount(0)
+        if (route.path === '/') await expect(page.locator('#footer-contact')).toBeVisible()
         if (route.path === '/courses') {
           await expect(
             page.getByRole('link', {
@@ -181,7 +172,7 @@ test('restores the landing scroll position after browser Back and supports keybo
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight - innerHeight))
   const savedScroll = await page.evaluate(() => window.scrollY)
   const catalogLink = page
-    .getByRole('navigation', { name: 'Điều hướng cuối trang' })
+    .getByRole('navigation', { name: 'Khám phá' })
     .getByRole('link', { name: 'Khóa học', exact: true })
   await catalogLink.focus()
   await page.keyboard.press('Enter')

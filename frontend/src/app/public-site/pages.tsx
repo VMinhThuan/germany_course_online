@@ -16,6 +16,7 @@ import {
   LinkButton,
 } from '@/shared/ui'
 import { PublicShell } from '@/shared/layouts/shells'
+import { setBrandPageTitle } from '@/config/brand'
 import type { ReactNode } from 'react'
 import { useDialogs } from '@/shared/ui/dialogs'
 import {
@@ -38,12 +39,13 @@ import { getPreviewSections } from '@/data/public-demo/use-cases'
 import { useAuthSession } from '@/app/auth/auth-session'
 import {
   FAQSection,
-  HeroSection,
-  LearningIntroSection,
-  PricingSection,
-  QuickEntrySection,
-  ValuePropositionSection,
-  homepageFooterLinks,
+  CourseIntroduction,
+  CourseOverviewVideo,
+  CoursePricingSection,
+  HomepageFooter,
+  LearningBenefitsSection,
+  LearningFeaturesGrid,
+  PhotographicHero,
 } from '@/features/homepage'
 import '@/features/homepage/homepage.css'
 
@@ -53,22 +55,22 @@ const publicShellProps = {
   navItems: [
     { label: 'Trang chủ', href: '/' },
     { label: 'Khóa học', href: '/courses' },
+    { label: 'Giới thiệu', href: '/#course-intro' },
     { label: 'Học thử', href: `/courses/${courseSlug}/preview` },
-    { label: 'Trợ giúp', href: '/help' },
+    { label: 'Liên hệ', href: '/#footer-contact' },
   ],
   brandHref: '/',
-  brandSubtitle: 'Khóa học tiếng Đức trực tuyến',
-  previewNotice: 'Bản demo sản phẩm · Nội dung và thông tin khóa học đang được cập nhật',
-  showPreviewNotice: true,
+  showPreviewNotice: false,
   showLogin: true,
+  showRegister: false,
   primaryAction: { label: 'Xem khóa học', href: '/courses' },
-  footerLink: { label: 'Câu hỏi thường gặp', href: '/help' },
-  menuDescription: 'Khám phá khóa học A1.1 và nội dung học thử',
+  footerLink: { label: 'Câu hỏi thường gặp', href: '/#faq' },
+  menuDescription: 'Khám phá khóa học và nội dung học thử',
 } as const
 
 function usePageTitle(title: string) {
   useEffect(() => {
-    document.title = `${title} · Deutsch A1.1`
+    setBrandPageTitle(title)
   }, [title])
 }
 
@@ -80,9 +82,8 @@ function SitePage({ children, homepage = false }: { children: ReactNode; homepag
       {...(homepage
         ? {
             primaryAction: { label: 'Học thử miễn phí', href: `/courses/${courseSlug}/preview` },
-            footerNavItems: homepageFooterLinks,
-            footerCopyright: `© ${new Date().getFullYear()} · Bản demo Deutsch A1.1`,
             wideNavigation: true,
+            footerContent: <HomepageFooter signedIn={Boolean(session)} />,
           }
         : {})}
       {...(session
@@ -121,11 +122,12 @@ export function PublicLandingPage() {
 
   return (
     <SitePage homepage>
-      <div>
-        <HeroSection />
-        <QuickEntrySection />
-        <LearningIntroSection />
-        <PricingSection
+      <>
+        <PhotographicHero />
+        <CourseIntroduction />
+        <CourseOverviewVideo />
+        <LearningFeaturesGrid />
+        <CoursePricingSection
           courses={catalog.data ?? []}
           loading={catalog.isPending}
           {...(catalog.isError
@@ -133,9 +135,9 @@ export function PublicLandingPage() {
             : {})}
           onRetry={() => void catalog.refetch()}
         />
-        <ValuePropositionSection />
+        <LearningBenefitsSection />
         <FAQSection />
-      </div>
+      </>
     </SitePage>
   )
 }

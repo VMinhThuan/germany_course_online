@@ -1,4 +1,5 @@
 import { useParams } from 'react-router'
+import { brandConfig } from '@/config/brand'
 import {
   LayoutPreviewIntro,
   AuthShell,
@@ -64,7 +65,7 @@ function PreviewContent({ layout }: { layout: LayoutKey }) {
             <div className="mb-7 flex items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-bold uppercase tracking-[0.14em] text-action-primary">
-                  Lernspur · A1.1
+                  {brandConfig.name} · A1.1
                 </p>
                 <h2 className="mt-2 text-2xl font-bold">Một đường học mẫu</h2>
               </div>

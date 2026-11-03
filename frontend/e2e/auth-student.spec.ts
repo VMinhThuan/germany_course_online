@@ -1,17 +1,5 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
-import { mkdirSync } from 'node:fs'
-import path from 'node:path'
-
-const screenshotDir = path.resolve(
-  process.cwd(),
-  '..',
-  'docs',
-  'ui-implementation',
-  'phase-2b',
-  'screenshots',
-)
-mkdirSync(screenshotDir, { recursive: true })
 
 async function chooseDemoAccount(page: Page, account: RegExp, navigateToLogin = true) {
   if (navigateToLogin) await page.goto('/login')
@@ -42,7 +30,7 @@ async function capture(page: Page, file: string, fullPage = true) {
   await page.locator('[data-dev-controls]').evaluateAll((items) => {
     items.forEach((item) => ((item as HTMLElement).style.display = 'none'))
   })
-  await page.screenshot({ path: path.join(screenshotDir, file), fullPage, animations: 'disabled' })
+  await page.screenshot({ path: test.info().outputPath(file), fullPage, animations: 'disabled' })
 }
 
 test('Flow A: public landing → demo login → dashboard', async ({ page }) => {
@@ -237,7 +225,7 @@ test('axe checks and screenshot evidence cover auth, empty, populated, and expir
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/')
   await expect(
-    page.getByRole('heading', { name: 'Nói tiếng Đức bắt đầu từ lời chào.' }),
+    page.getByRole('heading', { name: 'Học tiếng Đức từ những bước đầu tiên.' }),
   ).toBeVisible()
   await expect(page.locator('#hero').getByRole('link', { name: 'Học thử miễn phí' })).toBeVisible()
   await expect(
@@ -248,7 +236,7 @@ test('axe checks and screenshot evidence cover auth, empty, populated, and expir
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/')
   await expect(
-    page.getByRole('heading', { name: 'Nói tiếng Đức bắt đầu từ lời chào.' }),
+    page.getByRole('heading', { name: 'Học tiếng Đức từ những bước đầu tiên.' }),
   ).toBeVisible()
   await expect(page.locator('#hero').getByRole('link', { name: 'Học thử miễn phí' })).toBeVisible()
   await expect(

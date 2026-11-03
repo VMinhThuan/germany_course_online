@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { brandConfig } from '@/config/brand'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
@@ -411,7 +412,7 @@ export function UiKitPage() {
                   <Sparkles aria-hidden="true" className="size-5" />
                 </span>
                 <div>
-                  <p className="font-semibold">Lernspur · A1.1</p>
+                  <p className="font-semibold">{brandConfig.name} · A1.1</p>
                   <p className="text-sm text-ink-secondary">Dấu hiệu nhận diện giao diện</p>
                 </div>
               </div>
@@ -748,7 +749,7 @@ export function UiKitPage() {
 
           <ShowcaseSection
             id="path"
-            title="09 · Lernspur"
+            title="09 · PAniverseDeutsch"
             description="Dấu hiệu học tập với đường dẫn thị giác và các nút bước học, tách khỏi quy tắc nghiệp vụ."
           >
             <Card className="grid gap-6 p-5 sm:grid-cols-[minmax(0,1fr)_minmax(13rem,0.7fr)] sm:p-7">
@@ -758,7 +759,7 @@ export function UiKitPage() {
                     <BookOpenText aria-hidden="true" />
                   </span>
                   <div>
-                    <p className="font-bold">Lernspur · A1.1</p>
+                    <p className="font-bold">{brandConfig.name} · A1.1</p>
                     <p className="text-sm text-ink-secondary">Lộ trình mẫu</p>
                   </div>
                 </div>

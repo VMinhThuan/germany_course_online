@@ -1,5 +1,4 @@
 import {
-  BookOpenText,
   ChevronLeft,
   CircleHelp,
   ClipboardList,
@@ -14,6 +13,8 @@ import {
 } from 'lucide-react'
 import { useState, type PropsWithChildren, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
+import { BrandLogo } from '@/shared/brand/BrandLogo'
+import { brandConfig } from '@/config/brand'
 import { Container, DropdownMenu, IconButton, LinkButton, Sheet, SkipLink } from '@/shared/ui'
 import { cn } from '@/shared/ui/cn'
 
@@ -24,32 +25,6 @@ const publicItems = [
   { label: 'Từ vựng', href: '#dev-vocabulary' },
   { label: 'Cách học', href: '#dev-method' },
 ]
-
-function BrandMark({
-  compact = false,
-  to = '/',
-  subtitle = 'Bản xem trước nền tảng',
-}: {
-  compact?: boolean
-  to?: string
-  subtitle?: string | undefined
-}) {
-  return (
-    <Link to={to} className="group inline-flex min-w-0 items-center gap-2.5 rounded-lg">
-      {compact && <span className="sr-only sm:hidden">Deutsch · A1.1</span>}
-      <span className="relative grid size-10 shrink-0 place-items-center overflow-hidden rounded-[0.9rem] bg-brand-blue text-pastel-blue-ink">
-        <BookOpenText aria-hidden="true" className="size-5" />
-        <span className="absolute bottom-1 right-1 size-1.5 rounded-full bg-action-primary" />
-      </span>
-      <span className={cn('min-w-0', compact && 'hidden sm:block')}>
-        <span className="block truncate font-display text-sm font-extrabold tracking-tight text-ink-primary">
-          Deutsch · A1.1
-        </span>
-        <span className="block text-[0.7rem] leading-4 text-ink-secondary">{subtitle}</span>
-      </span>
-    </Link>
-  )
-}
 
 function PreviewNotice({
   text = 'Bản xem trước bố cục · Nội dung minh họa, chưa kết nối dữ liệu thật',
@@ -93,28 +68,30 @@ export function PublicShell({
   className,
   navItems = publicItems,
   brandHref = '/',
-  brandSubtitle = 'Khóa học tiếng Đức trực tuyến',
   previewNotice = 'Bản demo sản phẩm · Nội dung minh họa, chưa kết nối dữ liệu thật',
   showPreviewNotice = true,
   showLogin = true,
+  showRegister = true,
   primaryAction = { label: 'Xem khóa học', href: '/courses' },
   footerLink = { label: 'Câu hỏi thường gặp', href: '/#faq' },
   footerNavItems,
   footerCopyright,
+  footerContent,
   wideNavigation = false,
   menuDescription = 'Bản xem trước A1.1',
   authState,
 }: ShellProps & {
   navItems?: readonly PublicNavItem[]
   brandHref?: string
-  brandSubtitle?: string
   previewNotice?: string
   showPreviewNotice?: boolean
   showLogin?: boolean
+  showRegister?: boolean
   primaryAction?: { label: string; href: string }
   footerLink?: { label: string; href: string }
   footerNavItems?: readonly PublicNavItem[]
   footerCopyright?: string
+  footerContent?: ReactNode
   wideNavigation?: boolean
   menuDescription?: string
   authState?: { displayName: string; onLogout: () => void | Promise<void> }
@@ -127,7 +104,7 @@ export function PublicShell({
       <header className="sticky top-0 z-header border-b border-border-subtle/80 bg-card-surface/95 backdrop-blur-sm">
         {showPreviewNotice && <PreviewNotice text={previewNotice} />}
         <Container className="flex h-[4.25rem] items-center justify-between gap-4">
-          <BrandMark to={brandHref} subtitle={brandSubtitle} />
+          <BrandLogo to={brandHref} />
           <div className={`hidden items-center gap-7 ${wideNavigation ? 'lg:flex' : 'md:flex'}`}>
             <PublicMenu items={navItems} />
             {authState ? (
@@ -159,12 +136,14 @@ export function PublicShell({
                   >
                     Đăng nhập
                   </Link>
-                  <Link
-                    to="/register"
-                    className="text-sm font-semibold text-ink-secondary underline-offset-4 hover:text-ink-primary hover:underline"
-                  >
-                    Tạo tài khoản demo
-                  </Link>
+                  {showRegister && (
+                    <Link
+                      to="/register"
+                      className="text-sm font-semibold text-ink-secondary underline-offset-4 hover:text-ink-primary hover:underline"
+                    >
+                      Tạo tài khoản demo
+                    </Link>
+                  )}
                 </>
               )
             )}
@@ -238,13 +217,15 @@ export function PublicShell({
                   >
                     Đăng nhập
                   </Link>
-                  <Link
-                    to="/register"
-                    onClick={() => setMenuOpen(false)}
-                    className="flex min-h-11 items-center px-3 font-semibold text-ink-secondary"
-                  >
-                    Tạo tài khoản demo
-                  </Link>
+                  {showRegister && (
+                    <Link
+                      to="/register"
+                      onClick={() => setMenuOpen(false)}
+                      className="flex min-h-11 items-center px-3 font-semibold text-ink-secondary"
+                    >
+                      Tạo tài khoản demo
+                    </Link>
+                  )}
                 </>
               )
             )}
@@ -262,58 +243,63 @@ export function PublicShell({
       <main id="main-content" tabIndex={-1} className={cn('outline-none', className)}>
         {children}
       </main>
-      <footer className="border-t border-border-subtle bg-card-surface py-8 sm:py-10">
-        {footerNavItems ? (
-          <>
-            <Container className="grid gap-6 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-              <div>
-                <BrandMark to={brandHref} subtitle={brandSubtitle} />
-                <p className="mt-3 max-w-sm text-sm leading-6 text-ink-secondary">
-                  Làm quen với tiếng Đức A1.1 qua lộ trình và bài học mẫu.
-                </p>
-              </div>
-              <div className="grid gap-4 sm:justify-items-end">
-                <nav aria-label="Điều hướng cuối trang" className="flex flex-wrap gap-x-5 gap-y-2">
-                  {footerNavItems.map((item) => (
+      {footerContent ?? (
+        <footer className="border-t border-border-subtle bg-card-surface py-8 sm:py-10">
+          {footerNavItems ? (
+            <>
+              <Container className="grid gap-6 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                <div>
+                  <BrandLogo to={brandHref} />
+                  <p className="mt-3 max-w-sm text-sm leading-6 text-ink-secondary">
+                    Làm quen với {brandConfig.courseName} qua lộ trình và bài học mẫu.
+                  </p>
+                </div>
+                <div className="grid gap-4 sm:justify-items-end">
+                  <nav
+                    aria-label="Điều hướng cuối trang"
+                    className="flex flex-wrap gap-x-5 gap-y-2"
+                  >
+                    {footerNavItems.map((item) => (
+                      <Link
+                        key={item.href}
+                        to={item.href}
+                        className="inline-flex min-h-10 items-center rounded-sm text-sm font-semibold text-ink-secondary underline-offset-4 hover:text-ink-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-focus"
+                      >
+                        {item.label}
+                      </Link>
+                    ))}
                     <Link
-                      key={item.href}
-                      to={item.href}
+                      to={authState ? '/student/courses' : '/login'}
                       className="inline-flex min-h-10 items-center rounded-sm text-sm font-semibold text-ink-secondary underline-offset-4 hover:text-ink-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-focus"
                     >
-                      {item.label}
+                      {authState ? 'Khu vực học viên' : 'Đăng nhập'}
                     </Link>
-                  ))}
-                  <Link
-                    to={authState ? '/student/courses' : '/login'}
-                    className="inline-flex min-h-10 items-center rounded-sm text-sm font-semibold text-ink-secondary underline-offset-4 hover:text-ink-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-focus"
-                  >
-                    {authState ? 'Khu vực học viên' : 'Đăng nhập'}
-                  </Link>
-                </nav>
-                <LinkButton to={primaryAction.href} size="sm">
-                  {primaryAction.label}
-                </LinkButton>
-              </div>
-            </Container>
-            {footerCopyright && (
-              <Container className="mt-6 border-t border-border-subtle pt-4 text-xs text-ink-muted">
-                {footerCopyright}
+                  </nav>
+                  <LinkButton to={primaryAction.href} size="sm">
+                    {primaryAction.label}
+                  </LinkButton>
+                </div>
               </Container>
-            )}
-          </>
-        ) : (
-          <Container className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <BrandMark compact to={brandHref} subtitle={brandSubtitle} />
-            <p className="text-sm text-ink-secondary">Tiếng Đức, từng bước rõ ràng.</p>
-            <Link
-              to={footerLink.href}
-              className="inline-flex min-h-10 items-center rounded-lg text-sm font-semibold underline-offset-4 hover:underline"
-            >
-              {footerLink.label}
-            </Link>
-          </Container>
-        )}
-      </footer>
+              {footerCopyright && (
+                <Container className="mt-6 border-t border-border-subtle pt-4 text-xs text-ink-muted">
+                  {footerCopyright}
+                </Container>
+              )}
+            </>
+          ) : (
+            <Container className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <BrandLogo to={brandHref} />
+              <p className="text-sm text-ink-secondary">{brandConfig.tagline}.</p>
+              <Link
+                to={footerLink.href}
+                className="inline-flex min-h-10 items-center rounded-lg text-sm font-semibold underline-offset-4 hover:underline"
+              >
+                {footerLink.label}
+              </Link>
+            </Container>
+          )}
+        </footer>
+      )}
     </div>
   )
 }
@@ -322,14 +308,12 @@ export function AuthShell({
   children,
   className,
   brandHref = '/',
-  brandSubtitle = 'Khóa học tiếng Đức trực tuyến',
   backHref = '/',
   backLabel = 'Về trang chủ',
   previewNotice = 'Bản demo sản phẩm · Không gửi dữ liệu đăng nhập đến máy chủ',
   footerMessage = 'Luồng xác thực mô phỏng · Không dùng mật khẩu thật',
 }: ShellProps & {
   brandHref?: string
-  brandSubtitle?: string
   backHref?: string
   backLabel?: string
   previewNotice?: string
@@ -341,7 +325,7 @@ export function AuthShell({
       <header>
         <PreviewNotice text={previewNotice} />
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-5 sm:px-6">
-          <BrandMark to={brandHref} subtitle={brandSubtitle} />
+          <BrandLogo to={brandHref} />
           <Link
             to={backHref}
             className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-ink-secondary hover:bg-surface-muted hover:text-ink-primary"
@@ -381,7 +365,7 @@ export function CheckoutShell({
             <ChevronLeft aria-hidden="true" className="size-4" />
             Quay lại
           </Link>
-          <BrandMark compact />
+          <BrandLogo compact />
         </Container>
       </header>
       <main
@@ -493,11 +477,7 @@ export function StudentShell({
           className="sticky top-0 hidden h-screen flex-col border-r border-border-subtle bg-card-surface lg:flex"
         >
           <div className="flex h-[4.75rem] items-center border-b border-border-subtle px-5">
-            <BrandMark
-              compact
-              to={productMode ? '/student' : '/__dev/layouts/student'}
-              subtitle={productMode ? 'Không gian học demo' : undefined}
-            />
+            <BrandLogo compact to={productMode ? '/student' : '/__dev/layouts/student'} />
           </div>
           <div className="flex-1 overflow-y-auto px-3 py-6">
             <p className="mb-3 px-3 text-[0.68rem] font-bold uppercase tracking-[0.14em] text-ink-muted">
@@ -515,7 +495,7 @@ export function StudentShell({
           <div className="border-t border-border-subtle p-4">
             <div className="rounded-xl bg-surface-lime p-3">
               <p className="text-xs font-bold text-pastel-lime-ink">
-                {productMode ? 'Bản demo · A1.1' : 'Lernspur · A1.1'}
+                {productMode ? 'Bản demo · A1.1' : `${brandConfig.name} · A1.1`}
               </p>
               <p className="mt-1 text-xs leading-5 text-ink-secondary">
                 {productMode
@@ -695,7 +675,7 @@ export function LearningShell({ children, className }: ShellProps) {
               <span className="hidden sm:inline">Khóa học</span>
             </Link>
             <span aria-hidden="true" className="h-5 w-px bg-border-subtle" />
-            <BrandMark compact />
+            <BrandLogo compact />
           </div>
           <div className="hidden items-center gap-3 sm:flex">
             <span className="text-xs text-ink-secondary">Lộ trình demo</span>

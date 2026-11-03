@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, BookOpenText, MailCheck, ShieldCheck } from 'luc
 import { Navigate, useNavigate, useSearchParams } from 'react-router'
 import { studentDemoRepositories } from '@/data/student-demo/repository'
 import { useAuthSession } from '@/app/auth/auth-session'
+import { brandConfig, setBrandPageTitle } from '@/config/brand'
 import { getDemoErrorPresentation } from '@/data/student-demo/errors'
 import { useQuery } from '@tanstack/react-query'
 import { AuthShell } from '@/shared/layouts/shells'
@@ -34,14 +35,14 @@ type FormErrors = {
 
 function usePageTitle(title: string) {
   useEffect(() => {
-    document.title = `${title} · Deutsch A1.1`
+    setBrandPageTitle(title)
   }, [title])
 }
 
 function AuthPageFrame({
   children,
   title,
-  eyebrow = 'Deutsch · A1.1',
+  eyebrow = brandConfig.name,
 }: {
   children: ReactNode
   title: string
