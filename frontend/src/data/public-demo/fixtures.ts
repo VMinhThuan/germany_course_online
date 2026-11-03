@@ -10,7 +10,7 @@ export const PUBLIC_DEMO_COURSE: CourseDetailModel = {
   level: 'A1.1',
   shortDescription:
     'Làm quen với lời chào, cách giới thiệu bản thân và những cuộc hội thoại đầu tiên bằng tiếng Đức.',
-  thumbnailUrl: '/demo-assets/a11-course-card.svg',
+  thumbnailUrl: '/assets/homepage/course-banner-a11.webp',
   description:
     'Bản demo giới thiệu cấu trúc khóa A1.1 và một số nội dung học thử. Tên bài, mô tả và bài học mẫu đang chờ được đội ngũ nội dung xác nhận.',
   objectives: [
@@ -23,6 +23,9 @@ export const PUBLIC_DEMO_COURSE: CourseDetailModel = {
     'Nội dung hiện tại là bản demo, không đại diện đầy đủ cho khóa học chính thức.',
   ],
   status: 'PUBLISHED',
+  priceVnd: '1290000',
+  accessDurationMonths: 12,
+  previewAvailable: true,
   chapterCount: 4,
   lessonCount: 7,
   sections: [
@@ -146,6 +149,94 @@ export const PUBLIC_DEMO_COURSE: CourseDetailModel = {
     },
   ],
 }
+
+function createA12Chapter(
+  order: number,
+  title: string,
+  description: string,
+  lessonTitles: readonly [string, string],
+): CourseDetailModel['sections'][number] {
+  const chapterNumber = String(order).padStart(2, '0')
+
+  return {
+    id: `a12-chapter-${chapterNumber}`,
+    courseId: 'public-demo-a12',
+    title,
+    description,
+    sectionType: 'CHAPTER',
+    contentStatus: 'DRAFT',
+    sortOrder: order * 10,
+    lessons: lessonTitles.map((lessonTitle, index) => ({
+      id: `a12-lesson-${chapterNumber}-${index + 1}`,
+      title: lessonTitle,
+      lessonType: index === 0 ? 'LECTURE' : 'PRACTICE',
+      contentStatus: 'DRAFT',
+      estimatedMinutes: index === 0 ? 12 : 10,
+      countsTowardProgress: false,
+      progressStatus: 'NOT_STARTED',
+    })),
+  }
+}
+
+export const PUBLIC_DEMO_A12_COURSE: CourseDetailModel = {
+  id: 'public-demo-a12',
+  code: 'A1.2',
+  slug: 'tieng-duc-a1-2',
+  title: 'Tiếng Đức A1.2 · Mở rộng giao tiếp',
+  level: 'A1.2',
+  shortDescription:
+    'Tiếp nối nền tảng A1.1, mở rộng vốn từ và luyện giao tiếp trong các tình huống quen thuộc.',
+  thumbnailUrl: '/assets/homepage/feature-interactive.webp',
+  priceVnd: '1490000',
+  accessDurationMonths: 12,
+  previewAvailable: false,
+  description:
+    'A1.2 là lộ trình tiếp nối A1.1. Các chủ đề và bài học trên trang này chỉ minh họa bố cục; nội dung chính thức đang được chuẩn bị.',
+  objectives: [
+    'Mở rộng cách diễn đạt trong sinh hoạt hằng ngày.',
+    'Làm quen với giờ giấc, lịch hẹn và hoạt động thường ngày.',
+    'Thực hành các tình huống mua sắm và giao tiếp cơ bản.',
+  ],
+  requirements: [
+    'Phù hợp với người đã làm quen các kiến thức nền tảng A1.1.',
+    'Chương trình và điều kiện học chính thức đang được xác nhận.',
+  ],
+  status: 'PUBLISHED',
+  chapterCount: 4,
+  lessonCount: 8,
+  sections: [
+    createA12Chapter(
+      1,
+      'Mein Alltag · Sinh hoạt hằng ngày',
+      'Từ vựng và mẫu câu về một ngày thường.',
+      [
+        'Was machst du heute? · Hôm nay bạn làm gì?',
+        'Übung: Mein Tagesablauf · Luyện tập lịch sinh hoạt',
+      ],
+    ),
+    createA12Chapter(
+      2,
+      'Uhrzeit und Termine · Giờ giấc và lịch hẹn',
+      'Cách nói giờ và sắp xếp cuộc hẹn.',
+      ['Wie spät ist es? · Mấy giờ rồi?', 'Übung: Einen Termin vereinbaren · Luyện đặt lịch hẹn'],
+    ),
+    createA12Chapter(
+      3,
+      'Essen und Einkaufen · Ăn uống và mua sắm',
+      'Giao tiếp đơn giản khi gọi món và mua đồ.',
+      ['Was möchten Sie? · Bạn muốn dùng gì?', 'Übung: Im Geschäft · Luyện hội thoại ở cửa hàng'],
+    ),
+    createA12Chapter(4, 'Wohnen · Nhà ở', 'Từ vựng làm quen với ngôi nhà và nơi ở.', [
+      'Meine Wohnung · Căn hộ của tôi',
+      'Übung: Zimmer beschreiben · Luyện mô tả căn phòng',
+    ]),
+  ],
+}
+
+export const PUBLIC_DEMO_COURSES: readonly CourseDetailModel[] = [
+  PUBLIC_DEMO_COURSE,
+  PUBLIC_DEMO_A12_COURSE,
+]
 
 export const PUBLIC_PREVIEW_MANIFEST: PublicPreviewManifest = {
   courseSlug: 'tieng-duc-a1-1',

@@ -12,10 +12,12 @@ export const homepageContent = {
       'Tiếng Đức A1.1 được chia theo chương, giúp bạn làm quen với kiến thức cơ bản và luyện tập qua bài học trực tuyến.',
   },
   courseOverview: {
-    title: 'Xem trước trải nghiệm học tiếng Đức A1.1.',
-    description: 'Khám phá khóa học qua video giới thiệu.',
+    eyebrow: 'DIE PLATTFORM ENTDECKEN',
+    title: 'Giới thiệu nền tảng PAniverseDeutsch.',
+    description:
+      'Tổng quan website, các cấp độ tiếng Đức và cách bạn có thể học cùng PAniverseDeutsch.',
     videoUrl: 'https://www.youtube.com/watch?v=L-lkjyMArwE',
-    videoTitle: 'Video giới thiệu khóa học Tiếng Đức A1.1 của PAniverseDeutsch',
+    videoTitle: 'Video giới thiệu tổng quan website PAniverseDeutsch',
     poster: '/assets/homepage/feature-interactive.webp',
   },
   features: {
@@ -48,9 +50,10 @@ export const homepageContent = {
     ],
   },
   pricing: {
-    eyebrow: 'Khóa học hiện có',
+    eyebrow: 'UNSERE DEUTSCHKURSE',
     title: 'Chọn lộ trình học phù hợp.',
-    description: 'Xem nội dung và học phí của khóa học đang được giới thiệu.',
+    description:
+      'Khám phá lộ trình A1.1 và A1.2. Giá cùng thời hạn bên dưới chỉ là số liệu minh họa trong bản demo.',
     benefits: [
       'Cấu trúc bài học theo chương',
       'Nội dung học thử mở trực tiếp trên website',
@@ -58,7 +61,7 @@ export const homepageContent = {
     ],
   },
   benefits: {
-    eyebrow: 'Trải nghiệm học tập',
+    eyebrow: 'DEIN LERNWEG',
     title: 'Một lộ trình rõ ràng, từng bước một.',
     items: [
       {
@@ -80,7 +83,7 @@ export const homepageContent = {
     ],
   },
   faq: {
-    eyebrow: 'Câu hỏi thường gặp',
+    eyebrow: 'HÄUFIGE FRAGEN',
     title: 'Giải đáp trước khi bắt đầu.',
     description: 'Thông tin ngắn gọn về khóa học và cách sử dụng website.',
     questions: [
@@ -111,7 +114,7 @@ export const homepageContent = {
         id: 'tuition',
         question: 'Học phí và thời hạn truy cập đã được xác nhận chưa?',
         answer:
-          'Thông tin chính thức chưa có trong danh mục. Website sẽ hiển thị khi học phí và thời hạn được xác nhận.',
+          'Các mức đang hiển thị chỉ để minh họa trong bản demo, chưa phải học phí chính thức. Giá và thời hạn thật sẽ được công bố sau khi xác nhận.',
       },
       {
         id: 'access-expiry',

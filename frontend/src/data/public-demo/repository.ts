@@ -1,4 +1,4 @@
-import { PUBLIC_DEMO_COURSE, PUBLIC_PREVIEW_LESSONS, PUBLIC_PREVIEW_MANIFEST } from './fixtures'
+import { PUBLIC_DEMO_COURSES, PUBLIC_PREVIEW_LESSONS, PUBLIC_PREVIEW_MANIFEST } from './fixtures'
 import type { PublicCourseRepository } from './types'
 
 export interface PublicDemoRepositoryOptions {
@@ -16,29 +16,30 @@ export function createPublicDemoRepository(
   return {
     async listCourses() {
       await wait()
-      const course = PUBLIC_DEMO_COURSE
-      return [
-        {
-          id: course.id,
-          code: course.code,
-          slug: course.slug,
-          title: course.title,
-          level: course.level,
-          shortDescription: course.shortDescription,
-          ...(course.thumbnailUrl ? { thumbnailUrl: course.thumbnailUrl } : {}),
-          ...(course.priceVnd !== undefined ? { priceVnd: course.priceVnd } : {}),
-          ...(course.accessDurationMonths !== undefined
-            ? { accessDurationMonths: course.accessDurationMonths }
-            : {}),
-          status: course.status,
-          ...(course.chapterCount !== undefined ? { chapterCount: course.chapterCount } : {}),
-          ...(course.lessonCount !== undefined ? { lessonCount: course.lessonCount } : {}),
-        },
-      ]
+      return PUBLIC_DEMO_COURSES.map((course) => ({
+        id: course.id,
+        code: course.code,
+        slug: course.slug,
+        title: course.title,
+        level: course.level,
+        shortDescription: course.shortDescription,
+        ...(course.thumbnailUrl ? { thumbnailUrl: course.thumbnailUrl } : {}),
+        ...(course.priceVnd !== undefined ? { priceVnd: course.priceVnd } : {}),
+        ...(course.accessDurationMonths !== undefined
+          ? { accessDurationMonths: course.accessDurationMonths }
+          : {}),
+        ...(course.previewAvailable !== undefined
+          ? { previewAvailable: course.previewAvailable }
+          : {}),
+        status: course.status,
+        ...(course.chapterCount !== undefined ? { chapterCount: course.chapterCount } : {}),
+        ...(course.lessonCount !== undefined ? { lessonCount: course.lessonCount } : {}),
+      }))
     },
     async getCourseBySlug(slug) {
       await wait()
-      return slug === PUBLIC_DEMO_COURSE.slug ? structuredClone(PUBLIC_DEMO_COURSE) : null
+      const course = PUBLIC_DEMO_COURSES.find((item) => item.slug === slug)
+      return course ? structuredClone(course) : null
     },
     async getPreviewManifest(courseSlug) {
       await wait()

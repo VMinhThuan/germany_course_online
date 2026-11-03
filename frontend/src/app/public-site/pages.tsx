@@ -9,9 +9,6 @@ import {
   AccordionTrigger,
   Button,
   Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
   Container,
   LinkButton,
 } from '@/shared/ui'
@@ -21,7 +18,6 @@ import type { ReactNode } from 'react'
 import { useDialogs } from '@/shared/ui/dialogs'
 import {
   CourseDetailHero,
-  CourseCard,
   CourseGrid,
   CourseObjectives,
   CourseOutline,
@@ -150,15 +146,18 @@ export function CourseCatalogPage() {
     <SitePage>
       <Container className="space-y-10 py-10 sm:py-14">
         <header className="max-w-3xl space-y-4">
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-action-primary">
-            Khóa học tiếng Đức
+          <p
+            lang="de"
+            className="text-sm font-bold uppercase tracking-[0.14em] text-action-primary"
+          >
+            UNSERE DEUTSCHKURSE
           </p>
           <h1 className="font-display text-3xl font-extrabold tracking-tight sm:text-4xl">
             Chọn điểm bắt đầu của bạn
           </h1>
           <p className="text-lg leading-7 text-ink-secondary">
-            Danh mục hiện hiển thị khóa A1.1 duy nhất trong bản demo. Học phí và điều kiện đăng ký
-            đang được cập nhật.
+            Chọn lộ trình phù hợp với trình độ hiện tại. Các mức giá và thời hạn hiển thị chỉ dùng
+            để minh họa trong bản demo.
           </p>
         </header>
         {catalog.isError ? (
@@ -166,77 +165,12 @@ export function CourseCatalogPage() {
             title="Không tải được danh mục khóa học"
             retry={() => void catalog.refetch()}
           />
-        ) : catalog.isPending ? (
-          <CourseGrid courses={[]} loading singleColumn />
-        ) : catalog.data?.[0] ? (
-          <section
-            id="catalog"
-            aria-label="Khóa học nổi bật"
-            className="scroll-mt-28 grid items-stretch gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]"
-          >
-            <h2 className="sr-only">Khóa học hiện có</h2>
-            <CourseCard
-              course={catalog.data[0]}
-              href={`/courses/${catalog.data[0].slug}`}
-              access={{
-                kind: 'customer-preview',
-                label: 'Có chương học thử',
-                source: 'customer-requested-demo',
-              }}
-            />
-            <Card className="flex flex-col justify-between bg-surface-blue/75">
-              <CardHeader>
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-action-primary">
-                  Khóa học nổi bật
-                </p>
-                <CardTitle className="text-2xl">{catalog.data[0].title}</CardTitle>
-                <p className="text-sm leading-6 text-ink-secondary">
-                  Xem cấu trúc khóa học và thử những chương đang được mở công khai.
-                </p>
-              </CardHeader>
-              <CardContent className="grid gap-5">
-                <dl className="grid grid-cols-2 gap-3">
-                  {catalog.data[0].chapterCount !== undefined && (
-                    <div className="rounded-xl border border-white/80 bg-white/75 p-3">
-                      <dt className="text-xs text-ink-muted">Chương</dt>
-                      <dd className="mt-1 font-display text-xl font-extrabold">
-                        {catalog.data[0].chapterCount}
-                      </dd>
-                    </div>
-                  )}
-                  {catalog.data[0].lessonCount !== undefined && (
-                    <div className="rounded-xl border border-white/80 bg-white/75 p-3">
-                      <dt className="text-xs text-ink-muted">Bài học</dt>
-                      <dd className="mt-1 font-display text-xl font-extrabold">
-                        {catalog.data[0].lessonCount}
-                      </dd>
-                    </div>
-                  )}
-                </dl>
-                <div className="grid gap-3">
-                  <LinkButton
-                    to={`/courses/${catalog.data[0].slug}/preview`}
-                    className="w-full justify-center"
-                  >
-                    Mở bài học thử <ArrowRight aria-hidden="true" />
-                  </LinkButton>
-                  <LinkButton
-                    to={`/courses/${catalog.data[0].slug}`}
-                    variant="outline"
-                    className="w-full justify-center"
-                  >
-                    Xem thông tin khóa học
-                  </LinkButton>
-                </div>
-              </CardContent>
-            </Card>
-          </section>
         ) : (
-          <CourseGrid courses={[]} emptyMessage="Danh mục demo chưa có khóa học." singleColumn />
+          <CourseGrid courses={catalog.data ?? []} loading={catalog.isPending} />
         )}
         <p className="max-w-xl text-sm leading-6 text-ink-muted">
-          Đây là danh mục mẫu để xem bố cục. Chương trình, học phí và thông tin truy cập chính thức
-          sẽ được xác nhận trước khi mở đăng ký.
+          Chương trình A1.2 đang hoàn thiện. Nội dung học thử chỉ mở cho A1.1; thông tin chính thức
+          về học phí và thời hạn sẽ được công bố sau khi xác nhận.
         </p>
       </Container>
     </SitePage>
@@ -282,6 +216,7 @@ export function CourseDetailPage() {
   const manifest = manifestQuery.data
   const previewSections = manifest ? getPreviewSections(course, manifest) : null
   const previewSectionIds = previewSections?.map((section) => section.id) ?? []
+  const hasPreview = previewSectionIds.length > 0
   const detailPreviewHref = `/courses/${course.slug}/preview`
   const checkoutHref = `/checkout/purchase-course-a11-demo`
   const openDemoCheckout = () =>
@@ -310,17 +245,32 @@ export function CourseDetailPage() {
 
         <CourseDetailHero
           course={course}
-          access={{
-            kind: 'customer-preview',
-            label: 'Có 3 chương học thử miễn phí',
-            source: 'customer-requested-demo',
-          }}
+          access={
+            hasPreview
+              ? {
+                  kind: 'customer-preview',
+                  label: `Có ${previewSectionIds.length} chương học thử miễn phí`,
+                  source: 'customer-requested-demo',
+                }
+              : {
+                  kind: 'restricted',
+                  label: 'Nội dung học thử đang được chuẩn bị',
+                  reason: 'Khóa học chưa có chương học thử được cấu hình.',
+                }
+          }
           primaryAction={{
-            label: 'Học thử miễn phí',
-            onClick: () => navigate(detailPreviewHref),
+            label: hasPreview ? 'Học thử miễn phí' : 'Xem chương trình học',
+            onClick: () =>
+              hasPreview
+                ? navigate(detailPreviewHref)
+                : document
+                    .getElementById('course-outline-heading')
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
           }}
-          secondaryAction={{ label: 'Thử quy trình mua demo', onClick: openDemoCheckout }}
-          accessNote="Giá và thời hạn checkout chỉ là giả định demo."
+          {...(course.slug === 'tieng-duc-a1-1'
+            ? { secondaryAction: { label: 'Thử quy trình mua demo', onClick: openDemoCheckout } }
+            : {})}
+          accessNote="Giá và thời hạn trên danh mục chỉ là số liệu minh họa trong bản demo."
         />
 
         <div className="grid gap-12 lg:grid-cols-[minmax(0,1.2fr)_minmax(17rem,0.8fr)] lg:items-start">
@@ -369,8 +319,9 @@ export function CourseDetailPage() {
                 <h2 className="font-display text-lg font-bold">Quyền truy cập</h2>
               </div>
               <p className="mt-3 text-sm leading-6 text-ink-secondary">
-                Ba chương đầu được mở học thử. Các chương và phần ôn tập còn lại thuộc khóa học đầy
-                đủ và cần quyền truy cập.
+                {hasPreview
+                  ? `${previewSectionIds.length} chương đầu được mở học thử. Các chương và phần ôn tập còn lại thuộc khóa học đầy đủ và cần quyền truy cập.`
+                  : 'Chương trình A1.2 đang được hoàn thiện; hiện chưa có nội dung học thử.'}
               </p>
               <p className="mt-3 text-sm leading-6 text-ink-muted">
                 Giá và thời hạn trong checkout là giả định; đây không phải giao dịch thật.
@@ -389,16 +340,20 @@ export function CourseDetailPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 border-t border-border-subtle pt-6">
-          <LinkButton
-            to={checkoutHref}
-            variant="outline"
-            endIcon={<ArrowRight aria-hidden="true" />}
-          >
-            Thử quy trình mua demo
-          </LinkButton>
-          <LinkButton to={detailPreviewHref} endIcon={<ArrowRight aria-hidden="true" />}>
-            Mở ba chương học thử
-          </LinkButton>
+          {course.slug === 'tieng-duc-a1-1' && (
+            <LinkButton
+              to={checkoutHref}
+              variant="outline"
+              endIcon={<ArrowRight aria-hidden="true" />}
+            >
+              Thử quy trình mua demo
+            </LinkButton>
+          )}
+          {hasPreview && (
+            <LinkButton to={detailPreviewHref} endIcon={<ArrowRight aria-hidden="true" />}>
+              Mở chương học thử
+            </LinkButton>
+          )}
           <Link
             to="/courses"
             className="inline-flex min-h-11 items-center gap-2 px-2 font-semibold text-ink-secondary hover:text-action-primary"

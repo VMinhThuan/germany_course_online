@@ -27,7 +27,10 @@ export function CoursePricingSection({
     >
       <Container>
         <header className="mx-auto mb-8 max-w-2xl text-center sm:mb-10">
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-action-primary">
+          <p
+            lang="de"
+            className="text-sm font-bold uppercase tracking-[0.14em] text-action-primary"
+          >
             {pricing.eyebrow}
           </p>
           <h2
@@ -56,30 +59,26 @@ export function CoursePricingSection({
             message="Danh mục khóa học hiện chưa có nội dung để hiển thị."
           />
         ) : (
-          <div className="mx-auto grid max-w-5xl gap-5">
+          <div className="mx-auto grid max-w-5xl items-stretch gap-5 md:grid-cols-2">
             {courses.map((course) => {
               const priceValue = course.priceVnd?.trim()
               const benefits =
                 course.slug === 'tieng-duc-a1-1'
                   ? pricing.benefits
                   : [
-                      ...(course.chapterCount !== undefined
-                        ? [`Nội dung theo ${course.chapterCount} chương`]
-                        : []),
-                      ...(course.lessonCount !== undefined
-                        ? [`Khám phá ${course.lessonCount} bài học`]
-                        : []),
-                      'Xem nội dung khóa học',
+                      'Tiếp nối kiến thức nền tảng A1.1',
+                      'Chủ đề sinh hoạt và giao tiếp quen thuộc',
+                      'Bài tập minh họa theo từng chương',
                     ]
 
               return (
                 <article
                   key={course.id}
-                  className="overflow-hidden rounded-[1.5rem] border border-border-subtle bg-card-surface shadow-soft"
+                  className="flex h-full flex-col overflow-hidden rounded-[1.5rem] border border-border-subtle bg-card-surface shadow-soft"
                 >
                   <div className="homepage-course-banner relative isolate overflow-hidden bg-surface-blue">
                     <img
-                      src="/assets/homepage/course-banner-a11.webp"
+                      src={course.thumbnailUrl ?? '/assets/homepage/course-banner-a11.webp'}
                       alt=""
                       width="1600"
                       height="896"
@@ -104,16 +103,16 @@ export function CoursePricingSection({
                     </div>
                   </div>
 
-                  <div className="grid gap-7 p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-                    <div className="min-w-0">
+                  <div className="flex flex-1 flex-col gap-5 p-5 sm:p-6">
+                    <div>
                       <p className="max-w-2xl leading-7 text-ink-secondary">
                         {course.shortDescription}
                       </p>
-                      <ul className="mt-5 grid gap-3 sm:grid-cols-2">
+                      <ul className="mt-4 grid gap-2.5">
                         {benefits.map((benefit) => (
                           <li
                             key={benefit}
-                            className="flex items-start gap-2.5 text-sm leading-6 text-ink-secondary"
+                            className="flex items-start gap-2.5 text-sm leading-5 text-ink-secondary"
                           >
                             <Check
                               aria-hidden="true"
@@ -132,51 +131,49 @@ export function CoursePricingSection({
                               strokeWidth={2.5}
                             />
                             <span>
-                              {[course.chapterCount, course.lessonCount]
-                                .filter((value): value is number => value !== undefined)
-                                .join(' chương · ')}
-                              {course.chapterCount !== undefined && course.lessonCount !== undefined
-                                ? ' bài học'
-                                : course.chapterCount !== undefined
-                                  ? ' chương'
-                                  : ' bài học'}
+                              {course.chapterCount !== undefined && `${course.chapterCount} chương`}
+                              {course.chapterCount !== undefined &&
+                                course.lessonCount !== undefined &&
+                                ' · '}
+                              {course.lessonCount !== undefined && `${course.lessonCount} bài học`}
                             </span>
                           </li>
                         )}
                       </ul>
+                    </div>
+
+                    {course.previewAvailable ? (
                       <LinkButton
                         to={`/courses/${course.slug}/preview`}
                         variant="outline"
                         endIcon={<ArrowRight aria-hidden="true" />}
-                        className="mt-5"
+                        className="w-full justify-center sm:w-auto"
                       >
-                        Mở nội dung học thử
+                        Học thử miễn phí
                       </LinkButton>
-                    </div>
+                    ) : (
+                      <p className="text-sm font-medium text-ink-muted">
+                        Nội dung A1.2 đang được hoàn thiện.
+                      </p>
+                    )}
 
-                    <div className="flex flex-col gap-4 border-t border-border-subtle pt-5 sm:flex-row sm:items-end sm:justify-between lg:min-w-[17rem] lg:flex-col lg:items-stretch lg:border-l lg:border-t-0 lg:pl-7 lg:pt-0">
+                    <div className="mt-auto flex flex-col gap-4 border-t border-border-subtle pt-4 sm:flex-row sm:items-end sm:justify-between">
                       <div>
-                        <p className="text-xs font-bold uppercase tracking-[0.12em] text-ink-muted">
-                          Học phí
+                        <p className="text-sm font-semibold text-ink-secondary">Học phí minh họa</p>
+                        <p className="mt-0.5 font-display text-xl font-extrabold text-ink-primary">
+                          {priceValue ? formatVnd(priceValue) : 'Đang cập nhật'}
                         </p>
-                        <p className="mt-1 font-display text-xl font-extrabold text-ink-primary">
-                          {priceValue ? formatVnd(priceValue) : 'Học phí đang cập nhật'}
-                        </p>
-                        {course.accessDurationMonths !== undefined ? (
+                        {course.accessDurationMonths !== undefined && (
                           <p className="mt-1 flex items-center gap-1.5 text-sm text-ink-secondary">
                             <Clock3 aria-hidden="true" className="size-4" />
-                            {course.accessDurationMonths} tháng truy cập
-                          </p>
-                        ) : (
-                          <p className="mt-1 text-sm text-ink-muted">
-                            Thời hạn truy cập đang cập nhật
+                            {course.accessDurationMonths} tháng truy cập · demo
                           </p>
                         )}
                       </div>
                       <LinkButton
                         to={`/courses/${course.slug}`}
                         endIcon={<ArrowRight aria-hidden="true" />}
-                        className="w-full sm:w-auto lg:w-full"
+                        className="w-full justify-center sm:w-auto"
                       >
                         Xem nội dung khóa
                       </LinkButton>

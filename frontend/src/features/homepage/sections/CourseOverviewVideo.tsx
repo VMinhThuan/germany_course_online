@@ -13,8 +13,11 @@ export function CourseOverviewVideo() {
     >
       <Container>
         <header className="mx-auto mb-7 max-w-2xl text-center sm:mb-9">
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-action-primary">
-            Giới thiệu khóa học
+          <p
+            lang="de"
+            className="text-sm font-bold uppercase tracking-[0.14em] text-action-primary"
+          >
+            {courseOverview.eyebrow}
           </p>
           <h2
             id="course-overview-title"

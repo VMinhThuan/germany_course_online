@@ -193,15 +193,16 @@ test('brand metadata, favicon assets, course data and footer contact details rem
     expect((await request.get(asset)).ok(), `${asset} should resolve`).toBeTruthy()
   }
 
-  await expect(page.locator('#pricing').getByRole('article')).toHaveCount(1)
-  await expect(page.locator('#pricing').getByText('Học phí đang cập nhật')).toBeVisible()
-  await expect(page.locator('#pricing').getByText('Thời hạn truy cập đang cập nhật')).toBeVisible()
+  await expect(page.locator('#pricing').getByRole('article')).toHaveCount(2)
+  await expect(page.locator('#pricing').getByRole('heading', { name: /A1\.1/ })).toBeVisible()
+  await expect(page.locator('#pricing').getByRole('heading', { name: /A1\.2/ })).toBeVisible()
+  await expect(page.locator('#pricing').getByText('Học phí minh họa')).toHaveCount(2)
+  await expect(page.locator('#pricing').getByText('12 tháng truy cập · demo')).toHaveCount(2)
+  await expect(page.locator('#pricing').getByText(/1\.290\.000/)).toBeVisible()
+  await expect(page.locator('#pricing').getByText(/1\.490\.000/)).toBeVisible()
   await expect(page.locator('#pricing').getByText('4 chương · 7 bài học')).toBeVisible()
-  await expect(page.locator('#pricing').getByText(/(?:EUR|Lifetime|€|\b\d+\.\d{2}\b)/)).toHaveCount(
-    0,
-  )
   await expect(
-    page.locator('#pricing').getByRole('link', { name: 'Xem nội dung khóa' }),
+    page.locator('#pricing').getByRole('link', { name: 'Xem nội dung khóa' }).first(),
   ).toHaveAttribute('href', '/courses/tieng-duc-a1-1')
   await expect(page.locator('#footer-contact')).toContainText('Thông tin liên hệ sẽ được bổ sung')
   await expect(page.locator('#footer-contact a[href^="mailto:"]')).toHaveCount(0)
@@ -210,7 +211,10 @@ test('brand metadata, favicon assets, course data and footer contact details rem
     page.locator('#footer-contact').getByRole('link', { name: /Điều khoản|Chính sách/ }),
   ).toHaveCount(0)
 
-  const courseLink = page.locator('#pricing').getByRole('link', { name: 'Xem nội dung khóa' })
+  const courseLink = page
+    .locator('#pricing')
+    .getByRole('link', { name: 'Xem nội dung khóa' })
+    .first()
   await courseLink.click()
   await expect(page).toHaveURL('/courses/tieng-duc-a1-1')
   await expect(
@@ -256,7 +260,7 @@ test('hero CTA, feature photos and the click-to-load YouTube player work in Chro
   expect(aspectRatio).toBe('16 / 9')
   await page.locator('#course-overview').scrollIntoViewIfNeeded()
   await page.getByRole('button', { name: /Tải video:/ }).click()
-  const player = page.getByTitle('Video giới thiệu khóa học Tiếng Đức A1.1 của PAniverseDeutsch')
+  const player = page.getByTitle('Video giới thiệu tổng quan website PAniverseDeutsch')
   await expect(player).toBeVisible()
   await expect(player).toHaveAttribute(
     'src',

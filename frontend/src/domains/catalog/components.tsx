@@ -200,6 +200,12 @@ export function CourseCard({
       <CardContent className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-ink-secondary">
         {course.chapterCount !== undefined && <span>{course.chapterCount} chương</span>}
         {course.lessonCount !== undefined && <span>{course.lessonCount} bài học</span>}
+        {course.accessDurationMonths !== undefined && (
+          <span className="inline-flex items-center gap-1.5">
+            <Clock3 aria-hidden="true" className="size-4" />
+            {course.accessDurationMonths} tháng truy cập
+          </span>
+        )}
         {course.priceVnd ? (
           <span className="ml-auto font-bold text-ink-primary">{formatVnd(course.priceVnd)}</span>
         ) : (

@@ -14,18 +14,18 @@ function renderPricing(props: Partial<Parameters<typeof CoursePricingSection>[0]
 }
 
 describe('CoursePricingSection', () => {
-  it('shows the catalog course without inventing a price or access duration', () => {
+  it('shows the illustrative price and access duration for the demo course', () => {
     const { container } = renderPricing()
 
     expect(screen.getByRole('article')).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('Tiếng Đức A1.1')
-    expect(screen.getByText('Học phí đang cập nhật')).toBeInTheDocument()
-    expect(screen.getByText('Thời hạn truy cập đang cập nhật')).toBeInTheDocument()
+    expect(screen.getByText('Học phí minh họa')).toBeInTheDocument()
+    expect(screen.getByText(/1\.290\.000/)).toBeInTheDocument()
+    expect(screen.getByText('12 tháng truy cập · demo')).toBeInTheDocument()
     expect(screen.getByText('4 chương · 7 bài học')).toBeInTheDocument()
     expect(
       container.querySelector('img[src="/assets/homepage/course-banner-a11.webp"]'),
     ).not.toBeNull()
-    expect(screen.queryByText(/EUR|Lifetime|€|\b\d+\.\d{2}\b/)).not.toBeInTheDocument()
   })
 
   it('formats only the supplied course price and access duration', () => {
@@ -34,8 +34,8 @@ describe('CoursePricingSection', () => {
     })
 
     expect(screen.getByText(/1\.290\.000/)).toBeInTheDocument()
-    expect(screen.getByText('12 tháng truy cập')).toBeInTheDocument()
-    expect(screen.queryByText('Học phí đang cập nhật')).not.toBeInTheDocument()
+    expect(screen.getByText('12 tháng truy cập · demo')).toBeInTheDocument()
+    expect(screen.queryByText('Đang cập nhật')).not.toBeInTheDocument()
   })
 
   it('renders one card for each catalog result and exposes real course and preview routes', () => {

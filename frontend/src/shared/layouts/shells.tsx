@@ -104,7 +104,13 @@ export function PublicShell({
       <header className="sticky top-0 z-header border-b border-border-subtle/80 bg-card-surface/95 backdrop-blur-sm">
         {showPreviewNotice && <PreviewNotice text={previewNotice} />}
         <Container className="flex h-[4.25rem] items-center justify-between gap-4">
-          <BrandLogo to={brandHref} />
+          <Link
+            to={brandHref}
+            aria-label={brandConfig.name}
+            className="inline-flex min-h-11 items-center rounded-lg font-display text-lg font-extrabold tracking-tight text-action-primary hover:text-action-primary-hover sm:text-xl"
+          >
+            {brandConfig.name}
+          </Link>
           <div className={`hidden items-center gap-7 ${wideNavigation ? 'lg:flex' : 'md:flex'}`}>
             <PublicMenu items={navItems} />
             {authState ? (

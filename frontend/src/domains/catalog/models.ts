@@ -18,6 +18,7 @@ export interface CourseSummaryModel {
   thumbnailUrl?: string
   priceVnd?: MoneyAmount
   accessDurationMonths?: number
+  previewAvailable?: boolean
   status: CourseStatus
   chapterCount?: number
   lessonCount?: number
