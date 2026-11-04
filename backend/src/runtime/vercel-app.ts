@@ -1,10 +1,13 @@
-import express, { type Express } from "express";
-import { default as helmet } from "helmet";
+import express, { type Express, type RequestHandler } from "express";
+import helmet from "helmet";
 import { parseEnvironment, type AppConfig } from "../config/env.js";
 import { createApp, type AppDependencies } from "../app.js";
 import { createVercelMongoConnection } from "../db/connection.js";
 import { requestIdMiddleware } from "../http/request-id.js";
 import { success } from "../shared/responses.js";
+
+// Vercel's Node builder can type this ESM default export as a CJS namespace.
+const helmetFactory = helmet as unknown as () => RequestHandler;
 
 export function createVercelApp(
   config: AppConfig,
@@ -21,7 +24,7 @@ function createConfigurationUnavailableApp(): Express {
   const app = express();
   app.disable("x-powered-by");
   app.use(requestIdMiddleware);
-  app.use(helmet());
+  app.use(helmetFactory());
   app.get("/health", (_req, res) => success(res, { status: "ok" }));
   app.use((_req, res) => {
     res.status(503).json({

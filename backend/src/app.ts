@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import express, { type Express, type RequestHandler } from "express";
-import { default as helmet } from "helmet";
+import helmet from "helmet";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { rateLimit } from "express-rate-limit";
@@ -38,6 +38,9 @@ import { createLearningRouter } from "./modules/learning/routes.js";
 import { CommerceService } from "./modules/commerce/service.js";
 import { createCommerceRouter } from "./modules/commerce/routes.js";
 import { EmailOutboxWorker } from "./modules/commerce/email-outbox-worker.js";
+
+// Vercel's Node builder can type this ESM default export as a CJS namespace.
+const helmetFactory = helmet as unknown as () => RequestHandler;
 const VERCEL_OUTBOX_BATCH_LIMIT = 1;
 
 export type AppDependencies = {
@@ -116,7 +119,7 @@ export function createApp(
   app.disable("x-powered-by");
   app.use(requestIdMiddleware);
   app.use(requestLogger(logger));
-  app.use(helmet());
+  app.use(helmetFactory());
   app.use("/api/v1/auth", (req, res, next) => {
     if (
       ["/login", "/refresh", "/logout"].includes(req.path) &&
