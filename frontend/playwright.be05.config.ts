@@ -4,7 +4,8 @@ export default defineConfig({
   testDir: './e2e',
   testMatch: /be05-release\.spec\.ts$/,
   outputDir: './test-results/be05-isolated',
-  timeout: 180_000,
+  // The accessibility sweep scans 37 route/viewport combinations in one test.
+  timeout: 360_000,
   expect: { timeout: 20_000 },
   workers: 1,
   fullyParallel: false,

@@ -806,6 +806,7 @@ test('representative public, student and Admin routes stay usable at desktop, ta
     { impact: string; rule: string; occurrences: number; nodes: number }
   >()
   const scan = async (target: Page, route: string, viewport: string) => {
+    console.log(`BE-05 axe scan ${findings.length + 1}/37: ${route} (${viewport})`)
     const result = await new AxeBuilder({ page: target })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
       .analyze()

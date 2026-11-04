@@ -1,5 +1,5 @@
 import express, { type Express } from "express";
-import helmet from "helmet";
+import * as helmet from "helmet";
 import { parseEnvironment, type AppConfig } from "../config/env.js";
 import { createApp, type AppDependencies } from "../app.js";
 import { createVercelMongoConnection } from "../db/connection.js";
@@ -21,7 +21,7 @@ function createConfigurationUnavailableApp(): Express {
   const app = express();
   app.disable("x-powered-by");
   app.use(requestIdMiddleware);
-  app.use(helmet());
+  app.use(helmet.default());
   app.get("/health", (_req, res) => success(res, { status: "ok" }));
   app.use((_req, res) => {
     res.status(503).json({
