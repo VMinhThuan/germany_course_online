@@ -1,12 +1,10 @@
-import { createRequire } from "node:module";
-import express, { type Express, type RequestHandler } from "express";
+import express, { type Express } from "express";
+import { default as helmet } from "helmet";
 import { parseEnvironment, type AppConfig } from "../config/env.js";
 import { createApp, type AppDependencies } from "../app.js";
 import { createVercelMongoConnection } from "../db/connection.js";
 import { requestIdMiddleware } from "../http/request-id.js";
 import { success } from "../shared/responses.js";
-
-const helmet = createRequire(import.meta.url)("helmet") as () => RequestHandler;
 
 export function createVercelApp(
   config: AppConfig,

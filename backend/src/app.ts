@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import express, { type Express, type RequestHandler } from "express";
+import { default as helmet } from "helmet";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { rateLimit } from "express-rate-limit";
@@ -38,8 +38,6 @@ import { createLearningRouter } from "./modules/learning/routes.js";
 import { CommerceService } from "./modules/commerce/service.js";
 import { createCommerceRouter } from "./modules/commerce/routes.js";
 import { EmailOutboxWorker } from "./modules/commerce/email-outbox-worker.js";
-
-const helmet = createRequire(import.meta.url)("helmet") as () => RequestHandler;
 const VERCEL_OUTBOX_BATCH_LIMIT = 1;
 
 export type AppDependencies = {
