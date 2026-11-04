@@ -1,5 +1,7 @@
+import express from "express";
 import { createVercelHandler } from "./runtime/vercel-app.js";
 
-const app = createVercelHandler(process.env);
+const app = express();
+app.use(createVercelHandler(process.env));
 
 export default app;
