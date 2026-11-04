@@ -3,7 +3,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://paniversedeutsch-backend-git-main-nguyen-phi-vus-projects.vercel.app/api/:path*"
+      "destination": "https://paniversedeutsch-backend.vercel.app/api/:path*"
     },
     { "source": "/(.*)", "destination": "/index.html" }
   ]

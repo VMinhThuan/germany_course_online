@@ -406,7 +406,7 @@ describe("Express foundation, auth, and public APIs", () => {
       expect(await User.countDocuments()).toBe(1);
     });
 
-    it("authenticates, sets HttpOnly refresh cookie, and returns one JSON envelope", async () => {
+    it("authenticates without a bearer token, sets HttpOnly refresh cookie, and returns one JSON envelope", async () => {
       await registerUser();
       const response = await loginUser();
       expect(response.status).toBe(200);
@@ -418,6 +418,21 @@ describe("Express foundation, auth, and public APIs", () => {
       expect(cookieHeaders(response)[0]).toContain("HttpOnly");
       expect(cookieHeaders(response)[0]).toContain("Path=/api/v1/auth");
       expect(await UserSession.countDocuments({ status: "ACTIVE" })).toBe(1);
+    });
+
+    it("returns the API 401 contract for anonymous refresh after the CSRF check", async () => {
+      const response = await request(app)
+        .post("/api/v1/auth/refresh")
+        .set("Origin", origin)
+        .set("X-CSRF-Protection", "1");
+
+      expect(response.status).toBe(401);
+      expect(response.headers["content-type"]).toContain("application/json");
+      expect(response.body).toMatchObject({
+        success: false,
+        error: { code: "UNAUTHORIZED" },
+      });
+      expect(await UserSession.countDocuments()).toBe(0);
     });
 
     it("rotates a refresh cookie normally and accepts the new access token", async () => {
@@ -819,7 +834,7 @@ describe("Express foundation, auth, and public APIs", () => {
   });
 
   describe("public course catalog", () => {
-    it("lists only published non-deleted courses with stable pagination and exact money strings", async () => {
+    it("lists published non-deleted courses for an anonymous request with stable pagination and exact money strings", async () => {
       await createPublishedCourse({
         price: "900719925474099312345",
         slug: "large-price",
