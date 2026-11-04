@@ -1,10 +1,12 @@
-import express, { type Express } from "express";
-import * as helmet from "helmet";
+import { createRequire } from "node:module";
+import express, { type Express, type RequestHandler } from "express";
 import { parseEnvironment, type AppConfig } from "../config/env.js";
 import { createApp, type AppDependencies } from "../app.js";
 import { createVercelMongoConnection } from "../db/connection.js";
 import { requestIdMiddleware } from "../http/request-id.js";
 import { success } from "../shared/responses.js";
+
+const helmet = createRequire(import.meta.url)("helmet") as () => RequestHandler;
 
 export function createVercelApp(
   config: AppConfig,
@@ -21,7 +23,7 @@ function createConfigurationUnavailableApp(): Express {
   const app = express();
   app.disable("x-powered-by");
   app.use(requestIdMiddleware);
-  app.use(helmet.default());
+  app.use(helmet());
   app.get("/health", (_req, res) => success(res, { status: "ok" }));
   app.use((_req, res) => {
     res.status(503).json({

@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import express, { type Express, type RequestHandler } from "express";
-import * as helmet from "helmet";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { rateLimit } from "express-rate-limit";
@@ -39,6 +39,7 @@ import { CommerceService } from "./modules/commerce/service.js";
 import { createCommerceRouter } from "./modules/commerce/routes.js";
 import { EmailOutboxWorker } from "./modules/commerce/email-outbox-worker.js";
 
+const helmet = createRequire(import.meta.url)("helmet") as () => RequestHandler;
 const VERCEL_OUTBOX_BATCH_LIMIT = 1;
 
 export type AppDependencies = {
@@ -117,7 +118,7 @@ export function createApp(
   app.disable("x-powered-by");
   app.use(requestIdMiddleware);
   app.use(requestLogger(logger));
-  app.use(helmet.default());
+  app.use(helmet());
   app.use("/api/v1/auth", (req, res, next) => {
     if (
       ["/login", "/refresh", "/logout"].includes(req.path) &&
