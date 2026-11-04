@@ -1,7 +1,7 @@
 import express, { type Express, type RequestHandler } from "express";
 import helmet from "helmet";
 import { parseEnvironment, type AppConfig } from "../config/env.js";
-import { createApp, type AppDependencies } from "../app.js";
+import { createApp, type AppDependencies } from "../application.js";
 import { createVercelMongoConnection } from "../db/connection.js";
 import { requestIdMiddleware } from "../http/request-id.js";
 import { success } from "../shared/responses.js";

@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { Types } from "mongoose";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { createApp } from "../../src/app.js";
+import { createApp } from "../../src/application.js";
 import {
   AuditLog,
   Coupon,

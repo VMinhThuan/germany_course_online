@@ -18,7 +18,7 @@ import {
   SiteSettings,
   User,
 } from "../src/db/models/index.js";
-import { createApp } from "../src/app.js";
+import { createApp } from "../src/application.js";
 import { FakeEmailService } from "../src/modules/auth/email-service.js";
 import { ensureIndexes } from "../src/db/ensure-indexes.js";
 

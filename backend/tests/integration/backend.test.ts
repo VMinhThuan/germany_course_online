@@ -4,7 +4,7 @@ import mongoose from "mongoose";
 import argon2 from "argon2";
 import { createHash } from "node:crypto";
 import { SignJWT } from "jose";
-import { createApp } from "../../src/app.js";
+import { createApp } from "../../src/application.js";
 import {
   createVercelApp,
   createVercelHandler,

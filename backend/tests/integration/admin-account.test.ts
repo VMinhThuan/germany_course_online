@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 import argon2 from "argon2";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { createApp } from "../../src/app.js";
+import { createApp } from "../../src/application.js";
 import type { AppConfig } from "../../src/config/env.js";
 import {
   AuditLog,

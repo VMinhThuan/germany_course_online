@@ -3,7 +3,7 @@ import type { Server } from "node:http";
 import { parseEnvironment } from "./config/env.js";
 import { connectMongo, disconnectMongo } from "./db/connection.js";
 import { ensureIndexes } from "./db/ensure-indexes.js";
-import { createApp } from "./app.js";
+import { createApp } from "./application.js";
 import { createLogger } from "./http/logger.js";
 import { closeHttpServer, listenHttp } from "./http/server-lifecycle.js";
 import { EmailOutboxWorker } from "./modules/commerce/email-outbox-worker.js";

@@ -7,9 +7,9 @@
     "node": ">=22.12.0 <23"
   },
   "scripts": {
-    "dev": "tsx watch src/server.ts",
+    "dev": "tsx watch src/persistent-server.ts",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/src/server.js",
+    "start": "node dist/src/persistent-server.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint src tests scripts --max-warnings=0",
     "format:check": "prettier --check src tests scripts package.json tsconfig.json eslint.config.mjs vitest.config.ts",
