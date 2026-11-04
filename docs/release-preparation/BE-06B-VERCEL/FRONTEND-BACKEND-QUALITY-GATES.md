@@ -14,4 +14,4 @@ Local BE-06B validation:
 | `npm audit --omit=dev`, frontend and backend | 0 vulnerabilities |
 | `git diff --cached --check` | PASS |
 
-GitHub Actions run status is added after push. Browser E2E uses synthetic fixtures and MongoMemory; it never uses a remote MongoDB URI. A local build or unit test is not evidence of a deployed or operational service.
+GitHub Actions `Quality Gates` run [#7](https://github.com/VMinhThuan/germany_course_online/actions/runs/41788527881) completed successfully for `main` at `3063a1ee889fb97bf10449925c9faeb1f3685a7e`. Browser E2E uses synthetic fixtures and MongoMemory; it never uses a remote MongoDB URI. The live GET smoke is recorded separately; a local build, unit test, or successful CI run does not establish that the unconfigured backend is operational.

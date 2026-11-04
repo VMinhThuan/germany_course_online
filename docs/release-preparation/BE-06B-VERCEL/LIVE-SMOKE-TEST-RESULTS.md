@@ -1,7 +1,15 @@
 # Live Smoke Test Results
 
-**Status:** `NOT_RUN`; BE-06B source has not yet been deployed.
+**Status:** Partial read-only smoke completed on Production deployments from implementation SHA `3063a1ee889fb97bf10449925c9faeb1f3685a7e`.
 
-After deployment, record independent results for frontend root and direct SPA routes, backend `/health`, database-backed `/ready`, OpenAPI document/docs, public course API, and same-origin API/auth cookie flow. Do not call `/ready` operational if Mongo is unconfigured. Do not create users, send real email, exercise payment operations, or modify production data as smoke tests.
+| Request | Result | Interpretation |
+|---|---|---|
+| Frontend `/` | HTTP 200 | SPA document served |
+| Frontend `/courses` | HTTP 200 | Direct SPA route fallback works |
+| Backend `/health` | HTTP 200 | Liveness only |
+| Backend `/ready` | HTTP 503 `CONFIGURATION_UNAVAILABLE` | Expected: no backend environment variables are configured |
+| Backend `/api/openapi.yaml` | HTTP 503 `CONFIGURATION_UNAVAILABLE` | Configuration guard runs before API docs |
+| Backend `/api/v1/courses` | HTTP 503 `CONFIGURATION_UNAVAILABLE` | No MongoDB connection attempted without valid configuration |
+| Frontend `/api/v1/courses` rewrite | HTTP 302 authentication required | Protected backend rewrite could not be fetched through this authenticated-fetch session; SSO remains enabled |
 
-Existing baseline evidence is limited to a READY Vite Production deployment for the pre-BE-06B SHA. No route was fetched in this phase. The existing deployment is SSO protected. Run only safe read-only checks after the new deployment is available; do not create users, send real email, exercise payments or modify production data.
+Frontend deployment `dpl_7YNB57foyzrEDMoMpwuqM8AuWjPz` and backend deployment `dpl_AdRW7A4okNbVxBggNgZSxyzPV1j3` both report `READY`. Requests used Vercel's authenticated-fetch facility and did not create users, send email, exercise payments, or modify MongoDB data. Auth cookies, CSRF, write methods, browser rendering/console, and database readiness were not tested. Do not report `OPERATIONAL_PASS`.

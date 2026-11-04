@@ -7,4 +7,4 @@
 - Mongo connection failures produce a redacted 503; no URI or database host is emitted in responses/log fields.
 - No remote MongoDB, SMTP, media store, bank/payment service, or real student record was accessed.
 - Pre-stage text scan reviewed tracked modifications and untracked text files except the explicitly excluded `.rar`. Four URI-shaped matches are invalid-domain examples or synthetic unit-test fixtures; no real credentials were found. Repeat on the final staged tree before commit.
-- Existing frontend project environment inventory was previously reported empty; no settings or values were changed. Backend project/environment inventory remains pending project creation. No user-supplied MongoDB URI was copied into Vercel.
+- Current Vercel environment inventories for both `germany-course-online-new` and `paniversedeutsch-backend` are empty (`hiddenProductionEnvCount: 0`). No settings or values were changed, and no user-supplied MongoDB URI was copied into Vercel.

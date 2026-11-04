@@ -12,3 +12,5 @@
 | MEDIA_S3_* | No | Yes | Optional complete private storage tuple; not configured. |
 
 Do not put backend secrets in the repo, GitHub Actions, Vite variables, or chat. The example files contain placeholders only and are not deployable settings.
+
+Live project inventory check: frontend and backend both currently list zero environment variables and zero hidden Production variables. Accordingly, the backend responds with `503 CONFIGURATION_UNAVAILABLE` outside `/health`.
