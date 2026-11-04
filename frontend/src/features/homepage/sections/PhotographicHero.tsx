@@ -3,9 +3,15 @@ import { LinkButton } from '@/shared/ui'
 import { BilingualSectionHeading } from '../components/BilingualSectionHeading'
 import { homepageContent } from '../content/homepage-content'
 
-const coursePath = '/courses/tieng-duc-a1-1'
-
-export function PhotographicHero() {
+export function PhotographicHero({
+  title,
+  description,
+  imageUrl,
+}: {
+  title?: string
+  description?: string
+  imageUrl?: string | null
+}) {
   const { hero } = homepageContent
 
   return (
@@ -22,33 +28,33 @@ export function PhotographicHero() {
             align="left"
             id="homepage-hero-title"
             className="max-w-xl"
-            title={hero.title}
+            title={title || hero.title}
             german={hero.german}
-            description={hero.description}
+            description={description || hero.description}
           />
           <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             <LinkButton
-              to={`${coursePath}/preview`}
+              to="/courses"
               size="lg"
               endIcon={<ArrowRight aria-hidden="true" />}
               className="w-full shadow-soft sm:w-auto"
             >
-              Học thử miễn phí
+              Xem khóa học
             </LinkButton>
             <LinkButton
-              to={coursePath}
+              to="/courses"
               variant="outline"
               size="lg"
               className="w-full border-action-primary/25 bg-card-surface/90 sm:w-auto"
             >
-              Khám phá khóa học
+              Tìm lộ trình phù hợp
             </LinkButton>
           </div>
         </div>
 
         <figure className="homepage-hero__media relative mx-auto w-full max-w-[39rem] md:ml-auto">
           <img
-            src="/assets/homepage/paniverse-hero.webp"
+            src={imageUrl || '/assets/homepage/paniverse-hero.webp'}
             alt="Người học đang xem bài học tiếng Đức và ghi chú tại bàn học."
             width="1500"
             height="1000"

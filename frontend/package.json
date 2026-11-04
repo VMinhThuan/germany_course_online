@@ -13,6 +13,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "playwright test",
+    "e2e:be04": "playwright test --config=playwright.be04.config.ts",
+    "e2e:be05": "playwright test --config=playwright.be05.config.ts",
     "e2e:production": "playwright test --config=playwright.production.config.ts",
     "e2e:ui": "playwright test --ui",
     "check": "npm run typecheck && npm run lint && npm run test && npm run build",

@@ -8,69 +8,99 @@ import {
   type PropsWithChildren,
 } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { studentDemoRepositories } from '@/data/student-demo/repository'
+import { ApiError } from '@/lib/api/client'
+import { apiAuth, type AppSession } from '@/lib/auth/api-auth'
 import { subscribeSessionRevoked } from '@/data/student-demo/session-events'
 import type { SessionEndReason } from '@/data/student-demo/session-events'
-import type { DemoSession } from '@/data/student-demo/types'
 import { useNotifications } from '@/shared/ui/notifications'
 
-export type AuthSessionStatus = 'checking' | 'anonymous' | 'authenticated'
+export type AuthSessionStatus = 'checking' | 'anonymous' | 'authenticated' | 'error'
 
 interface AuthSessionContextValue {
   status: AuthSessionStatus
-  session: DemoSession | null
+  session: AppSession | null
   sessionEndReason: SessionEndReason | null
-  acceptSession: (session: DemoSession) => void
-  refreshSession: () => Promise<DemoSession | null>
+  acceptSession: (session: AppSession) => void
+  refreshSession: () => Promise<AppSession | null>
   logout: (reason?: SessionEndReason) => Promise<void>
 }
 
 const AuthSessionContext = createContext<AuthSessionContextValue | null>(null)
 
+function clearAccountQueries(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.removeQueries({
+    predicate: (query) => ['student', 'admin', 'auth'].includes(String(query.queryKey[0])),
+  })
+}
+
 export function AuthSessionProvider({ children }: PropsWithChildren) {
   const queryClient = useQueryClient()
   const { warning } = useNotifications()
   const [status, setStatus] = useState<AuthSessionStatus>('checking')
-  const [session, setSession] = useState<DemoSession | null>(null)
+  const [session, setSession] = useState<AppSession | null>(null)
   const [sessionEndReason, setSessionEndReason] = useState<SessionEndReason | null>(null)
 
   const refreshSession = useCallback(async () => {
-    const restored = await studentDemoRepositories.auth.restoreSession()
-    setSession(restored)
-    setStatus(restored ? 'authenticated' : 'anonymous')
-    setSessionEndReason(null)
-    return restored
+    setStatus('checking')
+    try {
+      const restored = await apiAuth.restoreSession()
+      setSession(restored)
+      setStatus(restored ? 'authenticated' : 'anonymous')
+      setSessionEndReason(null)
+      return restored
+    } catch (error) {
+      setSession(null)
+      setStatus('error')
+      if (error instanceof ApiError && error.code === 'SESSION_REVOKED') {
+        setSessionEndReason('revoked')
+      }
+      throw error
+    }
   }, [])
 
   const acceptSession = useCallback(
-    (nextSession: DemoSession) => {
-      if (session?.id !== nextSession.id)
-        queryClient.removeQueries({ predicate: (query) => query.queryKey[0] === 'student' })
+    (nextSession: AppSession) => {
+      if (session?.id !== nextSession.id || session.role !== nextSession.role)
+        clearAccountQueries(queryClient)
       setSession(nextSession)
       setStatus('authenticated')
       setSessionEndReason(null)
     },
-    [queryClient, session?.id],
+    [queryClient, session],
   )
 
   const logout = useCallback(
     async (reason?: SessionEndReason) => {
-      await studentDemoRepositories.auth.logout()
-      queryClient.removeQueries({ predicate: (query) => query.queryKey[0] === 'student' })
-      setSession(null)
-      setStatus('anonymous')
-      setSessionEndReason(reason ?? null)
+      try {
+        await apiAuth.logout()
+      } catch {
+        apiAuth.clearLocalSession()
+      } finally {
+        clearAccountQueries(queryClient)
+        setSession(null)
+        setStatus('anonymous')
+        setSessionEndReason(reason ?? null)
+      }
     },
     [queryClient],
   )
 
   useEffect(() => {
     let active = true
-    void studentDemoRepositories.auth.restoreSession().then((restored) => {
-      if (!active) return
-      setSession(restored)
-      setStatus(restored ? 'authenticated' : 'anonymous')
-    })
+    void apiAuth
+      .restoreSession()
+      .then((restored) => {
+        if (!active) return
+        setSession(restored)
+        setStatus(restored ? 'authenticated' : 'anonymous')
+      })
+      .catch((error: unknown) => {
+        if (!active) return
+        setSession(null)
+        setStatus('error')
+        if (error instanceof ApiError && error.code === 'SESSION_REVOKED')
+          setSessionEndReason('revoked')
+      })
     return () => {
       active = false
     }
@@ -79,14 +109,16 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
   useEffect(
     () =>
       subscribeSessionRevoked((reason) => {
-        studentDemoRepositories.auth.clearSession()
-        queryClient.removeQueries({ predicate: (query) => query.queryKey[0] === 'student' })
+        apiAuth.clearLocalSession()
+        clearAccountQueries(queryClient)
         setSession(null)
         setStatus('anonymous')
         setSessionEndReason(reason)
         warning(
-          reason === 'revoked' ? 'Phiên demo đã bị thu hồi' : 'Phiên demo không còn hợp lệ',
-          'Dữ liệu học viên đã được xóa khỏi bộ nhớ truy vấn. Hãy đăng nhập lại để tiếp tục.',
+          reason === 'revoked'
+            ? 'Phiên đăng nhập đã bị thay thế hoặc thu hồi'
+            : 'Phiên đăng nhập không còn hợp lệ',
+          'Dữ liệu riêng đã được xóa khỏi bộ nhớ truy vấn. Hãy đăng nhập lại để tiếp tục.',
         )
       }),
     [queryClient, warning],

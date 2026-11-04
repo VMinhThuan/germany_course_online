@@ -5,7 +5,7 @@ import { LoadingSpinner } from '@/shared/ui'
 export function AuthChecking() {
   return (
     <main className="grid min-h-[70vh] place-items-center px-4" aria-live="polite">
-      <LoadingSpinner label="Đang kiểm tra phiên demo" />
+      <LoadingSpinner label="Đang kiểm tra phiên đăng nhập" />
     </main>
   )
 }

@@ -11,10 +11,13 @@ export interface ExerciseAssetViewModel {
   role: ExerciseAssetRole
   src?: string
   canDownload: boolean
+  availability?: 'ready' | 'loading' | 'error' | 'unavailable'
+  message?: string
 }
 
 export interface ExerciseViewModel {
   id: string
+  lessonId?: string
   title: string
   description?: string
   instructions: string

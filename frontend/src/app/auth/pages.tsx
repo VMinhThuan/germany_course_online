@@ -23,7 +23,8 @@ import {
 } from '@/shared/ui'
 import { AuthChecking, InlineProductLink } from './shared'
 import { getReturnToFromSearch } from './redirects'
-import type { DemoPersona } from '@/data/student-demo/types'
+import type { DemoPersona, DemoSession } from '@/data/student-demo/types'
+import type { AppSession } from '@/lib/auth/api-auth'
 
 type FormErrors = {
   email?: string
@@ -31,6 +32,22 @@ type FormErrors = {
   persona?: string
   name?: string
   confirm?: string
+}
+
+function toLegacyDemoSession(session: DemoSession): AppSession {
+  return {
+    id: session.id,
+    userId: session.userId,
+    role: 'STUDENT',
+    profile: {
+      id: session.profile.id ?? session.userId,
+      displayName: session.profile.displayName ?? '',
+      email: session.profile.email,
+      status: session.profile.status,
+      phone: session.profile.phone ?? null,
+      avatarUrl: session.profile.avatarUrl ?? null,
+    },
+  }
 }
 
 function usePageTitle(title: string) {
@@ -154,7 +171,7 @@ export function LoginPage() {
     setErrors({})
     try {
       const next = await studentDemoRepositories.auth.signInWithDemoAccount(persona as DemoPersona)
-      acceptSession(next)
+      acceptSession(toLegacyDemoSession(next))
       navigate(returnTo, { replace: true })
     } catch (error) {
       setRequestError(getDemoErrorPresentation(error).message)
@@ -176,7 +193,7 @@ export function LoginPage() {
     setPending(true)
     try {
       const next = await studentDemoRepositories.auth.signInWithCredentials(email, password)
-      acceptSession(next)
+      acceptSession(toLegacyDemoSession(next))
       navigate(returnTo, { replace: true })
     } catch (error) {
       setRequestError(getDemoErrorPresentation(error).message)

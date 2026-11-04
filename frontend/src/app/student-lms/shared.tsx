@@ -8,7 +8,7 @@ import { setBrandPageTitle } from '@/config/brand'
 
 export function ProductPage({
   title,
-  eyebrow = 'Không gian học demo',
+  eyebrow = 'Không gian học tập',
   description,
   children,
   backTo = '/student',
@@ -41,7 +41,7 @@ export function ProductPage({
   )
 }
 
-export function ProductLoading({ title = 'Đang tải dữ liệu demo' }: { title?: string }) {
+export function ProductLoading({ title = 'Đang tải dữ liệu' }: { title?: string }) {
   return (
     <div className="grid gap-4" role="status" aria-live="polite" aria-label={title}>
       <Skeleton className="h-24 w-full" />
@@ -53,8 +53,8 @@ export function ProductLoading({ title = 'Đang tải dữ liệu demo' }: { tit
 export function ProductError({ onRetry }: { onRetry: () => void }) {
   return (
     <ErrorState
-      title="Chưa tải được dữ liệu demo"
-      description="Dịch vụ dữ liệu mô phỏng đang gặp sự cố. Thử tải lại để tiếp tục."
+      title="Chưa tải được dữ liệu"
+      description="Không thể kết nối hoặc tải dữ liệu từ máy chủ. Kiểm tra kết nối rồi thử lại."
       onRetry={onRetry}
     />
   )

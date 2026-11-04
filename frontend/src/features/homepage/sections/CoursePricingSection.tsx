@@ -62,15 +62,6 @@ export function CoursePricingSection({
           <div className="mx-auto grid max-w-5xl items-stretch gap-5 md:grid-cols-2">
             {courses.map((course) => {
               const priceValue = course.priceVnd?.trim()
-              const benefits =
-                course.slug === 'tieng-duc-a1-1'
-                  ? pricing.benefits
-                  : [
-                      'Tiếp nối kiến thức nền tảng A1.1',
-                      'Chủ đề sinh hoạt và giao tiếp quen thuộc',
-                      'Bài tập minh họa theo từng chương',
-                    ]
-
               return (
                 <article
                   key={course.id}
@@ -78,7 +69,7 @@ export function CoursePricingSection({
                 >
                   <div className="homepage-course-banner relative isolate overflow-hidden bg-surface-blue">
                     <img
-                      src={course.thumbnailUrl ?? '/assets/homepage/course-banner-a11.webp'}
+                      src={course.thumbnailUrl ?? '/assets/homepage/paniverse-hero.webp'}
                       alt=""
                       width="1600"
                       height="896"
@@ -109,19 +100,6 @@ export function CoursePricingSection({
                         {course.shortDescription}
                       </p>
                       <ul className="mt-4 grid gap-2.5">
-                        {benefits.map((benefit) => (
-                          <li
-                            key={benefit}
-                            className="flex items-start gap-2.5 text-sm leading-5 text-ink-secondary"
-                          >
-                            <Check
-                              aria-hidden="true"
-                              className="mt-1 size-4 shrink-0 text-action-primary"
-                              strokeWidth={2.5}
-                            />
-                            <span>{benefit}</span>
-                          </li>
-                        ))}
                         {(course.chapterCount !== undefined ||
                           course.lessonCount !== undefined) && (
                           <li className="flex items-start gap-2.5 text-sm leading-6 text-ink-secondary">
@@ -142,31 +120,20 @@ export function CoursePricingSection({
                       </ul>
                     </div>
 
-                    {course.previewAvailable ? (
-                      <LinkButton
-                        to={`/courses/${course.slug}/preview`}
-                        variant="outline"
-                        endIcon={<ArrowRight aria-hidden="true" />}
-                        className="w-full justify-center sm:w-auto"
-                      >
-                        Học thử miễn phí
-                      </LinkButton>
-                    ) : (
-                      <p className="text-sm font-medium text-ink-muted">
-                        Nội dung A1.2 đang được hoàn thiện.
-                      </p>
-                    )}
+                    <p className="text-sm font-medium text-ink-muted">
+                      Nội dung khóa học được cấp theo enrollment do máy chủ xác minh.
+                    </p>
 
                     <div className="mt-auto flex flex-col gap-4 border-t border-border-subtle pt-4 sm:flex-row sm:items-end sm:justify-between">
                       <div>
-                        <p className="text-sm font-semibold text-ink-secondary">Học phí minh họa</p>
+                        <p className="text-sm font-semibold text-ink-secondary">Học phí</p>
                         <p className="mt-0.5 font-display text-xl font-extrabold text-ink-primary">
                           {priceValue ? formatVnd(priceValue) : 'Đang cập nhật'}
                         </p>
                         {course.accessDurationMonths !== undefined && (
                           <p className="mt-1 flex items-center gap-1.5 text-sm text-ink-secondary">
                             <Clock3 aria-hidden="true" className="size-4" />
-                            {course.accessDurationMonths} tháng truy cập · demo
+                            {course.accessDurationMonths} tháng truy cập
                           </p>
                         )}
                       </div>

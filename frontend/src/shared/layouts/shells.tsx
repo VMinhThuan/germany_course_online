@@ -76,7 +76,7 @@ export function PublicShell({
   className,
   navItems = publicItems,
   brandHref = '/',
-  previewNotice = 'Bản demo sản phẩm · Nội dung minh họa, chưa kết nối dữ liệu thật',
+  previewNotice = 'PAniverseDeutsch · Học tiếng Đức theo lộ trình',
   showPreviewNotice = true,
   showLogin = true,
   showRegister = true,
@@ -86,7 +86,7 @@ export function PublicShell({
   footerCopyright,
   footerContent,
   wideNavigation = false,
-  menuDescription = 'Bản xem trước A1.1',
+  menuDescription = 'Khám phá lộ trình học tiếng Đức',
   authState,
 }: ShellProps & {
   navItems?: readonly PublicNavItem[]
@@ -102,7 +102,11 @@ export function PublicShell({
   footerContent?: ReactNode
   wideNavigation?: boolean
   menuDescription?: string
-  authState?: { displayName: string; onLogout: () => void | Promise<void> }
+  authState?: {
+    displayName: string
+    role?: 'STUDENT' | 'ADMIN'
+    onLogout: () => void | Promise<void>
+  }
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const navigate = useNavigate()
@@ -128,15 +132,21 @@ export function PublicShell({
             {authState ? (
               <>
                 <Link
-                  to="/student/courses"
+                  to={authState.role === 'ADMIN' ? '/admin' : '/student/courses'}
                   className="text-sm font-semibold text-ink-secondary underline-offset-4 hover:text-ink-primary hover:underline"
                 >
-                  Học của tôi
+                  {authState.role === 'ADMIN' ? 'Khu vực quản trị' : 'Học của tôi'}
                 </Link>
                 <DropdownMenu
                   label={authState.displayName}
                   items={[
-                    { label: 'Bảng điều khiển học viên', onSelect: () => navigate('/student') },
+                    {
+                      label:
+                        authState.role === 'ADMIN'
+                          ? 'Bảng điều khiển quản trị'
+                          : 'Bảng điều khiển học viên',
+                      onSelect: () => navigate(authState.role === 'ADMIN' ? '/admin' : '/student'),
+                    },
                     {
                       label: 'Đăng xuất',
                       onSelect: () => void authState.onLogout(),
@@ -159,7 +169,7 @@ export function PublicShell({
                       to="/register"
                       className="text-sm font-semibold text-ink-secondary underline-offset-4 hover:text-ink-primary hover:underline"
                     >
-                      Tạo tài khoản demo
+                      Tạo tài khoản
                     </Link>
                   )}
                 </>
@@ -206,20 +216,23 @@ export function PublicShell({
             {authState ? (
               <>
                 <Link
-                  to="/student/courses"
+                  to={authState.role === 'ADMIN' ? '/admin' : '/student/courses'}
                   onClick={() => setMenuOpen(false)}
                   className="flex min-h-11 items-center px-3 font-semibold text-ink-secondary"
                 >
-                  Học của tôi
+                  {authState.role === 'ADMIN' ? 'Khu vực quản trị' : 'Học của tôi'}
                 </Link>
                 <DropdownMenu
                   label={authState.displayName}
                   items={[
                     {
-                      label: 'Bảng điều khiển học viên',
+                      label:
+                        authState.role === 'ADMIN'
+                          ? 'Bảng điều khiển quản trị'
+                          : 'Bảng điều khiển học viên',
                       onSelect: () => {
                         setMenuOpen(false)
-                        navigate('/student')
+                        navigate(authState.role === 'ADMIN' ? '/admin' : '/student')
                       },
                     },
                     {
@@ -246,7 +259,7 @@ export function PublicShell({
                       onClick={() => setMenuOpen(false)}
                       className="flex min-h-11 items-center px-3 font-semibold text-ink-secondary"
                     >
-                      Tạo tài khoản demo
+                      Tạo tài khoản
                     </Link>
                   )}
                 </>
@@ -333,8 +346,8 @@ export function AuthShell({
   brandHref = '/',
   backHref = '/',
   backLabel = 'Về trang chủ',
-  previewNotice = 'Bản demo sản phẩm · Không gửi dữ liệu đăng nhập đến máy chủ',
-  footerMessage = 'Luồng xác thực mô phỏng · Không dùng mật khẩu thật',
+  previewNotice = 'Kết nối bảo mật tới PAniverseDeutsch',
+  footerMessage = 'Thông tin được gửi trực tiếp tới máy chủ xác thực.',
 }: ShellProps & {
   brandHref?: string
   backHref?: string
@@ -490,9 +503,7 @@ export function StudentShell({
       <div className="min-h-[calc(100vh-2rem)] lg:grid lg:grid-cols-[15.5rem_minmax(0,1fr)]">
         <header className="lg:col-span-2">
           <PreviewNotice
-            text={
-              productMode ? 'Khu vực học viên demo · Tài khoản và tiến độ được mô phỏng' : undefined
-            }
+            text={productMode ? 'Khu vực học viên · Tiến độ được đồng bộ với tài khoản' : undefined}
           />
         </header>
         <aside
@@ -518,11 +529,11 @@ export function StudentShell({
           <div className="border-t border-border-subtle p-4">
             <div className="rounded-xl bg-surface-lime p-3">
               <p className="text-xs font-bold text-pastel-lime-ink">
-                {productMode ? 'Bản demo · A1.1' : `${brandConfig.name} · A1.1`}
+                {productMode ? 'Học tập trực tuyến' : brandConfig.name}
               </p>
               <p className="mt-1 text-xs leading-5 text-ink-secondary">
                 {productMode
-                  ? 'Nội dung và giao dịch trong khu vực này được mô phỏng.'
+                  ? 'Quyền học và tiến độ do máy chủ xác nhận.'
                   : 'Một lối đi gọn cho bài học, ghi chú và tiến độ.'}
               </p>
             </div>
@@ -607,7 +618,7 @@ export function StudentShell({
         onOpenChange={setMenuOpen}
         side="left"
         title="Khu vực học viên"
-        description={productMode ? 'Điều hướng học viên demo' : 'Điều hướng bản xem trước'}
+        description={productMode ? 'Điều hướng học viên' : 'Điều hướng bản xem trước'}
       >
         {productMode ? (
           <ProductStudentNavigation

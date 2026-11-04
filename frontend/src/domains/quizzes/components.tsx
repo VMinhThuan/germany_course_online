@@ -20,16 +20,18 @@ export function QuizIntro({
 }: {
   title: string
   description: string
-  questionCount: number
+  questionCount?: number
   onStart?: () => void
   headingLevel?: HeadingLevel
 }) {
   return (
     <Card className="grid gap-4 p-5 sm:p-7">
       <div>
-        <p className="text-sm font-semibold text-action-primary">
-          Bài kiểm tra · {questionCount} câu
-        </p>
+        {questionCount !== undefined && (
+          <p className="text-sm font-semibold text-action-primary">
+            Bài kiểm tra · {questionCount} câu
+          </p>
+        )}
         <SemanticHeading level={headingLevel} className="mt-1 font-display text-2xl font-bold">
           {title}
         </SemanticHeading>
@@ -205,7 +207,7 @@ export function QuizRunner({
   const confirmation: DialogRequest = {
     kind: 'confirm',
     title: 'Nộp bài kiểm tra?',
-    description: 'Sau khi nộp, lượt làm này sẽ được lưu và kết quả do repository demo trả về.',
+    description: 'Sau khi nộp, lượt làm này sẽ được lưu và kết quả do máy chủ trả về.',
     confirmLabel: 'Nộp bài',
     onConfirm: submit,
   }
@@ -312,13 +314,15 @@ export function QuizReview({ result }: { result: QuizResultViewModel }) {
       {result.review.map((item, index) => (
         <li key={item.questionId} className="rounded-xl border border-border-subtle p-4">
           <p className="font-semibold">Câu {index + 1}</p>
-          {item.correctOptionId && (
+          {(item.correctOption || item.correctOptionId) && (
             <p className="mt-2 text-sm text-success-foreground">
-              Đáp án được hệ thống trả về: {item.correctOptionId}
+              Đáp án được hệ thống trả về: {item.correctOption ?? item.correctOptionId}
             </p>
           )}
-          {item.selectedOptionId && (
-            <p className="mt-1 text-sm text-ink-secondary">Bạn đã chọn: {item.selectedOptionId}</p>
+          {(item.selectedOption || item.selectedOptionId) && (
+            <p className="mt-1 text-sm text-ink-secondary">
+              Bạn đã chọn: {item.selectedOption ?? item.selectedOptionId}
+            </p>
           )}
           {item.explanation && (
             <p className="mt-2 text-sm leading-6 text-ink-secondary">{item.explanation}</p>

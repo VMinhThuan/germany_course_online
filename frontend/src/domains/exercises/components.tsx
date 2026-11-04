@@ -69,6 +69,11 @@ export function ExerciseAssetList({ exercise }: { exercise: ExerciseViewModel })
             title={asset.title}
             canDownload={asset.canDownload}
           />
+          {asset.availability && asset.availability !== 'ready' && (
+            <span className="basis-full text-xs leading-5 text-ink-secondary">
+              {asset.message ?? 'Tài liệu media tạm thời chưa sẵn sàng.'}
+            </span>
+          )}
         </li>
       ))}
     </ul>
@@ -173,11 +178,18 @@ export function ExerciseSolutionPanel({ exercise }: { exercise: ExerciseViewMode
         <ul className="grid gap-2">
           {solutions.map((asset) => (
             <li key={asset.id}>
-              <MediaFallbackLink
-                {...(asset.src ? { src: asset.src } : {})}
-                title={asset.title}
-                canDownload={asset.canDownload}
-              />
+              <div className="grid gap-1">
+                {asset.availability && asset.availability !== 'ready' && (
+                  <p className="text-xs leading-5 text-ink-secondary">
+                    {asset.message ?? 'Tài liệu lời giải tạm thời chưa sẵn sàng.'}
+                  </p>
+                )}
+                <MediaFallbackLink
+                  {...(asset.src ? { src: asset.src } : {})}
+                  title={asset.title}
+                  canDownload={asset.canDownload}
+                />
+              </div>
             </li>
           ))}
         </ul>

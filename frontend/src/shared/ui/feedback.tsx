@@ -138,7 +138,7 @@ export function EmptyState({
 }: {
   icon?: ReactNode
   title: string
-  description: string
+  description?: string
   action?: ReactNode
 }) {
   return (
@@ -151,7 +151,9 @@ export function EmptyState({
         )}
         <div className="max-w-md space-y-1.5">
           <h3 className="font-display text-lg font-bold">{title}</h3>
-          <p className="text-sm leading-6 text-ink-secondary">{description}</p>
+          <p className="text-sm leading-6 text-ink-secondary">
+            {description ?? 'Chưa có dữ liệu phù hợp.'}
+          </p>
         </div>
         {action}
       </CardContent>

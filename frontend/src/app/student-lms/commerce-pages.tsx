@@ -1,176 +1,246 @@
-import { useState } from 'react'
-import { ArrowRight, CreditCard } from 'lucide-react'
+import { useState, type FormEvent } from 'react'
+import { ArrowRight, CheckCircle2, CircleAlert, CreditCard, QrCode, XCircle } from 'lucide-react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { useAuthSession } from '@/app/auth/auth-session'
-import { DEMO_COURSE_ID, DEMO_COURSE_SLUG } from '@/data/student-demo/fixtures'
-import { studentDemoRepositories } from '@/data/student-demo/repository'
 import {
+  useCancelStudentOrder,
+  useConfirmTransfer,
   useCreateOrder,
   useProductCheckout,
   useProductCourse,
   useProductOrder,
   useProductOrders,
   useProductRenewalPlans,
-  useSimulatePayment,
+  useValidateStudentCoupon,
 } from '@/data/student-demo/product-queries'
-import {
-  CouponField,
-  OrderHistoryItem,
-  OrderSummary,
-  PaymentPendingState,
-  PaymentStatusPanel,
-  PriceSummary,
-  RenewalPlanCard,
-} from '@/domains/commerce'
-import { EnrollmentStatusCard } from '@/domains/commerce/components'
-import { AccessStatePanel } from '@/domains/learning'
+import type { CouponValidationViewModel } from '@/domains/commerce/models'
+import { AccessStatePanel, EnrollmentStatusCard } from '@/domains'
 import { DomainState } from '@/domains/shared/presentation'
-import { Badge, Button, Card, ErrorState, LinkButton, SectionHeader } from '@/shared/ui'
+import { Badge, Button, Card, ErrorState, LinkButton, Pagination, SectionHeader } from '@/shared/ui'
 import { formatDateTimeInTimezone, formatVnd } from '@/shared/lib/format'
 import { ProductError, ProductLoading, ProductNotFound, ProductPage } from './shared'
 
-const PURCHASE_CONTEXT = `purchase-${DEMO_COURSE_ID}`
-const RENEWAL_CONTEXT = `renewal-${DEMO_COURSE_ID}`
+function checkoutContext(courseId: string, orderType: 'PURCHASE' | 'RENEWAL') {
+  return `${orderType}:${courseId}`
+}
+
+function DiscountSummary({
+  baseAmount,
+  discountAmount,
+  couponDiscountAmount,
+  automaticDiscountAmount,
+  discountSource,
+  totalAmount,
+}: {
+  baseAmount: string
+  discountAmount: string
+  couponDiscountAmount?: string
+  automaticDiscountAmount?: string
+  discountSource?: 'NONE' | 'COUPON' | 'AUTOMATIC_5_PERCENT'
+  totalAmount: string
+}) {
+  return (
+    <dl className="grid gap-2 text-sm">
+      <div className="flex justify-between gap-3">
+        <dt>Giá gốc</dt>
+        <dd className="font-semibold">{formatVnd(baseAmount)}</dd>
+      </div>
+      {couponDiscountAmount && BigInt(couponDiscountAmount) > 0n && (
+        <div className="flex justify-between gap-3 text-success-foreground">
+          <dt>Giảm từ coupon</dt>
+          <dd>−{formatVnd(couponDiscountAmount)}</dd>
+        </div>
+      )}
+      {automaticDiscountAmount && BigInt(automaticDiscountAmount) > 0n && (
+        <div className="flex justify-between gap-3 text-success-foreground">
+          <dt>Ưu đãi tự động</dt>
+          <dd>−{formatVnd(automaticDiscountAmount)}</dd>
+        </div>
+      )}
+      <div className="flex justify-between gap-3">
+        <dt>Tổng giảm · {discountSource ?? 'NONE'}</dt>
+        <dd>−{formatVnd(discountAmount)}</dd>
+      </div>
+      <div className="mt-1 flex justify-between gap-3 border-t border-border-subtle pt-3 text-base">
+        <dt className="font-bold">Cần thanh toán</dt>
+        <dd className="font-extrabold text-action-primary">{formatVnd(totalAmount)}</dd>
+      </div>
+    </dl>
+  )
+}
 
 export function CheckoutPage() {
   const { orderContext = '' } = useParams()
   const { session } = useAuthSession()
   const location = useLocation()
   const navigate = useNavigate()
-  const [couponCode, setCouponCode] = useState<string>()
   const params = new URLSearchParams(location.search)
+  const orderType = params.get('type') === 'RENEWAL' ? 'RENEWAL' : 'PURCHASE'
+  const context = checkoutContext(orderContext, orderType)
   const planId = params.get('plan') ?? undefined
-  const checkout = useProductCheckout(session?.id ?? '', orderContext, planId, couponCode)
+  const [couponCode, setCouponCode] = useState('')
+  const [acceptedCoupon, setAcceptedCoupon] = useState<string>()
+  const [couponResult, setCouponResult] = useState<CouponValidationViewModel>()
+  const quote = useProductCheckout(session?.id ?? '', context, planId, acceptedCoupon)
+  const validateCoupon = useValidateStudentCoupon(session?.id ?? '')
   const createOrder = useCreateOrder(session?.id ?? '')
-  const course = useProductCourse(session?.id ?? '', DEMO_COURSE_ID)
+
+  async function applyCoupon(event: FormEvent) {
+    event.preventDefault()
+    setCouponResult(undefined)
+    if (!couponCode.trim()) {
+      setAcceptedCoupon(undefined)
+      return
+    }
+    try {
+      const result = await validateCoupon.mutateAsync({
+        context,
+        code: couponCode.trim(),
+        ...(planId ? { planId } : {}),
+      })
+      setCouponResult(result)
+      setAcceptedCoupon(result.kind === 'valid' ? result.code : undefined)
+    } catch (error) {
+      setCouponResult({
+        kind: 'invalid',
+        code: couponCode.trim().toUpperCase(),
+        message: error instanceof Error ? error.message : 'Không xác minh được mã.',
+      })
+      setAcceptedCoupon(undefined)
+    }
+  }
+  async function submitOrder() {
+    if (!quote.data) return
+    try {
+      const order = await createOrder.mutateAsync({
+        context,
+        ...(acceptedCoupon ? { couponCode: acceptedCoupon } : {}),
+        ...(planId ? { planId } : {}),
+      })
+      navigate(`/orders/${order.order.id}/pending`)
+    } catch {
+      /* API error is shown below. */
+    }
+  }
 
   return (
     <ProductPage
-      title="Xác nhận đơn hàng"
-      eyebrow="Thanh toán mô phỏng"
-      backTo={`/courses/${DEMO_COURSE_SLUG}`}
+      title="Tạo đơn hàng"
+      eyebrow="Báo giá từ máy chủ"
+      backTo={orderType === 'RENEWAL' ? `/student/courses/${orderContext}/renew` : '/courses'}
     >
-      {checkout.isPending ? (
-        <ProductLoading title="Đang tải tóm tắt đơn hàng" />
-      ) : checkout.isError ? (
-        <div className="grid gap-4">
-          <ErrorState
-            title="Chưa thể tạo đơn hàng demo"
-            description="Ngữ cảnh checkout không hợp lệ hoặc tài khoản đã có quyền học còn hạn. Trạng thái quyền truy cập vẫn do repository quyết định."
-            onRetry={() => void checkout.refetch()}
-          />
-          {course.data?.access.kind === 'available' && (
-            <Card className="grid gap-3 p-4">
-              <AccessStatePanel access={course.data.access} />
-              <LinkButton to={`/learn/courses/${DEMO_COURSE_ID}`}>Tiếp tục học</LinkButton>
-            </Card>
-          )}
-          {orderContext === RENEWAL_CONTEXT && (
-            <LinkButton to={`/student/courses/${DEMO_COURSE_ID}/renew`} variant="outline">
-              Chọn lại gói gia hạn
-            </LinkButton>
-          )}
-        </div>
-      ) : !checkout.data ? (
-        <ProductNotFound message="Không tìm thấy ngữ cảnh đơn hàng này." />
+      {quote.isPending ? (
+        <ProductLoading title="Đang lấy báo giá" />
+      ) : quote.isError ? (
+        <ProductError onRetry={() => void quote.refetch()} />
+      ) : !quote.data ? (
+        <ProductNotFound message="Không tìm thấy báo giá cho khóa học này." />
       ) : (
-        <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
-          <div className="grid min-w-0 gap-5">
-            <Card className="grid gap-4 p-5 sm:p-6">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-action-primary">
-                    {checkout.data.orderType === 'PURCHASE' ? 'Mua khóa học' : 'Gia hạn khóa học'}
-                  </p>
-                  <h2 className="mt-1 font-display text-2xl font-bold">
-                    {checkout.data.courseTitle}
-                  </h2>
-                </div>
-                <Badge tone="warning">Giả định demo</Badge>
-              </div>
-              {checkout.data.plan && (
+        <div className="mx-auto grid w-full max-w-5xl gap-5 lg:grid-cols-[minmax(0,1fr)_21rem]">
+          <div className="grid content-start gap-5">
+            <Card className="grid gap-3 p-5 sm:p-6">
+              <Badge tone={quote.data.orderType === 'PURCHASE' ? 'brand' : 'info'}>
+                {quote.data.orderType === 'PURCHASE' ? 'Mua khóa học' : 'Gia hạn khóa học'}
+              </Badge>
+              <h2 className="font-display text-2xl font-bold">{quote.data.courseTitle}</h2>
+              {quote.data.plan && (
                 <p className="text-sm text-ink-secondary">
-                  Gói đã chọn: {checkout.data.plan.title}
+                  Gói: {quote.data.plan.title} · {quote.data.plan.durationMonths} tháng
                 </p>
               )}
-              {checkout.data.currentExpiry && (
+              {quote.data.currentExpiry && (
                 <p className="text-sm text-ink-secondary">
-                  Hạn hiện tại: {formatDateTimeInTimezone(checkout.data.currentExpiry)}
+                  Hạn hiện tại: {formatDateTimeInTimezone(quote.data.currentExpiry)}
                 </p>
               )}
-              <p className="rounded-xl bg-surface-blue p-4 text-sm leading-6 text-ink-secondary">
-                Giá và thời hạn này chỉ dùng để thử giao diện. Chưa phải học phí hoặc điều khoản
-                chính thức; không có cổng thanh toán thật.
+              <p className="text-sm leading-6 text-ink-secondary">
+                Báo giá và thời hạn này do backend tính. Tạo đơn sẽ ở trạng thái PENDING; quyền học
+                chỉ được cập nhật sau khi Admin duyệt.
               </p>
             </Card>
             <Card className="grid gap-4 p-5 sm:p-6">
               <SectionHeader
                 title="Mã ưu đãi"
-                description="Mã DEMO10 là dữ liệu minh họa; repository trả về mức giảm."
+                description="Backend kiểm tra điều kiện và quyết định coupon hay ưu đãi tự động có giá trị lớn hơn."
               />
-              <CouponField
-                onValidate={(code) =>
-                  studentDemoRepositories.commerce.validateCoupon(
-                    session!.id,
-                    orderContext,
-                    code,
-                    planId,
-                  )
-                }
-                onCodeChange={() => setCouponCode(undefined)}
-                onResult={(result) =>
-                  setCouponCode(result.kind === 'valid' ? result.code : undefined)
-                }
-              />
+              <form
+                className="flex flex-col gap-3 sm:flex-row"
+                onSubmit={(event) => void applyCoupon(event)}
+              >
+                <label className="grid flex-1 gap-1 text-sm font-semibold">
+                  Mã coupon
+                  <input
+                    className="min-h-11 rounded-xl border border-border-subtle bg-white px-3 font-normal outline-none focus-visible:ring-2 focus-visible:ring-action-primary"
+                    value={couponCode}
+                    onChange={(event) => {
+                      setCouponCode(event.target.value)
+                      setAcceptedCoupon(undefined)
+                      setCouponResult(undefined)
+                    }}
+                    autoComplete="off"
+                  />
+                </label>
+                <Button
+                  type="submit"
+                  variant="outline"
+                  loading={validateCoupon.isPending}
+                  className="self-end"
+                >
+                  Áp dụng
+                </Button>
+              </form>
+              {couponResult && (
+                <p
+                  role={couponResult.kind === 'valid' ? 'status' : 'alert'}
+                  className={`rounded-xl p-3 text-sm ${couponResult.kind === 'valid' ? 'bg-success-surface text-success-foreground' : 'bg-danger-surface text-danger-foreground'}`}
+                >
+                  {couponResult.message}
+                </p>
+              )}
             </Card>
           </div>
-          <aside aria-label="Tóm tắt đơn hàng" className="grid content-start gap-4">
+          <aside className="grid content-start gap-4">
             <Card className="grid gap-4 p-5">
-              <h2 className="font-display text-xl font-bold">Tóm tắt đơn hàng</h2>
-              <PriceSummary
-                items={[{ label: 'Giá demo', amountVnd: checkout.data.originalAmountVnd }]}
-                {...(BigInt(checkout.data.discountAmountVnd) > 0n
-                  ? { discountVnd: checkout.data.discountAmountVnd }
+              <h2 className="font-display text-xl font-bold">Tóm tắt</h2>
+              <DiscountSummary
+                baseAmount={quote.data.originalAmountVnd}
+                discountAmount={quote.data.discountAmountVnd}
+                {...(quote.data.couponDiscountAmountVnd !== undefined
+                  ? { couponDiscountAmount: quote.data.couponDiscountAmountVnd }
                   : {})}
-                totalVnd={checkout.data.totalAmountVnd}
+                {...(quote.data.automaticDiscountAmountVnd !== undefined
+                  ? { automaticDiscountAmount: quote.data.automaticDiscountAmountVnd }
+                  : {})}
+                {...(quote.data.discountSource !== undefined
+                  ? { discountSource: quote.data.discountSource }
+                  : {})}
+                totalAmount={quote.data.totalAmountVnd}
               />
               <p className="text-sm text-ink-secondary">
-                Thời hạn giả định: {checkout.data.durationMonths} tháng
+                Thời hạn truy cập: {quote.data.durationMonths} tháng
               </p>
               <Button
                 loading={createOrder.isPending}
                 disabled={createOrder.isPending}
-                onClick={() =>
-                  void createOrder
-                    .mutateAsync({
-                      context: orderContext,
-                      ...(couponCode ? { couponCode } : {}),
-                      ...(planId ? { planId } : {}),
-                    })
-                    .then((detail) => navigate(`/orders/${detail.order.id}/pending`))
-                }
-                startIcon={<CreditCard aria-hidden="true" />}
+                onClick={() => void submitOrder()}
+                startIcon={<CreditCard aria-hidden="true" className="size-4" />}
               >
-                Tạo đơn demo · trạng thái chờ
+                Tạo đơn PENDING
               </Button>
               {createOrder.isError && (
                 <ErrorState
-                  title="Chưa tạo được đơn demo"
-                  description="Dữ liệu không thay đổi. Thử tải lại hoặc kiểm tra quyền truy cập."
-                  onRetry={() =>
-                    void createOrder
-                      .mutateAsync({
-                        context: orderContext,
-                        ...(couponCode ? { couponCode } : {}),
-                        ...(planId ? { planId } : {}),
-                      })
-                      .then((detail) => navigate(`/orders/${detail.order.id}/pending`))
+                  title="Chưa tạo được đơn"
+                  description={
+                    createOrder.error instanceof Error
+                      ? createOrder.error.message
+                      : 'Backend chưa xác nhận việc tạo đơn.'
                   }
+                  onRetry={() => void submitOrder()}
                 />
               )}
               <p className="text-xs leading-5 text-ink-muted">
-                Tạo đơn chỉ ghi nhận trạng thái PENDING. Quyền học không được cấp cho đến khi
-                repository demo nhận một kết quả mô phỏng thành công.
+                Không thực hiện giao dịch trong ứng dụng. Chuyển khoản thủ công theo hướng dẫn của
+                Admin.
               </p>
             </Card>
           </aside>
@@ -180,54 +250,115 @@ export function CheckoutPage() {
   )
 }
 
-function DemoGatewayPanel({
-  orderId,
-  onOutcome,
-}: {
-  orderId: string
-  onOutcome: (outcome: 'success' | 'failure') => Promise<void>
-}) {
-  const [pending, setPending] = useState(false)
-  const [error, setError] = useState(false)
-  const [lastOutcome, setLastOutcome] = useState<'success' | 'failure'>('success')
-  async function run(outcome: 'success' | 'failure') {
-    setLastOutcome(outcome)
-    setPending(true)
-    setError(false)
-    try {
-      await onOutcome(outcome)
-    } catch {
-      setError(true)
-    } finally {
-      setPending(false)
-    }
-  }
+function OrderState({ order }: { order: NonNullable<ReturnType<typeof useProductOrder>['data']> }) {
+  const status = order.order.status
+  const reported = order.transferReported
+  if (status === 'PAID')
+    return (
+      <div
+        role="status"
+        className="rounded-2xl border border-success-foreground/20 bg-success-surface p-4 text-success-foreground"
+      >
+        <p className="flex items-center gap-2 font-bold">
+          <CheckCircle2 aria-hidden="true" className="size-5" />
+          Đã thanh toán và được xác nhận
+        </p>
+        <p className="mt-1 text-sm leading-6">
+          Enrollment do backend cấp hoặc gia hạn. Tải lại quyền học để tiếp tục.
+        </p>
+      </div>
+    )
+  if (status === 'CANCELLED' || status === 'FAILED' || status === 'EXPIRED')
+    return (
+      <div role="status" className="rounded-2xl border border-border-subtle bg-surface-muted p-4">
+        <p className="flex items-center gap-2 font-bold">
+          <XCircle aria-hidden="true" className="size-5" />
+          Đơn {status}
+        </p>
+        <p className="mt-1 text-sm leading-6 text-ink-secondary">Đơn này không cấp quyền học.</p>
+      </div>
+    )
   return (
-    <Card className="grid gap-4 border-dashed border-action-primary/40 bg-surface-blue/60 p-5">
-      <div className="flex items-center gap-2 font-semibold">
-        <CreditCard aria-hidden="true" className="size-5 text-action-primary" />
-        Cổng thanh toán demo
-      </div>
-      <p className="text-sm leading-6 text-ink-secondary">
-        Các nút dưới đây chỉ gửi kết quả tổng hợp tới repository mô phỏng. Không nhập thẻ, không
-        chuyển tiền và không gọi nhà cung cấp thanh toán.
+    <div
+      role="status"
+      className="rounded-2xl border border-warning-foreground/20 bg-warning-surface p-4 text-warning-foreground"
+    >
+      <p className="flex items-center gap-2 font-bold">
+        <CircleAlert aria-hidden="true" className="size-5" />
+        {reported ? 'Đã báo chuyển khoản · chờ Admin đối soát' : 'Đang chờ chuyển khoản'}
       </p>
-      <div className="flex flex-wrap gap-3">
-        <Button loading={pending} disabled={pending} onClick={() => void run('success')}>
-          Mô phỏng xác nhận thành công
-        </Button>
-        <Button variant="outline" disabled={pending} onClick={() => void run('failure')}>
-          Mô phỏng thất bại
-        </Button>
+      <p className="mt-1 text-sm leading-6">
+        Nhấn xác nhận chỉ gửi thông báo tới Admin; đơn vẫn PENDING và chưa cấp quyền học.
+      </p>
+    </div>
+  )
+}
+
+function PaymentInstructions({
+  order,
+}: {
+  order: NonNullable<ReturnType<typeof useProductOrder>['data']>
+}) {
+  const instructions = order.paymentInstructions
+  if (!instructions)
+    return (
+      <Card className="grid gap-2 border-dashed p-5">
+        <h2 className="font-display text-lg font-bold">Chưa có cấu hình chuyển khoản</h2>
+        <p className="text-sm leading-6 text-ink-secondary">
+          Admin chưa cấu hình ngân hàng hoặc QR. Không có thông tin thanh toán mẫu để hiển thị.
+        </p>
+        <p className="text-sm">
+          Mã đơn: <strong>{order.order.orderCode}</strong>
+        </p>
+        <p className="text-sm">
+          Số tiền theo đơn: <strong>{formatVnd(order.totalAmountVnd)}</strong>
+        </p>
+      </Card>
+    )
+  return (
+    <Card className="grid gap-4 p-5">
+      <div className="flex items-center gap-2">
+        <QrCode aria-hidden="true" className="size-5 text-action-primary" />
+        <h2 className="font-display text-lg font-bold">Hướng dẫn chuyển khoản</h2>
       </div>
-      {error && (
-        <ErrorState
-          title="Chưa cập nhật được trạng thái đơn"
-          description="Đơn vẫn giữ trạng thái hiện tại trong repository."
-          onRetry={() => void run(lastOutcome)}
+      {instructions.qrUrl && (
+        <img
+          src={instructions.qrUrl}
+          alt="Mã QR tĩnh do Admin cấu hình"
+          className="mx-auto max-h-64 max-w-full rounded-xl border border-border-subtle object-contain"
+          loading="lazy"
         />
       )}
-      <span className="sr-only">Đơn đang xử lý: {orderId}</span>
+      <dl className="grid gap-2 text-sm">
+        <div className="flex justify-between gap-3">
+          <dt>Ngân hàng</dt>
+          <dd className="text-right font-semibold">{instructions.bankName}</dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt>Số tài khoản</dt>
+          <dd className="text-right font-semibold">{instructions.accountNumber}</dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt>Chủ tài khoản</dt>
+          <dd className="text-right font-semibold">{instructions.accountHolderName}</dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt>Số tiền</dt>
+          <dd className="text-right font-extrabold text-action-primary">
+            {formatVnd(order.totalAmountVnd)}
+          </dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt>Nội dung</dt>
+          <dd className="text-right font-mono font-bold">{order.order.orderCode}</dd>
+        </div>
+      </dl>
+      <p className="whitespace-pre-line rounded-xl bg-surface-muted p-3 text-sm leading-6 text-ink-secondary">
+        {instructions.transferInstructions}
+      </p>
+      <p className="text-xs leading-5 text-ink-muted">
+        QR là ảnh tĩnh. Hãy kiểm tra số tiền và mã đơn ở trên trước khi chuyển khoản.
+      </p>
     </Card>
   )
 }
@@ -236,41 +367,101 @@ export function OrderPendingPage() {
   const { id = '' } = useParams()
   const { session } = useAuthSession()
   const order = useProductOrder(session?.id ?? '', id)
-  const payment = useSimulatePayment(session?.id ?? '')
+  const confirmTransfer = useConfirmTransfer(session?.id ?? '')
+  const cancelOrder = useCancelStudentOrder(session?.id ?? '')
   const navigate = useNavigate()
-
   return (
-    <ProductPage title="Đơn hàng đang chờ" backTo="/student/orders">
+    <ProductPage title="Thanh toán chuyển khoản" backTo="/student/orders">
       {order.isPending ? (
-        <ProductLoading title="Đang kiểm tra đơn hàng" />
+        <ProductLoading title="Đang tải hướng dẫn đơn hàng" />
       ) : order.isError ? (
         <ProductError onRetry={() => void order.refetch()} />
       ) : !order.data ? (
-        <ProductNotFound message="Đơn hàng không thuộc tài khoản demo hiện tại." />
+        <ProductNotFound message="Không tìm thấy đơn hàng thuộc tài khoản hiện tại." />
       ) : (
         <div className="mx-auto grid w-full max-w-3xl gap-5">
-          <OrderSummary order={order.data.order} />
-          {order.data.order.status === 'PENDING' ? (
-            <>
-              <PaymentPendingState order={order.data.order} />
-              <DemoGatewayPanel
-                orderId={id}
-                onOutcome={async (outcome) => {
-                  await payment.mutateAsync({ orderId: id, outcome })
-                  navigate(`/orders/${id}/result`)
-                }}
-              />
-            </>
-          ) : (
-            <Card className="grid gap-3 p-5">
-              <p className="text-sm text-ink-secondary">
-                Đơn đã có kết quả. Tải kết quả để xem quyền truy cập repository trả về.
+          <Card className="flex flex-wrap items-center justify-between gap-3 p-5">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest text-action-primary">
+                Mã đơn
               </p>
-              <LinkButton to={`/orders/${id}/result`}>Xem kết quả đơn hàng</LinkButton>
+              <h2 className="mt-1 font-mono text-xl font-bold">{order.data.order.orderCode}</h2>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-ink-secondary">Số tiền</p>
+              <p className="font-display text-xl font-extrabold">
+                {formatVnd(order.data.totalAmountVnd)}
+              </p>
+            </div>
+          </Card>
+          <OrderState order={order.data} />
+          {order.data.order.status === 'PENDING' && <PaymentInstructions order={order.data} />}
+          {order.data.order.status === 'PENDING' && (
+            <Card className="grid gap-3 p-5">
+              <h2 className="font-display text-lg font-bold">Bạn đã chuyển khoản?</h2>
+              <p className="text-sm leading-6 text-ink-secondary">
+                Xác nhận chỉ cập nhật trạng thái báo chuyển khoản. Admin sẽ đối soát riêng; đơn vẫn
+                PENDING cho đến khi được duyệt.
+              </p>
+              <Button
+                loading={confirmTransfer.isPending}
+                disabled={confirmTransfer.isPending || order.data.transferReported}
+                onClick={() =>
+                  void confirmTransfer
+                    .mutateAsync(id)
+                    .then(() => order.refetch())
+                    .catch(() => undefined)
+                }
+              >
+                {order.data.transferReported ? 'Đã gửi báo chuyển khoản' : 'Tôi đã chuyển khoản'}
+              </Button>
+              {confirmTransfer.isError && (
+                <ErrorState
+                  title="Chưa gửi được thông báo"
+                  description={
+                    confirmTransfer.error instanceof Error
+                      ? confirmTransfer.error.message
+                      : 'Đơn vẫn giữ trạng thái hiện tại.'
+                  }
+                  onRetry={() =>
+                    void confirmTransfer
+                      .mutateAsync(id)
+                      .then(() => order.refetch())
+                      .catch(() => undefined)
+                  }
+                />
+              )}
+              {!order.data.transferReported && (
+                <Button
+                  variant="outline"
+                  disabled={cancelOrder.isPending}
+                  loading={cancelOrder.isPending}
+                  onClick={() => {
+                    if (window.confirm('Hủy đơn trước khi báo chuyển khoản?'))
+                      void cancelOrder
+                        .mutateAsync(id)
+                        .then(() => navigate(`/orders/${id}/result`))
+                        .catch(() => undefined)
+                  }}
+                >
+                  Hủy đơn
+                </Button>
+              )}
+              {cancelOrder.isError && (
+                <AdminlessError
+                  error={cancelOrder.error}
+                  retry={() =>
+                    void cancelOrder
+                      .mutateAsync(id)
+                      .then(() => navigate(`/orders/${id}/result`))
+                      .catch(() => undefined)
+                  }
+                />
+              )}
             </Card>
           )}
-          <LinkButton to="/student/orders" variant="outline">
-            Về danh sách đơn hàng
+          <LinkButton to={`/student/orders/${id}`} variant="outline">
+            Chi tiết đơn hàng
           </LinkButton>
         </div>
       )}
@@ -278,39 +469,49 @@ export function OrderPendingPage() {
   )
 }
 
+function AdminlessError({ error, retry }: { error: unknown; retry: () => void }) {
+  return (
+    <ErrorState
+      title="Chưa cập nhật được đơn"
+      description={error instanceof Error ? error.message : 'Hãy thử lại.'}
+      onRetry={retry}
+    />
+  )
+}
+
 export function OrderResultPage() {
   const { id = '' } = useParams()
   const { session } = useAuthSession()
   const order = useProductOrder(session?.id ?? '', id)
-  const navigate = useNavigate()
-
   return (
-    <ProductPage title="Kết quả đơn hàng" backTo="/student/orders">
+    <ProductPage title="Trạng thái đơn hàng" backTo="/student/orders">
       {order.isPending ? (
-        <ProductLoading title="Đang tải kết quả" />
+        <ProductLoading title="Đang tải trạng thái" />
       ) : order.isError ? (
         <ProductError onRetry={() => void order.refetch()} />
       ) : !order.data ? (
-        <ProductNotFound message="Đơn hàng không thuộc tài khoản demo hiện tại." />
+        <ProductNotFound message="Không tìm thấy đơn hàng thuộc tài khoản hiện tại." />
       ) : (
-        <div className="mx-auto grid w-full max-w-3xl gap-5">
-          <PaymentStatusPanel
-            order={order.data.order}
-            canOpenCourse={order.data.access.kind === 'available' && Boolean(order.data.enrollment)}
-            onOpenCourse={() => navigate(`/learn/courses/${order.data!.courseId}`)}
-          />
-          <OrderSummary order={order.data.order} />
+        <div className="mx-auto grid w-full max-w-3xl gap-4">
+          <OrderState order={order.data} />
+          <Card className="grid gap-2 p-5">
+            <h2 className="font-display text-lg font-bold">{order.data.order.itemTitle}</h2>
+            <p className="text-sm text-ink-secondary">Mã: {order.data.order.orderCode}</p>
+            <p className="text-sm text-ink-secondary">
+              Số tiền: {formatVnd(order.data.totalAmountVnd)}
+            </p>
+            <p className="text-sm text-ink-secondary">
+              Tạo lúc: {formatDateTimeInTimezone(order.data.order.createdAt)}
+            </p>
+          </Card>
           <AccessStatePanel access={order.data.access} />
           {order.data.enrollment && <EnrollmentStatusCard enrollment={order.data.enrollment} />}
-          {order.data.order.status === 'FAILED' && (
-            <LinkButton
-              to={
-                order.data.order.orderType === 'RENEWAL' && order.data.planId
-                  ? `/checkout/${RENEWAL_CONTEXT}?plan=${encodeURIComponent(order.data.planId)}`
-                  : `/checkout/${PURCHASE_CONTEXT}`
-              }
-            >
-              Tạo đơn demo mới <ArrowRight aria-hidden="true" />
+          {order.data.access.kind === 'available' && order.data.enrollment && (
+            <LinkButton to={`/learn/courses/${order.data.courseId}`}>Mở khóa học</LinkButton>
+          )}
+          {order.data.order.status === 'PENDING' && (
+            <LinkButton to={`/orders/${id}/pending`} variant="outline">
+              Mở hướng dẫn chuyển khoản
             </LinkButton>
           )}
           <LinkButton to={`/student/orders/${id}`} variant="outline">
@@ -324,33 +525,62 @@ export function OrderResultPage() {
 
 export function StudentOrdersPage() {
   const { session } = useAuthSession()
-  const orders = useProductOrders(session?.id ?? '')
+  const [page, setPage] = useState(1)
+  const orders = useProductOrders(session?.id ?? '', page)
   return (
     <ProductPage
       title="Đơn hàng của tôi"
-      description="Lịch sử giả lập theo tài khoản hiện tại. Không có giao dịch hoặc mã thanh toán thật."
+      description="Trạng thái và số tiền được tải từ hệ thống."
       backTo="/student"
     >
       {orders.isPending ? (
         <ProductLoading title="Đang tải đơn hàng" />
       ) : orders.isError ? (
         <ProductError onRetry={() => void orders.refetch()} />
-      ) : !orders.data?.length ? (
+      ) : !orders.data?.items.length ? (
         <DomainState
           kind="empty"
           title="Chưa có đơn hàng"
-          message="Khi bạn thử checkout, repository sẽ tạo một đơn demo ở trạng thái chờ."
+          message="Đơn mua khóa học hoặc gia hạn sẽ xuất hiện tại đây."
         >
-          <LinkButton to={`/courses/${DEMO_COURSE_SLUG}`} variant="outline">
+          <LinkButton to="/courses" variant="outline">
             Xem khóa học
           </LinkButton>
         </DomainState>
       ) : (
-        <section className="grid gap-4" aria-label="Lịch sử đơn hàng">
-          {orders.data.map(({ order }) => (
-            <OrderHistoryItem key={order.id} order={order} href={`/student/orders/${order.id}`} />
+        <div className="grid gap-3">
+          {orders.data.items.map((item) => (
+            <Link
+              key={item.order.id}
+              to={`/student/orders/${item.order.id}`}
+              className="grid gap-2 rounded-2xl border border-border-subtle bg-card-surface p-4 hover:border-action-primary sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+            >
+              <span>
+                <strong className="block">{item.order.itemTitle}</strong>
+                <span className="mt-1 block text-sm text-ink-secondary">
+                  {item.order.orderCode} · {item.order.status} ·{' '}
+                  {formatDateTimeInTimezone(item.order.createdAt)}
+                </span>
+                {item.transferReported && item.order.status === 'PENDING' && (
+                  <span className="mt-1 block text-xs text-warning-foreground">
+                    Đã báo chuyển khoản · chờ Admin duyệt
+                  </span>
+                )}
+              </span>
+              <span className="font-semibold">
+                {formatVnd(item.totalAmountVnd)}{' '}
+                <ArrowRight aria-hidden="true" className="inline size-4" />
+              </span>
+            </Link>
           ))}
-        </section>
+        </div>
+      )}
+      {orders.data && orders.data.total > orders.data.pageSize && (
+        <Pagination
+          page={orders.data.page}
+          pages={Math.ceil(orders.data.total / orders.data.pageSize)}
+          onPageChange={setPage}
+        />
       )}
     </ProductPage>
   )
@@ -360,7 +590,6 @@ export function StudentOrderDetailPage() {
   const { id = '' } = useParams()
   const { session } = useAuthSession()
   const order = useProductOrder(session?.id ?? '', id)
-
   return (
     <ProductPage title="Chi tiết đơn hàng" backTo="/student/orders">
       {order.isPending ? (
@@ -368,38 +597,36 @@ export function StudentOrderDetailPage() {
       ) : order.isError ? (
         <ProductError onRetry={() => void order.refetch()} />
       ) : !order.data ? (
-        <ProductNotFound message="Đơn hàng không thuộc tài khoản demo hiện tại." />
+        <ProductNotFound message="Không tìm thấy đơn hàng thuộc tài khoản hiện tại." />
       ) : (
         <div className="mx-auto grid w-full max-w-3xl gap-5">
-          <OrderSummary order={order.data.order} />
           <Card className="grid gap-3 p-5">
-            <h2 className="font-display text-xl font-bold">Tóm tắt</h2>
+            <h2 className="font-display text-xl font-bold">{order.data.order.itemTitle}</h2>
+            <p className="text-sm text-ink-secondary">
+              Mã đơn: <strong>{order.data.order.orderCode}</strong>
+            </p>
             <p className="text-sm text-ink-secondary">
               Loại đơn: {order.data.order.orderType === 'PURCHASE' ? 'Mua khóa học' : 'Gia hạn'}
             </p>
             <p className="text-sm text-ink-secondary">
-              Giá giả định ban đầu: {formatVnd(order.data.originalAmountVnd)}
+              Giá gốc: {formatVnd(order.data.originalAmountVnd)}
             </p>
-            {order.data.couponCode && (
-              <p className="text-sm text-ink-secondary">Mã demo: {order.data.couponCode}</p>
-            )}
-            {BigInt(order.data.discountAmountVnd) > 0n && (
-              <p className="text-sm text-ink-secondary">
-                Giảm minh họa: {formatVnd(order.data.discountAmountVnd)}
-              </p>
-            )}
+            <p className="text-sm text-ink-secondary">
+              Giảm giá: {formatVnd(order.data.discountAmountVnd)}
+            </p>
+            <p className="text-sm text-ink-secondary">
+              Thời hạn: {order.data.durationMonths} tháng
+            </p>
             <p className="text-sm text-ink-secondary">
               Tạo lúc: {formatDateTimeInTimezone(order.data.order.createdAt)}
             </p>
           </Card>
+          <OrderState order={order.data} />
+          {order.data.order.status === 'PENDING' && (
+            <LinkButton to={`/orders/${id}/pending`}>Xem hướng dẫn chuyển khoản</LinkButton>
+          )}
           <AccessStatePanel access={order.data.access} />
           {order.data.enrollment && <EnrollmentStatusCard enrollment={order.data.enrollment} />}
-          <LinkButton
-            to={`/orders/${id}/${order.data.order.status === 'PENDING' ? 'pending' : 'result'}`}
-            variant="outline"
-          >
-            Mở trạng thái đơn hàng
-          </LinkButton>
         </div>
       )}
     </ProductPage>
@@ -410,47 +637,56 @@ export function CourseRenewalPage() {
   const { courseId = '' } = useParams()
   const { session } = useAuthSession()
   const course = useProductCourse(session?.id ?? '', courseId)
-  const plans = useProductRenewalPlans(session?.id ?? '', courseId)
-  const navigate = useNavigate()
-
+  const renewals = useProductRenewalPlans(session?.id ?? '', courseId)
   return (
     <ProductPage title="Gia hạn khóa học" backTo="/student/courses">
-      {course.isPending || plans.isPending ? (
-        <ProductLoading title="Đang tải gói gia hạn" />
-      ) : course.isError || plans.isError ? (
+      {course.isPending || renewals.isPending ? (
+        <ProductLoading title="Đang tải quyền học và gói gia hạn" />
+      ) : course.isError || renewals.isError ? (
         <ProductError
           onRetry={() => {
             void course.refetch()
-            void plans.refetch()
+            void renewals.refetch()
           }}
         />
-      ) : !course.data ? (
-        <ProductNotFound message="Không tìm thấy khóa học cần gia hạn." />
+      ) : !course.data || !renewals.data ? (
+        <ProductNotFound message="Không tìm thấy quyền học hoặc gói gia hạn." />
       ) : (
         <div className="grid gap-5">
           <Card className="grid gap-3 p-5">
             <h2 className="font-display text-xl font-bold">{course.data.course.title}</h2>
             <AccessStatePanel access={course.data.access} />
-            {course.data.access.kind === 'expired-display' && (
-              <p className="text-sm text-ink-secondary">
-                Hết hạn: {formatDateTimeInTimezone(course.data.access.expiresAt)}
-              </p>
-            )}
-            <p className="rounded-xl bg-surface-blue p-4 text-sm leading-6 text-ink-secondary">
-              Gói và giá bên dưới là giả định demo. Hạn mới do repository tính và trả về sau trạng
-              thái thanh toán mô phỏng.
+            <p className="text-sm text-ink-secondary">
+              Hạn enrollment hiện tại:{' '}
+              {formatDateTimeInTimezone(renewals.data.course.enrollmentExpiresAt)}
+            </p>
+            <p className="text-sm leading-6 text-ink-secondary">
+              Thời hạn mới được backend tính khi Admin duyệt đơn gia hạn. Progress, ghi chú và lịch
+              sử quiz hiện có được giữ nguyên.
             </p>
           </Card>
-          {plans.data?.length ? (
-            <ul className="grid gap-4 md:grid-cols-3" aria-label="Gói gia hạn demo">
-              {plans.data.map((plan) => (
+          {course.data.access.kind === 'restricted' && (
+            <Card className="p-4 text-sm leading-6 text-warning-foreground">
+              Enrollment bị thu hồi cần Admin khôi phục trước; không thể gia hạn trực tiếp.
+            </Card>
+          )}
+          {renewals.data.plans.length ? (
+            <ul className="grid gap-4 md:grid-cols-2">
+              {renewals.data.plans.map((plan) => (
                 <li key={plan.id}>
-                  <RenewalPlanCard
-                    plan={plan}
-                    onSelect={() =>
-                      navigate(`/checkout/${RENEWAL_CONTEXT}?plan=${encodeURIComponent(plan.id)}`)
-                    }
-                  />
+                  <Card className="grid h-full gap-3 p-5">
+                    <Badge tone="info">Gia hạn</Badge>
+                    <h3 className="font-display text-lg font-bold">{plan.title}</h3>
+                    <p className="text-sm text-ink-secondary">{plan.durationMonths} tháng</p>
+                    <p className="font-display text-2xl font-extrabold text-action-primary">
+                      {formatVnd(plan.priceVnd)}
+                    </p>
+                    <LinkButton
+                      to={`/checkout/${encodeURIComponent(courseId)}?type=RENEWAL&plan=${encodeURIComponent(plan.id)}`}
+                    >
+                      Tiếp tục <ArrowRight aria-hidden="true" />
+                    </LinkButton>
+                  </Card>
                 </li>
               ))}
             </ul>
@@ -458,15 +694,9 @@ export function CourseRenewalPage() {
             <DomainState
               kind="empty"
               title="Chưa có gói gia hạn"
-              message="Tài khoản này không có enrollment có thể gia hạn trong kịch bản demo."
+              message="Admin chưa cấu hình gói đang bán cho khóa học này."
             />
           )}
-          <Link
-            to={`/courses/${DEMO_COURSE_SLUG}`}
-            className="min-h-11 self-start px-1 py-3 text-sm font-semibold text-action-primary"
-          >
-            Tìm hiểu lại khóa học
-          </Link>
         </div>
       )}
     </ProductPage>

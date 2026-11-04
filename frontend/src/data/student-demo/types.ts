@@ -30,7 +30,7 @@ export interface DemoSession {
 
 export interface StudentCourseRecord {
   courseId: string
-  courseSlug: string
+  courseSlug?: string
   enrollment: EnrollmentSummaryViewModel
   progress?: CourseProgressViewModel
   continueLessonId?: string

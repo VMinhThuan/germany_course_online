@@ -1,5 +1,11 @@
+import { lazy, Suspense } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router'
-import { ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage } from './pages'
+import {
+  ApiForgotPasswordPage,
+  ApiLoginPage,
+  ApiRegisterPage,
+  ApiResetPasswordPage,
+} from './api-pages'
 import { StudentCoursesPage, StudentDashboardPage } from '@/app/student/pages'
 import {
   LearningCoursePage,
@@ -27,11 +33,46 @@ import { useAuthSession } from './auth-session'
 import { sanitizeReturnTo } from './redirects'
 import { AuthChecking } from './shared'
 
+const AdminDashboardPage = lazy(async () => {
+  const pages = await import('@/app/admin/pages')
+  return { default: pages.AdminDashboardPage }
+})
+const AdminWorkspacePage = lazy(async () => {
+  const pages = await import('@/app/admin/pages')
+  return { default: pages.AdminWorkspacePage }
+})
+
+function AdminRouteLoading() {
+  return (
+    <main className="mx-auto grid min-h-[50vh] max-w-xl place-items-center px-5 py-12">
+      <p role="status" className="text-sm text-ink-secondary">
+        Đang tải khu vực quản trị…
+      </p>
+    </main>
+  )
+}
+
 export function ProtectedStudentRoute() {
-  const { status, session, sessionEndReason } = useAuthSession()
+  const { status, session, sessionEndReason, refreshSession } = useAuthSession()
   const location = useLocation()
 
   if (status === 'checking') return <AuthChecking />
+  if (status === 'error') {
+    return (
+      <main className="mx-auto grid min-h-[60vh] max-w-xl content-center gap-4 px-5 py-12 text-center">
+        <h1 className="font-display text-2xl font-bold">Chưa xác minh được phiên đăng nhập</h1>
+        <p className="text-ink-secondary">
+          Không thể kết nối với API để khôi phục phiên. Thử lại trước khi đăng nhập lại.
+        </p>
+        <button
+          className="mx-auto min-h-11 rounded-xl bg-action-primary px-5 font-semibold text-white"
+          onClick={() => void refreshSession().catch(() => undefined)}
+        >
+          Thử kết nối lại
+        </button>
+      </main>
+    )
+  }
   if (!session) {
     const returnTo = sanitizeReturnTo(`${location.pathname}${location.search}${location.hash}`)
     const revoked =
@@ -45,14 +86,49 @@ export function ProtectedStudentRoute() {
       />
     )
   }
+  if (session.role === 'ADMIN') return <Navigate replace to="/admin" />
+  return <Outlet />
+}
+
+export function ProtectedAdminRoute() {
+  const { status, session, sessionEndReason, refreshSession } = useAuthSession()
+  const location = useLocation()
+  if (status === 'checking') return <AuthChecking />
+  if (status === 'error') {
+    return (
+      <main className="mx-auto grid min-h-[60vh] max-w-xl content-center gap-4 px-5 py-12 text-center">
+        <h1 className="font-display text-2xl font-bold">Chưa xác minh được quyền quản trị</h1>
+        <p className="text-ink-secondary">
+          Kết nối API đang lỗi. Hãy thử khôi phục phiên trước khi tiếp tục.
+        </p>
+        <button
+          className="mx-auto min-h-11 rounded-xl bg-action-primary px-5 font-semibold text-white"
+          onClick={() => void refreshSession().catch(() => undefined)}
+        >
+          Thử kết nối lại
+        </button>
+      </main>
+    )
+  }
+  if (!session) {
+    const returnTo = sanitizeReturnTo(`${location.pathname}${location.search}${location.hash}`)
+    const revoked = sessionEndReason === 'revoked'
+    return (
+      <Navigate
+        replace
+        to={`/login?returnTo=${encodeURIComponent(returnTo)}${revoked ? '&sessionRevoked=1' : ''}`}
+      />
+    )
+  }
+  if (session.role !== 'ADMIN') return <Navigate replace to="/student" />
   return <Outlet />
 }
 
 export const authRoutes = [
-  { path: '/login', element: <LoginPage /> },
-  { path: '/register', element: <RegisterPage /> },
-  { path: '/forgot-password', element: <ForgotPasswordPage /> },
-  { path: '/reset-password', element: <ResetPasswordPage /> },
+  { path: '/login', element: <ApiLoginPage /> },
+  { path: '/register', element: <ApiRegisterPage /> },
+  { path: '/forgot-password', element: <ApiForgotPasswordPage /> },
+  { path: '/reset-password', element: <ApiResetPasswordPage /> },
 ]
 
 export const studentRoutes = [
@@ -77,6 +153,27 @@ export const studentRoutes = [
       { path: '/checkout/:orderContext', element: <CheckoutPage /> },
       { path: '/orders/:id/pending', element: <OrderPendingPage /> },
       { path: '/orders/:id/result', element: <OrderResultPage /> },
+    ],
+  },
+  {
+    element: <ProtectedAdminRoute />,
+    children: [
+      {
+        path: '/admin',
+        element: (
+          <Suspense fallback={<AdminRouteLoading />}>
+            <AdminDashboardPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: '/admin/*',
+        element: (
+          <Suspense fallback={<AdminRouteLoading />}>
+            <AdminWorkspacePage />
+          </Suspense>
+        ),
+      },
     ],
   },
 ]

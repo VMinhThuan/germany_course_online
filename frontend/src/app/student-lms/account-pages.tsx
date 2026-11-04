@@ -2,10 +2,10 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { useAuthSession } from '@/app/auth/auth-session'
 import {
-  useChangeDemoPassword,
+  useChangePassword,
   useProductProfile,
   useProductSessions,
-  useRevokeDemoSession,
+  useRevokeSession,
   useUpdateProfile,
 } from '@/data/student-demo/product-queries'
 import {
@@ -27,7 +27,7 @@ export function StudentProfilePage() {
   return (
     <ProductPage
       title="Tài khoản học viên"
-      description="Tên hiển thị và email demo; trạng thái, quyền và vai trò chỉ đọc."
+      description="Cập nhật tên hiển thị. Email và trạng thái tài khoản do hệ thống quản lý."
       backTo="/student"
     >
       <AccountNavigation current="profile" />
@@ -40,8 +40,7 @@ export function StudentProfilePage() {
           <div className="grid content-start gap-4">
             <StudentProfileCard profile={profile.data} />
             <SecurityNotice>
-              Hồ sơ chỉ chứa tên hiển thị, email .test và trạng thái tài khoản. Bản demo không có
-              mật khẩu hoặc token trong hồ sơ.
+              Hồ sơ không hiển thị mật khẩu, access token hoặc thông tin phiên nội bộ.
             </SecurityNotice>
           </div>
           <div className="grid content-start gap-4">
@@ -50,7 +49,18 @@ export function StudentProfilePage() {
               profile={profile.data}
               onSave={async ({ displayName }) => {
                 const updated = await updateProfile.mutateAsync(displayName)
-                if (session) acceptSession({ ...session, profile: updated })
+                if (session)
+                  acceptSession({
+                    ...session,
+                    profile: {
+                      ...session.profile,
+                      displayName: updated.displayName ?? session.profile.displayName,
+                      email: updated.email,
+                      status: updated.status,
+                      phone: updated.phone ?? session.profile.phone,
+                      avatarUrl: updated.avatarUrl ?? session.profile.avatarUrl,
+                    },
+                  })
               }}
             />
             {updateProfile.isError && (
@@ -69,7 +79,7 @@ export function StudentProfilePage() {
 
 export function StudentPasswordPage() {
   const { session, logout } = useAuthSession()
-  const changePassword = useChangeDemoPassword(session?.id ?? '')
+  const changePassword = useChangePassword(session?.id ?? '')
   const navigate = useNavigate()
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -79,8 +89,8 @@ export function StudentPasswordPage() {
   async function submit(event: FormEvent) {
     event.preventDefault()
     setValidation(undefined)
-    if (newPassword.length < 8) {
-      setValidation('Dùng ít nhất 8 ký tự trong kịch bản demo.')
+    if (newPassword.length < 12) {
+      setValidation('Mật khẩu mới cần ít nhất 12 ký tự.')
       return
     }
     if (newPassword !== confirmPassword) {
@@ -92,12 +102,12 @@ export function StudentPasswordPage() {
       await logout('revoked')
       navigate('/login?sessionRevoked=1', { replace: true })
     } catch {
-      setValidation('Không đổi được mật khẩu demo. Kiểm tra mật khẩu hiện tại rồi thử lại.')
+      setValidation('Không đổi được mật khẩu. Kiểm tra mật khẩu hiện tại rồi thử lại.')
     }
   }
 
   return (
-    <ProductPage title="Đổi mật khẩu demo" backTo="/student/profile">
+    <ProductPage title="Đổi mật khẩu" backTo="/student/profile">
       <AccountNavigation current="security" />
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(17rem,0.8fr)]">
         <form
@@ -123,7 +133,7 @@ export function StudentPasswordPage() {
               <PasswordInput
                 id="new-password"
                 required
-                minLength={8}
+                minLength={12}
                 value={newPassword}
                 onChange={(event) => setNewPassword(event.target.value)}
                 aria-describedby={describedBy}
@@ -160,12 +170,10 @@ export function StudentPasswordPage() {
         </form>
         <div className="grid content-start gap-4">
           <SecurityNotice>
-            Quy tắc độ dài tối thiểu 8 ký tự chỉ là xác nhận demo. Không lưu mật khẩu vào browser
-            storage.
+            Mật khẩu được gửi trực tiếp tới API; frontend không lưu mật khẩu vào browser storage.
           </SecurityNotice>
           <Card className="p-4 text-sm leading-6 text-ink-secondary">
-            Đổi mật khẩu sẽ kết thúc phiên hiện tại theo mô phỏng. Đăng nhập lại bằng tài khoản demo
-            sau khi đổi.
+            Backend thu hồi các phiên hoạt động sau khi đổi mật khẩu. Đăng nhập lại để tiếp tục.
           </Card>
         </div>
       </div>
@@ -176,7 +184,7 @@ export function StudentPasswordPage() {
 export function StudentSessionsPage() {
   const { session, logout } = useAuthSession()
   const sessions = useProductSessions(session?.id ?? '')
-  const revoke = useRevokeDemoSession(session?.id ?? '')
+  const revoke = useRevokeSession(session?.id ?? '')
   const dialogs = useDialogs()
   const navigate = useNavigate()
 
@@ -184,7 +192,7 @@ export function StudentSessionsPage() {
     if (!session) return
     dialogs.confirm({
       title: 'Kết thúc phiên hiện tại?',
-      description: 'Thao tác này sẽ đăng xuất tài khoản demo trên trình duyệt này.',
+      description: 'Thao tác này sẽ thu hồi phiên hiện tại ở backend và đăng xuất trình duyệt.',
       confirmLabel: 'Kết thúc phiên',
       destructive: true,
       onConfirm: async () => {
@@ -220,7 +228,7 @@ export function StudentSessionsPage() {
               </Button>
               {revoke.isError && (
                 <p role="alert" className="text-sm text-danger-foreground">
-                  Không kết thúc được phiên demo. Thử lại.
+                  Không kết thúc được phiên đăng nhập. Thử lại.
                 </p>
               )}
             </Card>

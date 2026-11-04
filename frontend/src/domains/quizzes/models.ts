@@ -24,7 +24,9 @@ export interface QuizAttemptViewModel {
 export interface QuizReviewItemViewModel {
   questionId: string
   selectedOptionId?: string
+  selectedOption?: string
   correctOptionId?: string
+  correctOption?: string
   explanation?: string
 }
 

@@ -1,0 +1,3676 @@
+{
+  "specVersion": "BE-00",
+  "format": "Design catalog only; not a migration or Mongoose implementation.",
+  "idPolicy": "Mongo ObjectId is serialized as hex id for normal entities; site_settings uses fixed string _id=site as singleton and does not expose that key.",
+  "moneyPolicy": {
+    "storage": "Decimal128",
+    "api": "nonnegative decimal integer string",
+    "currency": "VND",
+    "floatingPointBusinessMath": false
+  },
+  "datePolicy": "UTC BSON Date; frontend controls display timezone.",
+  "sourceLabels": [
+    "CONFIRMED_FROM_SPEC",
+    "CONFIRMED_BY_OWNER",
+    "TECHNICAL_RECOMMENDATION",
+    "OPEN_DECISION"
+  ],
+  "physicalCollectionCount": 25,
+  "collections": [
+    {
+      "collection": "users",
+      "origin": "CONFIRMED_FROM_SPEC",
+      "timestamps": "Mongoose timestamps: createdAt, updatedAt",
+      "softDelete": false,
+      "fields": [
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "fullName",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "email",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "adminEditable": true,
+          "note": "trim, lowercase, validated",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "passwordHash",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "private": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "phone",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "avatarAssetId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "ref": "media_assets",
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "role",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "enum": [
+            "STUDENT",
+            "ADMIN"
+          ],
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "status",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "default": "ACTIVE",
+          "enum": [
+            "ACTIVE",
+            "BLOCKED"
+          ],
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "emailVerifiedAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        }
+      ],
+      "indexes": [
+        {
+          "keys": {
+            "email": 1
+          },
+          "unique": true,
+          "purpose": "Unique normalized login email"
+        }
+      ],
+      "notes": "Never serialize passwordHash. Registration role is server-assigned STUDENT."
+    },
+    {
+      "collection": "user_sessions",
+      "origin": "CONFIRMED_FROM_SPEC",
+      "timestamps": "Mongoose timestamps: createdAt, updatedAt",
+      "softDelete": false,
+      "fields": [
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "userId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "ref": "users",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "refreshTokenHash",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "private": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "deviceId",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "private": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "deviceName",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "private": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "userAgent",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "private": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "ipAddress",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "private": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "status",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "enum": [
+            "ACTIVE",
+            "REVOKED",
+            "EXPIRED"
+          ],
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "expiresAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "revokedAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "revokeReason",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "roleAtIssue",
+          "type": "String",
+          "origin": "TECHNICAL_RECOMMENDATION",
+          "required": true,
+          "nullable": false,
+          "enum": [
+            "STUDENT",
+            "ADMIN"
+          ],
+          "note": "Needed for Student-only active unique index; owner approval pending",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        }
+      ],
+      "indexes": [
+        {
+          "keys": {
+            "refreshTokenHash": 1
+          },
+          "unique": true,
+          "purpose": "Refresh-token hash lookup"
+        },
+        {
+          "keys": {
+            "userId": 1,
+            "status": 1,
+            "expiresAt": -1
+          },
+          "unique": false,
+          "purpose": "Active session lookup"
+        },
+        {
+          "keys": {
+            "userId": 1
+          },
+          "unique": true,
+          "purpose": "One active Student session",
+          "partialFilter": {
+            "status": "ACTIVE",
+            "roleAtIssue": "STUDENT"
+          }
+        }
+      ],
+      "notes": "TTL expiresAt cleanup is optional and never used for authorization."
+    },
+    {
+      "collection": "login_events",
+      "origin": "TECHNICAL_RECOMMENDATION",
+      "timestamps": "createdAt only",
+      "softDelete": false,
+      "fields": [
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "userId",
+          "type": "ObjectId",
+          "origin": "TECHNICAL_RECOMMENDATION",
+          "required": false,
+          "nullable": true,
+          "ref": "users",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "outcome",
+          "type": "String",
+          "origin": "TECHNICAL_RECOMMENDATION",
+          "required": true,
+          "nullable": false,
+          "enum": [
+            "SUCCESS",
+            "FAILURE"
+          ],
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "reasonCode",
+          "type": "String",
+          "origin": "TECHNICAL_RECOMMENDATION",
+          "required": true,
+          "nullable": false,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "ipAddress",
+          "type": "String",
+          "origin": "TECHNICAL_RECOMMENDATION",
+          "required": false,
+          "nullable": true,
+          "private": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "userAgent",
+          "type": "String",
+          "origin": "TECHNICAL_RECOMMENDATION",
+          "required": false,
+          "nullable": true,
+          "private": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "origin": "TECHNICAL_RECOMMENDATION",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        }
+      ],
+      "indexes": [
+        {
+          "keys": {
+            "userId": 1,
+            "createdAt": -1
+          },
+          "unique": false,
+          "purpose": "User auth event history"
+        },
+        {
+          "keys": {
+            "ipAddress": 1,
+            "createdAt": -1
+          },
+          "unique": false,
+          "purpose": "Abuse investigation"
+        }
+      ],
+      "notes": "PDF names the table but supplies no fields; retention and exact event policy open."
+    },
+    {
+      "collection": "password_reset_tokens",
+      "origin": "TECHNICAL_RECOMMENDATION",
+      "timestamps": "createdAt only",
+      "softDelete": false,
+      "fields": [
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "userId",
+          "type": "ObjectId",
+          "origin": "TECHNICAL_RECOMMENDATION",
+          "required": true,
+          "nullable": false,
+          "ref": "users",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "tokenHash",
+          "type": "String",
+          "origin": "TECHNICAL_RECOMMENDATION",
+          "required": true,
+          "nullable": false,
+          "private": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "expiresAt",
+          "type": "Date",
+          "origin": "TECHNICAL_RECOMMENDATION",
+          "required": true,
+          "nullable": false,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "consumedAt",
+          "type": "Date",
+          "origin": "TECHNICAL_RECOMMENDATION",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "origin": "TECHNICAL_RECOMMENDATION",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        }
+      ],
+      "indexes": [
+        {
+          "keys": {
+            "tokenHash": 1
+          },
+          "unique": true,
+          "purpose": "One-time token lookup"
+        },
+        {
+          "keys": {
+            "userId": 1,
+            "expiresAt": 1
+          },
+          "unique": false,
+          "purpose": "User token lifecycle"
+        }
+      ],
+      "notes": "PDF names the table but supplies no fields; store hash only."
+    },
+    {
+      "collection": "courses",
+      "origin": "CONFIRMED_FROM_SPEC",
+      "timestamps": "Mongoose timestamps: createdAt, updatedAt",
+      "softDelete": true,
+      "fields": [
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "code",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "title",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "slug",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "description",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "shortDescription",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "objectives",
+          "type": "String[]",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "default": [],
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "requirements",
+          "type": "String[]",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "default": [],
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "level",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "thumbnailAssetId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "ref": "media_assets",
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "bannerAssetId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "ref": "media_assets",
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "introVideoAssetId",
+          "type": "ObjectId",
+          "origin": "TECHNICAL_RECOMMENDATION",
+          "required": false,
+          "nullable": true,
+          "ref": "media_assets",
+          "adminEditable": true,
+          "note": "Optional public course introduction; owner confirmation pending",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "accessDurationMonths",
+          "type": "Number",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "price",
+          "type": "Decimal128",
+          "origin": "CONFIRMED_BY_OWNER",
+          "required": true,
+          "nullable": false,
+          "adminEditable": true,
+          "note": "Nonnegative VND; API integer string",
+          "constraintOrigin": "CONFIRMED_BY_OWNER"
+        },
+        {
+          "name": "status",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "default": "DRAFT",
+          "enum": [
+            "DRAFT",
+            "PUBLISHED",
+            "ARCHIVED"
+          ],
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "sortOrder",
+          "type": "Number",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "default": 0,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "deletedAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        }
+      ],
+      "indexes": [
+        {
+          "keys": {
+            "slug": 1
+          },
+          "unique": true,
+          "purpose": "Public slug"
+        },
+        {
+          "keys": {
+            "code": 1
+          },
+          "unique": true,
+          "purpose": "Stable course code"
+        },
+        {
+          "keys": {
+            "status": 1,
+            "deletedAt": 1,
+            "sortOrder": 1,
+            "_id": 1
+          },
+          "unique": false,
+          "purpose": "Published catalog order"
+        }
+      ],
+      "notes": "introVideoAssetId and price are not original PDF fields; price is owner-confirmed, intro link proposed."
+    },
+    {
+      "collection": "course_sections",
+      "origin": "CONFIRMED_FROM_SPEC",
+      "timestamps": "Mongoose timestamps: createdAt, updatedAt",
+      "softDelete": true,
+      "fields": [
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "courseId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "ref": "courses",
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "title",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "description",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "sectionType",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "enum": [
+            "CHAPTER",
+            "EXAM_PREP"
+          ],
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "sortOrder",
+          "type": "Number",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "status",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "enum": [
+            "DRAFT",
+            "PUBLISHED",
+            "HIDDEN"
+          ],
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "deletedAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        }
+      ],
+      "indexes": [
+        {
+          "keys": {
+            "courseId": 1,
+            "status": 1,
+            "deletedAt": 1,
+            "sortOrder": 1,
+            "_id": 1
+          },
+          "unique": false,
+          "purpose": "Ordered course outline"
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "collection": "lessons",
+      "origin": "CONFIRMED_FROM_SPEC",
+      "timestamps": "Mongoose timestamps: createdAt, updatedAt",
+      "softDelete": true,
+      "fields": [
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "sectionId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "ref": "course_sections",
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "title",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "description",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "content",
+          "type": "Mixed/JSON",
+          "origin": "OPEN_DECISION",
+          "required": false,
+          "nullable": true,
+          "adminEditable": true,
+          "note": "Define versioned block contract before strict validation",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "lessonType",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "enum": [
+            "LECTURE",
+            "PRACTICE"
+          ],
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "estimatedMinutes",
+          "type": "Number",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "countsTowardProgress",
+          "type": "Boolean",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "sortOrder",
+          "type": "Number",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "status",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "enum": [
+            "DRAFT",
+            "PUBLISHED",
+            "HIDDEN"
+          ],
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "deletedAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        }
+      ],
+      "indexes": [
+        {
+          "keys": {
+            "sectionId": 1,
+            "status": 1,
+            "deletedAt": 1,
+            "sortOrder": 1,
+            "_id": 1
+          },
+          "unique": false,
+          "purpose": "Ordered section lessons"
+        }
+      ],
+      "notes": "Default countsTowardProgress is not specified; require an explicit value until decided."
+    },
+    {
+      "collection": "exercises",
+      "origin": "CONFIRMED_FROM_SPEC",
+      "timestamps": "Mongoose timestamps: createdAt, updatedAt",
+      "softDelete": true,
+      "fields": [
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "lessonId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "ref": "lessons",
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "title",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "description",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "instructions",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "exerciseType",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "enum": [
+            "FILE_BASED",
+            "QUIZ"
+          ],
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "completionMode",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "enum": [
+            "MANUAL",
+            "QUIZ_SUBMISSION"
+          ],
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "isRequired",
+          "type": "Boolean",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "sortOrder",
+          "type": "Number",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "status",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "enum": [
+            "DRAFT",
+            "PUBLISHED",
+            "HIDDEN"
+          ],
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "deletedAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        }
+      ],
+      "indexes": [
+        {
+          "keys": {
+            "lessonId": 1,
+            "status": 1,
+            "deletedAt": 1,
+            "sortOrder": 1,
+            "_id": 1
+          },
+          "unique": false,
+          "purpose": "Ordered lesson exercises"
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "collection": "media_assets",
+      "origin": "CONFIRMED_FROM_SPEC",
+      "timestamps": "createdAt only",
+      "softDelete": false,
+      "fields": [
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "originalName",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "mediaType",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "enum": [
+            "IMAGE",
+            "VIDEO",
+            "AUDIO",
+            "PDF"
+          ],
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "mimeType",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "fileSize",
+          "type": "Number",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "provider",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "private": true,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "storageKey",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "private": true,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "externalMediaId",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "private": true,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "durationSeconds",
+          "type": "Number",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "uploadedById",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "ref": "users",
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "visibility",
+          "type": "String",
+          "origin": "TECHNICAL_RECOMMENDATION",
+          "required": true,
+          "nullable": false,
+          "default": "ENROLLED",
+          "enum": [
+            "PUBLIC",
+            "ENROLLED"
+          ],
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        }
+      ],
+      "indexes": [
+        {
+          "keys": {
+            "provider": 1,
+            "storageKey": 1
+          },
+          "unique": true,
+          "purpose": "Canonical object key uniqueness"
+        }
+      ],
+      "notes": "Visibility is proposed; signed URLs are never persisted."
+    },
+    {
+      "collection": "lesson_assets",
+      "origin": "CONFIRMED_FROM_SPEC",
+      "timestamps": "No timestamps in PDF",
+      "softDelete": false,
+      "fields": [
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "lessonId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "ref": "lessons",
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "assetId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "ref": "media_assets",
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "assetRole",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "enum": [
+            "LECTURE_VIDEO",
+            "LECTURE_PDF",
+            "ATTACHMENT"
+          ],
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "title",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "sortOrder",
+          "type": "Number",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        }
+      ],
+      "indexes": [
+        {
+          "keys": {
+            "lessonId": 1,
+            "assetId": 1,
+            "assetRole": 1
+          },
+          "unique": true,
+          "purpose": "No duplicate same-role asset association"
+        },
+        {
+          "keys": {
+            "lessonId": 1,
+            "sortOrder": 1
+          },
+          "unique": false,
+          "purpose": "Ordered lesson assets"
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "collection": "exercise_assets",
+      "origin": "CONFIRMED_FROM_SPEC",
+      "timestamps": "No timestamps in PDF",
+      "softDelete": false,
+      "fields": [
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "exerciseId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "ref": "exercises",
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "assetId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "ref": "media_assets",
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "assetRole",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "enum": [
+            "QUESTION_PDF",
+            "QUESTION_AUDIO",
+            "ANSWER_PDF",
+            "SOLUTION_VIDEO"
+          ],
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "title",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "sortOrder",
+          "type": "Number",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        }
+      ],
+      "indexes": [
+        {
+          "keys": {
+            "exerciseId": 1,
+            "assetId": 1,
+            "assetRole": 1
+          },
+          "unique": true,
+          "purpose": "No duplicate same-role asset association"
+        },
+        {
+          "keys": {
+            "exerciseId": 1,
+            "sortOrder": 1
+          },
+          "unique": false,
+          "purpose": "Ordered exercise assets"
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "collection": "quizzes",
+      "origin": "CONFIRMED_FROM_SPEC",
+      "timestamps": "No timestamps specified for quiz in PDF",
+      "softDelete": false,
+      "fields": [
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "exerciseId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "ref": "exercises",
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "title",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "description",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "passScorePercent",
+          "type": "Number",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "showCorrectAnswers",
+          "type": "Boolean",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "questions",
+          "type": "EmbeddedQuestion[]",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "default": [],
+          "adminEditable": true,
+          "note": "Logical quiz_questions rows embedded; fields: _id, questionText, questionType, explanation, points, sortOrder, options[]",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "questions.options",
+          "type": "EmbeddedOption[]",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "default": [],
+          "adminEditable": true,
+          "note": "Logical quiz_options rows embedded; fields: _id, optionText, isCorrect, sortOrder",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        }
+      ],
+      "indexes": [
+        {
+          "keys": {
+            "exerciseId": 1
+          },
+          "unique": true,
+          "purpose": "One bounded quiz per exercise"
+        }
+      ],
+      "notes": "isCorrect is admin-only and stripped from every Student attempt projection.",
+      "embeddedSchemas": {
+        "quiz_questions": {
+          "origin": "CONFIRMED_FROM_SPEC; embedded representation is TECHNICAL_RECOMMENDATION",
+          "fields": [
+            {
+              "name": "_id",
+              "type": "ObjectId",
+              "origin": "CONFIRMED_FROM_SPEC",
+              "required": false,
+              "nullable": false,
+              "readOnlyGenerated": true,
+              "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+            },
+            {
+              "name": "questionText",
+              "type": "String",
+              "origin": "CONFIRMED_FROM_SPEC",
+              "required": true,
+              "nullable": false,
+              "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+            },
+            {
+              "name": "questionType",
+              "type": "String",
+              "origin": "CONFIRMED_FROM_SPEC",
+              "required": true,
+              "nullable": false,
+              "note": "Single-choice confirmed; enum literal to verify",
+              "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+            },
+            {
+              "name": "explanation",
+              "type": "String",
+              "origin": "CONFIRMED_FROM_SPEC",
+              "required": false,
+              "nullable": true,
+              "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+            },
+            {
+              "name": "points",
+              "type": "Decimal128",
+              "origin": "CONFIRMED_FROM_SPEC",
+              "required": true,
+              "nullable": false,
+              "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+            },
+            {
+              "name": "sortOrder",
+              "type": "Number",
+              "origin": "CONFIRMED_FROM_SPEC",
+              "required": true,
+              "nullable": false,
+              "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+            },
+            {
+              "name": "options",
+              "type": "EmbeddedOption[]",
+              "origin": "CONFIRMED_FROM_SPEC",
+              "required": true,
+              "nullable": false,
+              "default": [],
+              "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+            }
+          ]
+        },
+        "quiz_options": {
+          "origin": "CONFIRMED_FROM_SPEC; embedded representation is TECHNICAL_RECOMMENDATION",
+          "fields": [
+            {
+              "name": "_id",
+              "type": "ObjectId",
+              "origin": "CONFIRMED_FROM_SPEC",
+              "required": false,
+              "nullable": false,
+              "readOnlyGenerated": true,
+              "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+            },
+            {
+              "name": "optionText",
+              "type": "String",
+              "origin": "CONFIRMED_FROM_SPEC",
+              "required": true,
+              "nullable": false,
+              "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+            },
+            {
+              "name": "isCorrect",
+              "type": "Boolean",
+              "origin": "CONFIRMED_FROM_SPEC",
+              "required": true,
+              "nullable": false,
+              "private": true,
+              "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+            },
+            {
+              "name": "sortOrder",
+              "type": "Number",
+              "origin": "CONFIRMED_FROM_SPEC",
+              "required": true,
+              "nullable": false,
+              "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "collection": "quiz_attempts",
+      "origin": "CONFIRMED_FROM_SPEC",
+      "timestamps": "No timestamps specified; attempt lifecycle dates explicit",
+      "softDelete": false,
+      "fields": [
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "userId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "ref": "users",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "quizId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "ref": "quizzes",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "exerciseId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "ref": "exercises",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "status",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "note": "PDF field; allowed literals require confirmation",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "score",
+          "type": "Decimal128",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "maxScore",
+          "type": "Decimal128",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "correctCount",
+          "type": "Number",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "totalQuestions",
+          "type": "Number",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "gradingSnapshot",
+          "type": "Object",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "note": "Frozen question/answer key and scoring configuration",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "answers",
+          "type": "EmbeddedAnswer[]",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "default": [],
+          "note": "Logical quiz_attempt_answers rows embedded: questionId, selectedOptionId, isCorrect, awardedPoints",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "startedAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "submittedAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        }
+      ],
+      "indexes": [
+        {
+          "keys": {
+            "userId": 1,
+            "quizId": 1,
+            "startedAt": -1
+          },
+          "unique": false,
+          "purpose": "Learner quiz history"
+        },
+        {
+          "keys": {
+            "exerciseId": 1,
+            "userId": 1,
+            "submittedAt": -1
+          },
+          "unique": false,
+          "purpose": "Latest exercise result"
+        }
+      ],
+      "notes": "Freeze labels/options/scoring at attempt time; never return answer key until authorized result.",
+      "embeddedSchemas": {
+        "quiz_attempt_answers": {
+          "origin": "CONFIRMED_FROM_SPEC; embedded representation is TECHNICAL_RECOMMENDATION",
+          "fields": [
+            {
+              "name": "questionId",
+              "type": "ObjectId",
+              "origin": "CONFIRMED_FROM_SPEC",
+              "required": true,
+              "nullable": false,
+              "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+            },
+            {
+              "name": "selectedOptionId",
+              "type": "ObjectId",
+              "origin": "CONFIRMED_FROM_SPEC",
+              "required": false,
+              "nullable": true,
+              "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+            },
+            {
+              "name": "isCorrect",
+              "type": "Boolean",
+              "origin": "CONFIRMED_FROM_SPEC",
+              "required": true,
+              "nullable": false,
+              "private": true,
+              "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+            },
+            {
+              "name": "awardedPoints",
+              "type": "Decimal128",
+              "origin": "CONFIRMED_FROM_SPEC",
+              "required": true,
+              "nullable": false,
+              "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "collection": "lesson_progress",
+      "origin": "CONFIRMED_FROM_SPEC",
+      "timestamps": "PDF updatedAt explicit; do not add createdAt without approval",
+      "softDelete": false,
+      "fields": [
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "userId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "ref": "users",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "lessonId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "ref": "lessons",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "status",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "enum": [
+            "NOT_STARTED",
+            "IN_PROGRESS",
+            "COMPLETED"
+          ],
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "startedAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "completedAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "lastAccessedAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        }
+      ],
+      "indexes": [
+        {
+          "keys": {
+            "userId": 1,
+            "lessonId": 1
+          },
+          "unique": true,
+          "purpose": "One progress record per learner/lesson"
+        },
+        {
+          "keys": {
+            "userId": 1,
+            "status": 1
+          },
+          "unique": false,
+          "purpose": "Student progress listing"
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "collection": "exercise_progress",
+      "origin": "CONFIRMED_FROM_SPEC",
+      "timestamps": "PDF updatedAt explicit",
+      "softDelete": false,
+      "fields": [
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "userId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "ref": "users",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "exerciseId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "ref": "exercises",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "status",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "note": "PDF status field; confirm literal set against original schema",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "completionSource",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "enum": [
+            "MANUAL",
+            "QUIZ"
+          ],
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "startedAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "completedAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        }
+      ],
+      "indexes": [
+        {
+          "keys": {
+            "userId": 1,
+            "exerciseId": 1
+          },
+          "unique": true,
+          "purpose": "One progress record per learner/exercise"
+        },
+        {
+          "keys": {
+            "userId": 1,
+            "status": 1
+          },
+          "unique": false,
+          "purpose": "Required completion lookup"
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "collection": "lesson_notes",
+      "origin": "CONFIRMED_FROM_SPEC",
+      "timestamps": "Mongoose timestamps: createdAt, updatedAt",
+      "softDelete": false,
+      "fields": [
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "userId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "ref": "users",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "lessonId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "ref": "lessons",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "content",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "private": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        }
+      ],
+      "indexes": [
+        {
+          "keys": {
+            "userId": 1,
+            "lessonId": 1
+          },
+          "unique": true,
+          "purpose": "One private note per learner/lesson"
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "collection": "enrollments",
+      "origin": "CONFIRMED_FROM_SPEC",
+      "timestamps": "Mongoose timestamps: createdAt, updatedAt",
+      "softDelete": false,
+      "fields": [
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "userId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "ref": "users",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "courseId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "ref": "courses",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "sourceOrderId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "ref": "orders",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "activatedAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "expiresAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "status",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "enum": [
+            "ACTIVE",
+            "REVOKED"
+          ],
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        }
+      ],
+      "indexes": [
+        {
+          "keys": {
+            "userId": 1,
+            "courseId": 1
+          },
+          "unique": true,
+          "purpose": "One current entitlement per learner/course"
+        },
+        {
+          "keys": {
+            "userId": 1,
+            "status": 1,
+            "expiresAt": 1
+          },
+          "unique": false,
+          "purpose": "Student access lookup"
+        },
+        {
+          "keys": {
+            "courseId": 1,
+            "status": 1,
+            "expiresAt": 1
+          },
+          "unique": false,
+          "purpose": "Course access/reminder scan"
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "collection": "enrollment_adjustments",
+      "origin": "CONFIRMED_FROM_SPEC",
+      "timestamps": "createdAt only; append-only",
+      "softDelete": false,
+      "fields": [
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "enrollmentId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "ref": "enrollments",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "adjustmentType",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "enum": [
+            "GRANT",
+            "RENEW",
+            "REVOKE",
+            "RESTORE"
+          ],
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "previousExpiresAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "newExpiresAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "durationMonths",
+          "type": "Number",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "orderId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "ref": "orders",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "performedById",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "ref": "users",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "reason",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "idempotencyKey",
+          "type": "String",
+          "origin": "CONFIRMED_BY_OWNER",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION",
+          "private": true,
+          "immutable": true,
+          "note": "Admin mutation key; excluded from API DTOs."
+        },
+        {
+          "name": "requestFingerprint",
+          "type": "String",
+          "origin": "CONFIRMED_BY_OWNER",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION",
+          "private": true,
+          "immutable": true,
+          "note": "Detects reuse of an Admin idempotency key for a different request."
+        }
+      ],
+      "indexes": [
+        {
+          "keys": {
+            "enrollmentId": 1,
+            "createdAt": -1
+          },
+          "unique": false,
+          "purpose": "Adjustment history"
+        },
+        {
+          "keys": {
+            "performedById": 1,
+            "idempotencyKey": 1
+          },
+          "unique": true,
+          "purpose": "Admin idempotency per actor/key",
+          "partialFilter": {
+            "idempotencyKey": {
+              "$type": "string"
+            }
+          }
+        },
+        {
+          "keys": {
+            "orderId": 1,
+            "adjustmentType": 1
+          },
+          "unique": true,
+          "purpose": "Exactly-once paid-order entitlement effect",
+          "partialFilter": {
+            "orderId": {
+              "$type": "objectId"
+            }
+          }
+        }
+      ],
+      "notes": "Manual GRANT/REVOKE/RESTORE/EXTEND require reason and idempotency fingerprint; adjustment and enrollment state are transactional. RENEW adjustment has unique paid Order association."
+    },
+    {
+      "collection": "renewal_plans",
+      "origin": "CONFIRMED_FROM_SPEC",
+      "timestamps": "Mongoose timestamps: createdAt, updatedAt",
+      "softDelete": false,
+      "fields": [
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "courseId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "ref": "courses",
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "title",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "durationMonths",
+          "type": "Number",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "price",
+          "type": "Decimal128",
+          "origin": "CONFIRMED_BY_OWNER",
+          "required": true,
+          "nullable": false,
+          "adminEditable": true,
+          "note": "Admin-maintained positive whole-VND Decimal128 price used for new renewal quotes; existing order snapshots remain immutable.",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "status",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "adminEditable": true,
+          "note": "Minimal active/deactivated lifecycle; deletion is soft deactivation.",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION",
+          "enum": [
+            "ACTIVE",
+            "INACTIVE"
+          ]
+        },
+        {
+          "name": "sortOrder",
+          "type": "Number",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        }
+      ],
+      "indexes": [
+        {
+          "keys": {
+            "courseId": 1,
+            "status": 1,
+            "sortOrder": 1,
+            "_id": 1
+          },
+          "unique": false,
+          "purpose": "Active plan listing in stable order"
+        }
+      ],
+      "notes": "Each plan is course-scoped. Paid renewal plans require a positive whole-VND price; no fallback to courses.price. Admin changes do not reprice existing orders."
+    },
+    {
+      "collection": "orders",
+      "origin": "CONFIRMED_FROM_SPEC",
+      "timestamps": "createdAt explicit; updatedAt disabled",
+      "softDelete": false,
+      "fields": [
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "orderCode",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "userId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "ref": "users",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "courseId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "ref": "courses",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "orderType",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "enum": [
+            "PURCHASE",
+            "RENEWAL"
+          ],
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "renewalPlanId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "ref": "renewal_plans",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "durationMonthsSnapshot",
+          "type": "Number",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "courseTitleSnapshot",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "coursePriceSnapshot",
+          "type": "Decimal128",
+          "origin": "CONFIRMED_BY_OWNER",
+          "required": true,
+          "nullable": false,
+          "note": "Selected base price snapshot: course price for PURCHASE or renewal plan price for RENEWAL.",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION",
+          "immutable": true
+        },
+        {
+          "name": "baseAmount",
+          "type": "Decimal128",
+          "origin": "CONFIRMED_BY_OWNER",
+          "required": true,
+          "nullable": false,
+          "note": "Pre-discount whole-VND amount snapshot.",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION",
+          "immutable": true
+        },
+        {
+          "name": "discountAmount",
+          "type": "Decimal128",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "totalAmount",
+          "type": "Decimal128",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "couponId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "ref": "coupons",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "status",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "enum": [
+            "PENDING",
+            "PAID",
+            "FAILED",
+            "CANCELLED",
+            "EXPIRED"
+          ],
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "paymentSubmittedAt",
+          "type": "Date",
+          "origin": "CONFIRMED_BY_OWNER",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "CONFIRMED_BY_OWNER"
+        },
+        {
+          "name": "reviewedById",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_BY_OWNER",
+          "required": false,
+          "nullable": true,
+          "ref": "users",
+          "constraintOrigin": "CONFIRMED_BY_OWNER"
+        },
+        {
+          "name": "reviewedAt",
+          "type": "Date",
+          "origin": "CONFIRMED_BY_OWNER",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "CONFIRMED_BY_OWNER"
+        },
+        {
+          "name": "reviewNote",
+          "type": "String",
+          "origin": "CONFIRMED_BY_OWNER",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "CONFIRMED_BY_OWNER"
+        },
+        {
+          "name": "idempotencyKey",
+          "type": "String",
+          "origin": "TECHNICAL_RECOMMENDATION",
+          "required": false,
+          "nullable": true,
+          "private": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "requestFingerprint",
+          "type": "String",
+          "origin": "TECHNICAL_RECOMMENDATION",
+          "required": false,
+          "nullable": true,
+          "private": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "paidAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "expiresAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "renewalPlanTitleSnapshot",
+          "type": "String",
+          "origin": "CONFIRMED_BY_OWNER",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION",
+          "immutable": true,
+          "note": "Frozen renewal plan title at order creation."
+        },
+        {
+          "name": "renewalPlanPriceSnapshot",
+          "type": "Decimal128",
+          "origin": "CONFIRMED_BY_OWNER",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION",
+          "immutable": true,
+          "note": "Nullable for PURCHASE; frozen renewal plan price for RENEWAL."
+        },
+        {
+          "name": "discountSource",
+          "type": "String",
+          "origin": "CONFIRMED_BY_OWNER",
+          "required": true,
+          "nullable": false,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION",
+          "enum": [
+            "NONE",
+            "COUPON",
+            "AUTOMATIC_5_PERCENT"
+          ],
+          "immutable": true
+        },
+        {
+          "name": "cancelledAt",
+          "type": "Date",
+          "origin": "CONFIRMED_BY_OWNER",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "cancelledById",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_BY_OWNER",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION",
+          "ref": "users"
+        },
+        {
+          "name": "cancellationActorType",
+          "type": "String",
+          "origin": "CONFIRMED_BY_OWNER",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION",
+          "enum": [
+            "STUDENT",
+            "ADMIN"
+          ]
+        },
+        {
+          "name": "cancellationReason",
+          "type": "String",
+          "origin": "CONFIRMED_BY_OWNER",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION",
+          "note": "Admin reason or server-assigned Student cancellation reason."
+        },
+        {
+          "name": "reconciliationOutcome",
+          "type": "String",
+          "origin": "CONFIRMED_BY_OWNER",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION",
+          "enum": [
+            "NO_FUNDS_RECEIVED",
+            "REFUND_CONFIRMED_EXTERNALLY"
+          ],
+          "note": "Required manual bank-reconciliation attestation for Admin cancellation; no refund execution."
+        }
+      ],
+      "indexes": [
+        {
+          "keys": {
+            "orderCode": 1
+          },
+          "unique": true,
+          "purpose": "Unique transfer reference"
+        },
+        {
+          "keys": {
+            "userId": 1,
+            "createdAt": -1
+          },
+          "unique": false,
+          "purpose": "Student order history"
+        },
+        {
+          "keys": {
+            "status": 1,
+            "paymentSubmittedAt": 1,
+            "createdAt": 1
+          },
+          "unique": false,
+          "purpose": "Admin review queue"
+        },
+        {
+          "keys": {
+            "userId": 1,
+            "idempotencyKey": 1
+          },
+          "unique": true,
+          "purpose": "Optional replay protection",
+          "partialFilter": {
+            "idempotencyKey": {
+              "$type": "string"
+            }
+          }
+        },
+        {
+          "keys": {
+            "userId": 1,
+            "courseId": 1
+          },
+          "unique": true,
+          "purpose": "At most one pending PURCHASE per student/course",
+          "partialFilter": {
+            "status": "PENDING",
+            "orderType": "PURCHASE"
+          }
+        },
+        {
+          "keys": {
+            "userId": 1,
+            "courseId": 1
+          },
+          "unique": true,
+          "purpose": "At most one pending RENEWAL per student/course",
+          "partialFilter": {
+            "status": "PENDING",
+            "orderType": "RENEWAL"
+          }
+        },
+        {
+          "keys": {
+            "status": 1,
+            "cancelledAt": -1,
+            "cancelledById": 1
+          },
+          "unique": false,
+          "purpose": "Cancellation review history"
+        },
+        {
+          "keys": {
+            "courseId": 1,
+            "userId": 1,
+            "createdAt": -1
+          },
+          "unique": false,
+          "purpose": "Course and student order history"
+        }
+      ],
+      "notes": "No payment provider, transaction collection or webhook. PENDING never expires automatically. PURCHASE and RENEWAL partial unique indexes are independent by orderType. Prices and discounts are immutable snapshots."
+    },
+    {
+      "collection": "coupons",
+      "origin": "CONFIRMED_FROM_SPEC",
+      "timestamps": "Mongoose timestamps: createdAt, updatedAt",
+      "softDelete": false,
+      "fields": [
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "code",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "discountType",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "enum": [
+            "PERCENT",
+            "FIXED"
+          ],
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "discountValue",
+          "type": "Decimal128",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "maxDiscount",
+          "type": "Decimal128",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "usageLimit",
+          "type": "Number",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "redemptionCount",
+          "type": "Number",
+          "origin": "TECHNICAL_RECOMMENDATION",
+          "required": true,
+          "nullable": false,
+          "default": 0,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "startsAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "expiresAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "status",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "adminEditable": true,
+          "note": "INACTIVE is soft deactivation; preserve redemption history.",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION",
+          "enum": [
+            "ACTIVE",
+            "INACTIVE"
+          ]
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "reservedCount",
+          "type": "Number",
+          "origin": "CONFIRMED_BY_OWNER",
+          "required": true,
+          "nullable": false,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION",
+          "default": 0,
+          "min": 0,
+          "integer": true,
+          "note": "Active RESERVED redemption slots held by pending orders."
+        }
+      ],
+      "indexes": [
+        {
+          "keys": {
+            "code": 1
+          },
+          "unique": true,
+          "purpose": "Normalized code lookup"
+        },
+        {
+          "keys": {
+            "status": 1,
+            "createdAt": -1,
+            "_id": -1
+          },
+          "unique": false,
+          "purpose": "Coupon status and admin listing"
+        }
+      ],
+      "notes": "Coupon codes are normalized uppercase. Capacity is reserved + redeemed; released reservations do not consume capacity. No per-user caps, course restrictions, stacking or automatic order expiry."
+    },
+    {
+      "collection": "coupon_redemptions",
+      "origin": "CONFIRMED_FROM_SPEC",
+      "timestamps": "Mongoose timestamps: createdAt, updatedAt",
+      "softDelete": false,
+      "fields": [
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "couponId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "ref": "coupons",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "userId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "ref": "users",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "orderId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "ref": "orders",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "discountAmount",
+          "type": "Decimal128",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "status",
+          "type": "String",
+          "origin": "CONFIRMED_BY_OWNER",
+          "required": true,
+          "nullable": false,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION",
+          "default": "RESERVED",
+          "enum": [
+            "RESERVED",
+            "REDEEMED",
+            "RELEASED"
+          ],
+          "note": "Reserved at order creation, redeemed on approval, released on cancellation."
+        },
+        {
+          "name": "reservedAt",
+          "type": "Date",
+          "origin": "CONFIRMED_BY_OWNER",
+          "required": true,
+          "nullable": false,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION",
+          "immutable": true
+        },
+        {
+          "name": "redeemedAt",
+          "type": "Date",
+          "origin": "CONFIRMED_BY_OWNER",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "releasedAt",
+          "type": "Date",
+          "origin": "CONFIRMED_BY_OWNER",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "origin": "CONFIRMED_BY_OWNER",
+          "required": true,
+          "nullable": false,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION",
+          "readOnlyGenerated": true
+        }
+      ],
+      "indexes": [
+        {
+          "keys": {
+            "orderId": 1
+          },
+          "unique": true,
+          "purpose": "At most one redemption record per order"
+        },
+        {
+          "keys": {
+            "couponId": 1,
+            "createdAt": -1
+          },
+          "unique": false,
+          "purpose": "Coupon usage history"
+        },
+        {
+          "keys": {
+            "userId": 1,
+            "createdAt": -1
+          },
+          "unique": false,
+          "purpose": "User discount history"
+        },
+        {
+          "keys": {
+            "couponId": 1,
+            "status": 1,
+            "createdAt": -1
+          },
+          "unique": false,
+          "purpose": "Coupon reservation state and usage history"
+        },
+        {
+          "keys": {
+            "userId": 1,
+            "createdAt": -1
+          },
+          "unique": false,
+          "purpose": "User coupon history"
+        }
+      ],
+      "notes": "One immutable discount snapshot per order. RESERVED -> REDEEMED on PAID or RESERVED -> RELEASED on CANCELLED; transitions and coupon counters are transactional. No TTL or automatic expiry."
+    },
+    {
+      "collection": "email_logs",
+      "origin": "CONFIRMED_FROM_SPEC",
+      "timestamps": "createdAt only",
+      "softDelete": false,
+      "fields": [
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "userId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "ref": "users",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "recipientEmail",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "private": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "templateType",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION",
+          "enum": [
+            "TRANSFER_SUBMITTED_ADMIN",
+            "ORDER_APPROVED_STUDENT",
+            "RENEWAL_APPROVED_STUDENT",
+            "ORDER_CANCELLED_STUDENT",
+            "ENROLLMENT_GRANTED_STUDENT",
+            "ENROLLMENT_REVOKED_STUDENT",
+            "ENROLLMENT_RESTORED_STUDENT",
+            "ENROLLMENT_EXTENDED_STUDENT"
+          ],
+          "note": "Outbox event templates supported by BE-03A/BE-03C. Delivery requires configured SMTP and a running worker."
+        },
+        {
+          "name": "subject",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "status",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "enum": [
+            "PENDING",
+            "PROCESSING",
+            "SENT",
+            "FAILED"
+          ],
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "dedupeKey",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "attempts",
+          "type": "Number",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "default": 0,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "providerMessageId",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "sentAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "errorMessage",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "private": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "availableAt",
+          "type": "Date",
+          "origin": "TECHNICAL_RECOMMENDATION",
+          "required": true,
+          "nullable": false,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "leaseExpiresAt",
+          "type": "Date",
+          "origin": "TECHNICAL_RECOMMENDATION",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "lastErrorCode",
+          "type": "String",
+          "origin": "TECHNICAL_RECOMMENDATION",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        }
+      ],
+      "indexes": [
+        {
+          "keys": {
+            "dedupeKey": 1
+          },
+          "unique": true,
+          "purpose": "Idempotent email scheduling"
+        },
+        {
+          "keys": {
+            "status": 1,
+            "availableAt": 1,
+            "leaseExpiresAt": 1
+          },
+          "unique": false,
+          "purpose": "Outbox worker claim"
+        }
+      ],
+      "notes": "Worker fields and status enum are proposed; PDF names delivery fields but not status values."
+    },
+    {
+      "collection": "site_settings",
+      "origin": "CONFIRMED_FROM_SPEC",
+      "timestamps": "PDF updatedAt explicit; singleton ID is a technical recommendation",
+      "softDelete": false,
+      "fields": [
+        {
+          "name": "_id",
+          "type": "String",
+          "origin": "TECHNICAL_RECOMMENDATION",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "default": "site",
+          "note": "Fixed singleton key; not exposed as a resource ID.",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "siteName",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "logoAssetId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "ref": "media_assets",
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "heroTitle",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": false,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "heroDescription",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": false,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "heroAssetId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "ref": "media_assets",
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "contactEmail",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": false,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "contactPhone",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "facebookUrl",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "zaloUrl",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "footerDescription",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": false,
+          "adminEditable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "payment",
+          "type": "EmbeddedPaymentSettings",
+          "origin": "TECHNICAL_RECOMMENDATION",
+          "required": false,
+          "nullable": true,
+          "private": true,
+          "adminEditable": true,
+          "note": "bankName, accountNumber, accountHolderName, qrAssetId, transferInstructions",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        }
+      ],
+      "indexes": [
+        {
+          "keys": {
+            "_id": 1
+          },
+          "unique": true,
+          "purpose": "Singleton settings document"
+        }
+      ],
+      "notes": "Public projection excludes payment settings. Never seed fake bank details.",
+      "embeddedSchemas": {
+        "payment": {
+          "origin": "TECHNICAL_RECOMMENDATION",
+          "fields": [
+            {
+              "name": "bankName",
+              "type": "String",
+              "origin": "CONFIRMED_FROM_SPEC",
+              "required": false,
+              "nullable": true,
+              "private": true,
+              "adminEditable": true,
+              "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+            },
+            {
+              "name": "accountNumber",
+              "type": "String",
+              "origin": "CONFIRMED_FROM_SPEC",
+              "required": false,
+              "nullable": true,
+              "private": true,
+              "adminEditable": true,
+              "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+            },
+            {
+              "name": "accountHolderName",
+              "type": "String",
+              "origin": "CONFIRMED_FROM_SPEC",
+              "required": false,
+              "nullable": true,
+              "private": true,
+              "adminEditable": true,
+              "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+            },
+            {
+              "name": "qrAssetId",
+              "type": "ObjectId",
+              "origin": "CONFIRMED_FROM_SPEC",
+              "required": false,
+              "nullable": true,
+              "ref": "media_assets",
+              "private": true,
+              "adminEditable": true,
+              "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+            },
+            {
+              "name": "transferInstructions",
+              "type": "String",
+              "origin": "CONFIRMED_FROM_SPEC",
+              "required": false,
+              "nullable": true,
+              "private": true,
+              "adminEditable": true,
+              "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "collection": "audit_logs",
+      "origin": "CONFIRMED_FROM_SPEC",
+      "timestamps": "createdAt only; append-only",
+      "softDelete": false,
+      "fields": [
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "actorUserId",
+          "type": "ObjectId",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "ref": "users",
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "action",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "entityType",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "entityId",
+          "type": "ObjectId/String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "oldValue",
+          "type": "Object",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "newValue",
+          "type": "Object",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "ipAddress",
+          "type": "String",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": false,
+          "nullable": true,
+          "private": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "origin": "CONFIRMED_FROM_SPEC",
+          "required": true,
+          "nullable": false,
+          "readOnlyGenerated": true,
+          "constraintOrigin": "TECHNICAL_RECOMMENDATION"
+        }
+      ],
+      "indexes": [
+        {
+          "keys": {
+            "entityType": 1,
+            "entityId": 1,
+            "createdAt": -1
+          },
+          "unique": false,
+          "purpose": "Entity history"
+        },
+        {
+          "keys": {
+            "actorUserId": 1,
+            "createdAt": -1
+          },
+          "unique": false,
+          "purpose": "Actor audit trail"
+        }
+      ],
+      "notes": "Redact hashes, signed URLs, passwords, and bank secrets."
+    }
+  ],
+  "omissions": [
+    {
+      "name": "payment_transactions",
+      "reason": "Explicitly prohibited by owner for manual transfer V1."
+    }
+  ],
+  "embeddedLogicalTables": [
+    {
+      "name": "quiz_questions",
+      "embeddedAt": "quizzes.questions[]"
+    },
+    {
+      "name": "quiz_options",
+      "embeddedAt": "quizzes.questions[].options[]"
+    },
+    {
+      "name": "quiz_attempt_answers",
+      "embeddedAt": "quiz_attempts.answers[]"
+    }
+  ],
+  "fieldConstraintsNote": "Required/null/default flags are proposed validation choices unless explicitly confirmed by owner; PDF field presence alone does not establish requiredness."
+}

@@ -14,15 +14,15 @@ function renderPricing(props: Partial<Parameters<typeof CoursePricingSection>[0]
 }
 
 describe('CoursePricingSection', () => {
-  it('shows the illustrative price and access duration for the demo course', () => {
+  it('shows the supplied course price, duration and outline without a preview entitlement', () => {
     const { container } = renderPricing()
 
     expect(screen.getByRole('article')).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('Tiếng Đức A1.1')
-    expect(screen.getByText('Học phí minh họa')).toBeInTheDocument()
     expect(screen.getByText(/1\.290\.000/)).toBeInTheDocument()
-    expect(screen.getByText('12 tháng truy cập · demo')).toBeInTheDocument()
+    expect(screen.getByText('12 tháng truy cập')).toBeInTheDocument()
     expect(screen.getByText('4 chương · 7 bài học')).toBeInTheDocument()
+    expect(screen.queryByText(/học thử/i)).not.toBeInTheDocument()
     expect(
       container.querySelector('img[src="/assets/homepage/course-banner-a11.webp"]'),
     ).not.toBeNull()
@@ -34,11 +34,11 @@ describe('CoursePricingSection', () => {
     })
 
     expect(screen.getByText(/1\.290\.000/)).toBeInTheDocument()
-    expect(screen.getByText('12 tháng truy cập · demo')).toBeInTheDocument()
+    expect(screen.getByText('12 tháng truy cập')).toBeInTheDocument()
     expect(screen.queryByText('Đang cập nhật')).not.toBeInTheDocument()
   })
 
-  it('renders one card for each catalog result and exposes real course and preview routes', () => {
+  it('renders one card per catalog result and links only to real course details', () => {
     renderPricing({
       courses: [
         PUBLIC_DEMO_COURSE,
@@ -55,13 +55,12 @@ describe('CoursePricingSection', () => {
     })
 
     expect(screen.getAllByRole('article')).toHaveLength(2)
-    expect(screen.getByText('Nội dung theo 8 chương')).toBeInTheDocument()
-    expect(screen.getByText('Khám phá 15 bài học')).toBeInTheDocument()
+    expect(screen.getByText('8 chương · 15 bài học')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Tiếng Đức A2/ })).toHaveAttribute(
       'href',
       '/courses/tieng-duc-a2',
     )
-    expect(screen.getAllByRole('link', { name: 'Mở nội dung học thử' })).toHaveLength(2)
+    expect(screen.getAllByRole('link', { name: 'Xem nội dung khóa' })).toHaveLength(2)
   })
 
   it('renders loading, error and empty states from repository state', () => {

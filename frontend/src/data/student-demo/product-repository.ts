@@ -622,6 +622,7 @@ export function createStudentProductRepositories(
         return {
           courseId: COURSE_ID,
           courseTitle: A11_COURSE.title,
+          courseLevel: A11_COURSE.level,
           section,
           access: deriveAccess(state.enrollment, now),
         }
@@ -984,8 +985,17 @@ export function createStudentProductRepositories(
       return request('commerce', () => {
         ensureCourse(courseId)
         const { state } = resolve(sessionId)
-        if (!state.enrollment || state.enrollment.status === 'REVOKED') return []
-        return RENEWAL_PLANS.filter((plan) => plan.status === 'ACTIVE')
+        if (!state.enrollment || state.enrollment.status === 'REVOKED') {
+          throw new DemoRepositoryError({ message: 'Không tìm thấy quyền học cần gia hạn.' })
+        }
+        return {
+          course: {
+            id: COURSE_ID,
+            title: A11_COURSE.title,
+            enrollmentExpiresAt: state.enrollment.expiresAt,
+          },
+          plans: RENEWAL_PLANS.filter((plan) => plan.status === 'ACTIVE'),
+        }
       })
     },
     async simulateDemoPayment(sessionId, orderId, outcome) {

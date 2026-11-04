@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { ArrowRight, Check, LockKeyhole } from 'lucide-react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { useAuthSession } from '@/app/auth/auth-session'
-import { DEMO_COURSE_ID, DEMO_COURSE_SLUG } from '@/data/student-demo/fixtures'
 import {
   useCompleteExercise,
   useCompleteLesson,
@@ -56,7 +55,7 @@ export function LearningCoursePage() {
       ) : course.isError ? (
         <ProductError onRetry={() => void course.refetch()} />
       ) : !course.data ? (
-        <ProductNotFound message="Khóa học này chưa có dữ liệu trong bản demo." />
+        <ProductNotFound message="Khóa học này không có trong danh sách khóa học được cấp cho tài khoản." />
       ) : (
         <div className="grid min-w-0 gap-6">
           <LearningCourseHeader
@@ -70,7 +69,7 @@ export function LearningCoursePage() {
             <section className="grid min-w-0 gap-4" aria-labelledby="course-map-title">
               <SectionHeader
                 title="Lộ trình khóa học"
-                description="Khóa học → chương → bài học → bài tập. Nội dung trả phí chỉ mở khi repository demo trả quyền truy cập còn hạn."
+                description="Khóa học → chương → bài học → bài tập. Máy chủ kiểm tra quyền truy cập trước khi trả nội dung học."
               />
               <CourseTree
                 tree={course.data.tree}
@@ -95,11 +94,10 @@ export function LearningCoursePage() {
               {course.data.access.kind !== 'available' && (
                 <Card className="p-4">
                   <p className="text-sm leading-6 text-ink-secondary">
-                    Nội dung bài học, media và đáp án được kiểm tra trong repository cho từng yêu
-                    cầu.
+                    Nội dung bài học, media và đáp án được máy chủ kiểm tra cho từng yêu cầu.
                   </p>
                   <LinkButton
-                    to={`/courses/${DEMO_COURSE_SLUG}`}
+                    to={`/courses/${course.data.course.slug}`}
                     variant="outline"
                     className="mt-3 w-full"
                   >
@@ -128,12 +126,12 @@ export function LearningSectionPage() {
       ) : section.isError ? (
         <ProductError onRetry={() => void section.refetch()} />
       ) : !section.data ? (
-        <ProductNotFound message="Chương này không nằm trong khóa học demo." />
+        <ProductNotFound message="Chương này không thuộc khóa học hoặc tài khoản hiện tại." />
       ) : (
         <div className="grid gap-5">
           <LearningCourseHeader
             title={section.data.courseTitle}
-            level="A1.1"
+            level={section.data.courseLevel}
             access={section.data.access}
             onBack={() => navigate(`/learn/courses/${courseId}`)}
             headingLevel={2}
@@ -150,7 +148,7 @@ export function LearningSectionPage() {
               <p className="text-sm text-ink-secondary">
                 Chọn một bài để xem trạng thái quyền truy cập.
               </p>
-              <LinkButton to={`/courses/${DEMO_COURSE_SLUG}`} variant="outline">
+              <LinkButton to="/courses" variant="outline">
                 Về khóa học công khai
               </LinkButton>
             </Card>
@@ -172,13 +170,16 @@ export function LearningLessonPage() {
   const navigate = useNavigate()
 
   return (
-    <ProductPage title="Không gian bài học" backTo={`/learn/courses/${DEMO_COURSE_ID}`}>
+    <ProductPage
+      title="Không gian bài học"
+      backTo={lesson.data ? `/learn/courses/${lesson.data.courseId}` : '/student/courses'}
+    >
       {lesson.isPending ? (
         <ProductLoading title="Đang tải bài học" />
       ) : lesson.isError ? (
         <ProductError onRetry={() => void lesson.refetch()} />
       ) : !lesson.data ? (
-        <ProductNotFound message="Bài học này không tồn tại trong khóa demo." />
+        <ProductNotFound message="Bài học này không tồn tại hoặc tài khoản chưa được cấp quyền truy cập." />
       ) : (
         <div className="grid min-w-0 gap-7">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -241,13 +242,11 @@ export function LearningLessonPage() {
                   <Card className="flex items-center gap-3 p-4">
                     <LockKeyhole aria-hidden="true" className="size-5 text-warning-foreground" />
                     <p className="text-sm text-ink-secondary">
-                      Bài tập sẽ xuất hiện khi repository xác nhận quyền học còn hạn.
+                      Bài tập sẽ xuất hiện khi máy chủ xác nhận quyền học còn hiệu lực.
                     </p>
                   </Card>
                 ) : (
-                  <Card className="p-4 text-sm text-ink-secondary">
-                    Bài này chưa có bài tập mô phỏng.
-                  </Card>
+                  <Card className="p-4 text-sm text-ink-secondary">Bài này chưa có bài tập.</Card>
                 )}
               </section>
               <section
@@ -333,7 +332,7 @@ export function LearningLessonPage() {
                   )}
                 </nav>
               </Card>
-              <LinkButton to={`/learn/courses/${DEMO_COURSE_ID}`} variant="outline">
+              <LinkButton to={`/learn/courses/${lesson.data.courseId}`} variant="outline">
                 Về lộ trình
               </LinkButton>
             </aside>
@@ -352,14 +351,32 @@ export function LearningExercisePage() {
   const startQuiz = useStartQuiz(session?.id ?? '')
   const navigate = useNavigate()
 
+  async function beginQuiz() {
+    try {
+      const attempt = await startQuiz.mutateAsync(exerciseId)
+      const params = new URLSearchParams({
+        exerciseId,
+        ...(exercise.data?.lessonId ? { lessonId: exercise.data.lessonId } : {}),
+      })
+      navigate(`/learn/quizzes/${attempt.id}?${params.toString()}`)
+    } catch {
+      // The mutation error is presented inline.
+    }
+  }
+
   return (
-    <ProductPage title="Bài tập" backTo={`/learn/lessons/a11-lesson-01`}>
+    <ProductPage
+      title="Bài tập"
+      backTo={
+        exercise.data?.lessonId ? `/learn/lessons/${exercise.data.lessonId}` : '/student/courses'
+      }
+    >
       {exercise.isPending ? (
         <ProductLoading title="Đang tải bài tập" />
       ) : exercise.isError ? (
         <ProductError onRetry={() => void exercise.refetch()} />
       ) : !exercise.data ? (
-        <ProductNotFound message="Bài tập này không tồn tại trong khóa demo." />
+        <ProductNotFound message="Bài tập này không tồn tại hoặc tài khoản chưa được cấp quyền truy cập." />
       ) : exercise.data.exerciseType === 'FILE_BASED' ? (
         <div className="mx-auto grid w-full max-w-3xl gap-4">
           {!exercise.data.capabilities.canMarkComplete && exercise.data.status !== 'COMPLETED' && (
@@ -368,7 +385,7 @@ export function LearningExercisePage() {
               title="Chưa có quyền truy cập bài tập"
               message="Enrollment hiện không cấp quyền xem hoặc hoàn thành nội dung trả phí."
             >
-              <LinkButton to={`/courses/${DEMO_COURSE_SLUG}`} variant="outline">
+              <LinkButton to="/courses" variant="outline">
                 Về trang khóa học
               </LinkButton>
             </DomainState>
@@ -382,11 +399,18 @@ export function LearningExercisePage() {
           {completeExercise.isError && (
             <ErrorState
               title="Chưa ghi nhận được bài tập"
-              description="Dữ liệu bài làm vẫn thuộc tài khoản demo này. Hãy thử lại."
+              description="Máy chủ chưa xác nhận hoàn tất bài tập. Hãy kiểm tra kết nối rồi thử lại."
               onRetry={() => void completeExercise.mutate(exerciseId)}
             />
           )}
-          <LinkButton to={`/learn/lessons/a11-lesson-01`} variant="outline">
+          <LinkButton
+            to={
+              exercise.data.lessonId
+                ? `/learn/lessons/${exercise.data.lessonId}`
+                : '/student/courses'
+            }
+            variant="outline"
+          >
             Quay lại bài học
           </LinkButton>
         </div>
@@ -401,24 +425,26 @@ export function LearningExercisePage() {
             </div>
             <QuizIntro
               title={exercise.data.title}
-              description={`${exercise.data.description} Đây là bài kiểm tra mô phỏng; đáp án chỉ được trả trong kết quả sau khi nộp.`}
-              questionCount={2}
-              onStart={() =>
-                void startQuiz
-                  .mutateAsync(exerciseId)
-                  .then((attempt) => navigate(`/learn/quizzes/${attempt.id}`))
-              }
+              description={`${exercise.data.description ? `${exercise.data.description} ` : ''}Câu hỏi được tải từ máy chủ; đáp án chỉ hiển thị nếu cấu hình bài kiểm tra cho phép.`}
+              onStart={() => void beginQuiz()}
               headingLevel={2}
             />
             {startQuiz.isError && (
               <ErrorState
                 title="Chưa bắt đầu được bài kiểm tra"
                 description="Hãy kiểm tra quyền truy cập rồi thử lại."
-                onRetry={() => void startQuiz.mutate(exerciseId)}
+                onRetry={() => void beginQuiz()}
               />
             )}
           </Card>
-          <LinkButton to={`/learn/lessons/a11-lesson-01`} variant="outline">
+          <LinkButton
+            to={
+              exercise.data.lessonId
+                ? `/learn/lessons/${exercise.data.lessonId}`
+                : '/student/courses'
+            }
+            variant="outline"
+          >
             Quay lại bài học
           </LinkButton>
         </div>
@@ -429,22 +455,29 @@ export function LearningExercisePage() {
 
 export function LearningQuizPage() {
   const { attemptId = '' } = useParams()
+  const [searchParams] = useSearchParams()
+  const exerciseId = searchParams.get('exerciseId') ?? ''
+  const lessonId = searchParams.get('lessonId') ?? ''
   const { session } = useAuthSession()
   const attempt = useProductQuizAttempt(session?.id ?? '', attemptId)
   const selectAnswer = useSelectQuizAnswer(session?.id ?? '', attemptId)
   const submitQuiz = useSubmitQuiz(session?.id ?? '', attemptId)
+  const retryQuiz = useRetryQuiz(session?.id ?? '')
   const navigate = useNavigate()
   const [optimisticAnswers, setOptimisticAnswers] = useState<Record<string, string>>({})
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
 
   return (
-    <ProductPage title="Bài kiểm tra" backTo="/learn/lessons/a11-lesson-01">
+    <ProductPage
+      title="Bài kiểm tra"
+      backTo={lessonId ? `/learn/lessons/${lessonId}` : '/student/courses'}
+    >
       {attempt.isPending ? (
         <ProductLoading title="Đang tải lượt làm bài" />
       ) : attempt.isError ? (
         <ProductError onRetry={() => void attempt.refetch()} />
       ) : !attempt.data ? (
-        <ProductNotFound message="Lượt làm bài này không nằm trong tài khoản demo." />
+        <ProductNotFound message="Không tìm thấy lượt làm bài trong tài khoản hiện tại." />
       ) : attempt.data.status === 'SUBMITTED' ? (
         <Card className="mx-auto grid w-full max-w-3xl gap-4 p-5">
           <DomainState
@@ -452,12 +485,14 @@ export function LearningQuizPage() {
             title="Lượt làm bài đã nộp"
             message="Mở trang kết quả để xem phần giải thích."
           />
-          <LinkButton to={`/learn/quizzes/${attemptId}/result`}>Mở kết quả</LinkButton>
+          <LinkButton to={`/learn/quizzes/${attemptId}/result?${searchParams.toString()}`}>
+            Mở kết quả
+          </LinkButton>
         </Card>
       ) : (
         <div className="grid gap-4">
           <Card className="mx-auto w-full max-w-3xl bg-surface-blue p-4 text-sm leading-6 text-ink-secondary">
-            Quiz demo · SINGLE_CHOICE · Không có đồng hồ hoặc giới hạn lượt làm.
+            Lựa chọn và trạng thái bài làm được lưu trực tiếp trên máy chủ.
           </Card>
           <QuizRunner
             attempt={{
@@ -475,16 +510,25 @@ export function LearningQuizPage() {
             }}
             onSubmit={async () => {
               const result = await submitQuiz.mutateAsync()
-              navigate(`/learn/quizzes/${attemptId}/result`)
+              navigate(`/learn/quizzes/${attemptId}/result?${searchParams.toString()}`)
               return result
             }}
-            onRetry={() => navigate(`/learn/exercises/exercise-a11-greeting-quiz`)}
+            {...(exerciseId
+              ? {
+                  onRetry: () =>
+                    void retryQuiz
+                      .mutateAsync(attemptId)
+                      .then((next) =>
+                        navigate(`/learn/quizzes/${next.id}?${searchParams.toString()}`),
+                      ),
+                }
+              : {})}
             confirmBeforeSubmit
           />
           {selectAnswer.isError && (
             <ErrorState
               title="Chưa lưu lựa chọn"
-              description="Chọn lại đáp án sau khi kết nối demo được khôi phục."
+              description="Chưa lưu được lựa chọn trên máy chủ. Hãy thử lại khi kết nối ổn định."
               onRetry={() => attempt.refetch()}
             />
           )}
@@ -503,6 +547,8 @@ export function LearningQuizPage() {
 
 export function LearningQuizResultPage() {
   const { attemptId = '' } = useParams()
+  const [searchParams] = useSearchParams()
+  const lessonId = searchParams.get('lessonId') ?? ''
   const { session } = useAuthSession()
   const result = useProductQuizResult(session?.id ?? '', attemptId)
   const attempt = useProductQuizAttempt(session?.id ?? '', attemptId)
@@ -521,7 +567,9 @@ export function LearningQuizResultPage() {
               title="Bài kiểm tra chưa được nộp"
               message="Bạn vẫn có thể tiếp tục lượt đang làm."
             />
-            <LinkButton to={`/learn/quizzes/${attemptId}`}>Tiếp tục bài kiểm tra</LinkButton>
+            <LinkButton to={`/learn/quizzes/${attemptId}?${searchParams.toString()}`}>
+              Tiếp tục bài kiểm tra
+            </LinkButton>
           </Card>
         ) : (
           <ProductError onRetry={() => void result.refetch()} />
@@ -531,14 +579,14 @@ export function LearningQuizResultPage() {
       ) : (
         <div className="mx-auto grid w-full max-w-3xl gap-4">
           <Card className="bg-surface-lime p-4 text-sm leading-6 text-pastel-lime-ink">
-            Kết quả do repository demo chấm. Không có điểm đạt/trượt hay giới hạn số lần.
+            Kết quả và quyền xem đáp án do cấu hình bài kiểm tra trên máy chủ quyết định.
           </Card>
           <QuizResult
             result={result.data}
             onRetry={() =>
               void retryQuiz
                 .mutateAsync(attemptId)
-                .then((next) => navigate(`/learn/quizzes/${next.id}`))
+                .then((next) => navigate(`/learn/quizzes/${next.id}?${searchParams.toString()}`))
             }
           />
           {retryQuiz.isError && (
@@ -548,9 +596,11 @@ export function LearningQuizResultPage() {
               onRetry={() => void retryQuiz.mutate(attemptId)}
             />
           )}
-          <LinkButton to={`/learn/lessons/a11-lesson-01`} variant="outline">
-            Quay lại bài học
-          </LinkButton>
+          {lessonId && (
+            <LinkButton to={`/learn/lessons/${lessonId}`} variant="outline">
+              Quay lại bài học
+            </LinkButton>
+          )}
         </div>
       )}
     </ProductPage>
@@ -559,11 +609,17 @@ export function LearningQuizResultPage() {
 
 export function StudentProgressPage() {
   const { session } = useAuthSession()
-  const progress = useProductProgress(session?.id ?? '', DEMO_COURSE_ID)
-  const course = useProductCourse(session?.id ?? '', DEMO_COURSE_ID)
+  const [searchParams] = useSearchParams()
   const dashboard = useStudentDashboard(session?.id ?? '')
-  const continueLesson =
-    dashboard.data?.courses[0]?.continueLessonId ?? course.data?.continueLessonId
+  const requestedCourseId = searchParams.get('courseId')
+  const selectedCourse =
+    dashboard.data?.courses.find((record) => record.courseId === requestedCourseId) ??
+    dashboard.data?.courses[0]
+  const courseId = selectedCourse?.courseId ?? ''
+  const progress = useProductProgress(session?.id ?? '', courseId)
+  const course = useProductCourse(session?.id ?? '', courseId)
+  const navigate = useNavigate()
+  const continueLesson = selectedCourse?.continueLessonId ?? course.data?.continueLessonId
 
   return (
     <ProductPage
@@ -571,7 +627,21 @@ export function StudentProgressPage() {
       description="Một nguồn tiến độ duy nhất cho bảng điều khiển, khóa học và bài học."
       backTo="/student"
     >
-      {progress.isPending || course.isPending ? (
+      {dashboard.isPending ? (
+        <ProductLoading title="Đang tải tiến độ" />
+      ) : dashboard.isError ? (
+        <ProductError onRetry={() => void dashboard.refetch()} />
+      ) : !selectedCourse ? (
+        <DomainState
+          kind="empty"
+          title="Chưa có khóa học được cấp"
+          message="Khi tài khoản có enrollment, tiến độ và danh sách bài học sẽ xuất hiện tại đây."
+        >
+          <LinkButton to="/courses" variant="outline">
+            Khám phá khóa học
+          </LinkButton>
+        </DomainState>
+      ) : progress.isPending || course.isPending ? (
         <ProductLoading title="Đang tải tiến độ" />
       ) : progress.isError || course.isError ? (
         <ProductError
@@ -588,19 +658,17 @@ export function StudentProgressPage() {
           <CourseProgressCard
             courseTitle={course.data.course.title}
             progress={progress.data}
-            href={`/learn/courses/${DEMO_COURSE_ID}`}
+            href={`/learn/courses/${courseId}`}
             {...(continueLesson
               ? {
-                  onContinue: () => {
-                    window.location.assign(`/learn/lessons/${continueLesson}`)
-                  },
+                  onContinue: () => navigate(`/learn/lessons/${continueLesson}`),
                 }
               : {})}
           />
           <section className="grid gap-3">
             <SectionHeader
               title="Tiến độ từng bài"
-              description="Chỉ bài học được repository đánh dấu countTowardProgress mới nằm trong tổng số tiến độ."
+              description="Tiến độ chỉ tính những bài mà máy chủ đánh dấu là có tham gia tổng tiến độ."
             />
             <LessonProgressList
               lessons={course.data.tree.sections.flatMap((section) =>
@@ -613,13 +681,6 @@ export function StudentProgressPage() {
               )}
             />
           </section>
-          {dashboard.isError && (
-            <ErrorState
-              title="Tổng quan chưa được làm mới"
-              description="Tiến độ vẫn được lấy trực tiếp từ repository học tập."
-              onRetry={() => void dashboard.refetch()}
-            />
-          )}
         </div>
       )}
     </ProductPage>

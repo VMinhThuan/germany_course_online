@@ -2,9 +2,12 @@ import type { SessionStatus, UserStatus } from '@/domains/contracts/backend-enum
 
 /** Safe presentation subset; never includes password/token hashes, IP, or raw user agent. */
 export interface StudentProfileViewModel {
+  id?: string
   displayName?: string
   email: string
   status: UserStatus
+  phone?: string | null
+  avatarUrl?: string | null
 }
 
 export interface SessionSummaryViewModel {

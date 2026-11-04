@@ -30,6 +30,7 @@ export interface StudentLearningCourseViewModel {
 export interface StudentLearningSectionViewModel {
   courseId: string
   courseTitle: string
+  courseLevel: string
   section: CourseSectionModel
   access: CourseAccessViewModel
 }
@@ -63,12 +64,15 @@ export interface StudentCheckoutContextViewModel {
   courseTitle: string
   originalAmountVnd: string
   discountAmountVnd: string
+  couponDiscountAmountVnd?: string
+  automaticDiscountAmountVnd?: string
+  discountSource?: 'NONE' | 'COUPON' | 'AUTOMATIC_5_PERCENT'
   totalAmountVnd: string
   couponCode?: string
   durationMonths: number
   plan?: RenewalPlanViewModel
   currentExpiry?: string
-  hypotheticalPrice: true
+  hypotheticalPrice?: true
 }
 
 export interface StudentOrderDetailViewModel {
@@ -80,8 +84,21 @@ export interface StudentOrderDetailViewModel {
   couponCode?: string
   durationMonths: number
   planId?: string
+  paymentInstructions?: {
+    bankName: string
+    accountNumber: string
+    accountHolderName: string
+    qrUrl: string
+    transferInstructions: string
+  } | null
+  transferReported?: boolean
   enrollment?: EnrollmentSummaryViewModel
   access: CourseAccessViewModel
+}
+
+export interface StudentRenewalContextViewModel {
+  course: { id: string; title: string; enrollmentExpiresAt: string }
+  plans: readonly RenewalPlanViewModel[]
 }
 
 export interface DemoPaymentResultViewModel {
@@ -100,7 +117,11 @@ export interface StudentLearningRepository {
   getLesson(sessionId: string, lessonId: string): Promise<StudentLessonWorkspaceViewModel>
   getExercise(sessionId: string, exerciseId: string): Promise<ExerciseViewModel>
   completeExercise(sessionId: string, exerciseId: string): Promise<ExerciseViewModel>
-  startQuiz(sessionId: string, exerciseId: string): Promise<QuizAttemptViewModel>
+  startQuiz(
+    sessionId: string,
+    exerciseId: string,
+    idempotencyKey?: string,
+  ): Promise<QuizAttemptViewModel>
   getQuizAttempt(sessionId: string, attemptId: string): Promise<QuizAttemptViewModel>
   selectQuizAnswer(
     sessionId: string,
@@ -110,7 +131,11 @@ export interface StudentLearningRepository {
   ): Promise<QuizAttemptViewModel>
   submitQuiz(sessionId: string, attemptId: string): Promise<QuizResultViewModel>
   getQuizResult(sessionId: string, attemptId: string): Promise<QuizResultViewModel>
-  retryQuiz(sessionId: string, attemptId: string): Promise<QuizAttemptViewModel>
+  retryQuiz(
+    sessionId: string,
+    attemptId: string,
+    idempotencyKey?: string,
+  ): Promise<QuizAttemptViewModel>
   completeLesson(sessionId: string, lessonId: string): Promise<LessonContentViewModel['lesson']>
   getProgress(sessionId: string, courseId: string): Promise<CourseProgressViewModel>
   getLessonNote(sessionId: string, lessonId: string): Promise<string>
@@ -133,16 +158,18 @@ export interface StudentCommerceRepository {
   createOrder(
     sessionId: string,
     context: string,
-    input?: { couponCode?: string; planId?: string },
+    input?: { couponCode?: string; planId?: string; idempotencyKey?: string },
   ): Promise<StudentOrderDetailViewModel>
   listOrders(sessionId: string): Promise<readonly StudentOrderDetailViewModel[]>
   getOrder(sessionId: string, orderId: string): Promise<StudentOrderDetailViewModel>
-  getRenewalPlans(sessionId: string, courseId: string): Promise<readonly RenewalPlanViewModel[]>
+  getRenewalPlans(sessionId: string, courseId: string): Promise<StudentRenewalContextViewModel>
   simulateDemoPayment(
     sessionId: string,
     orderId: string,
     outcome: 'success' | 'failure',
   ): Promise<DemoPaymentResultViewModel>
+  confirmTransfer?(sessionId: string, orderId: string): Promise<StudentOrderDetailViewModel>
+  cancelOrder?(sessionId: string, orderId: string): Promise<StudentOrderDetailViewModel>
 }
 
 export interface StudentAccountRepository {

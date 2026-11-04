@@ -56,7 +56,12 @@ export function MediaFallbackLink({
 }) {
   const href = safeMediaHref(src)
   if (!href)
-    return <p className="text-sm text-ink-secondary">Không có liên kết tài liệu an toàn để mở.</p>
+    return (
+      <div className="grid gap-1">
+        <p className="text-sm font-semibold text-ink-primary">{title}</p>
+        <p className="text-sm text-ink-secondary">Không có liên kết tài liệu an toàn để mở.</p>
+      </div>
+    )
   const external = new URL(href).origin !== window.location.origin
   return (
     <a

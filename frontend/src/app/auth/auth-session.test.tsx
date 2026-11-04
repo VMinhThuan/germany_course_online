@@ -1,19 +1,42 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuthSessionProvider, useAuthSession } from './auth-session'
 import { ProtectedStudentRoute } from './routes'
-import { studentDemoRepositories } from '@/data/student-demo/repository'
 import { publishSessionRevoked } from '@/data/student-demo/session-events'
 import { NotificationProvider } from '@/shared/ui/notifications'
 
+const { authMock } = vi.hoisted(() => ({
+  authMock: {
+    restoreSession: vi.fn(),
+    logout: vi.fn(),
+    clearLocalSession: vi.fn(),
+  },
+}))
+
+vi.mock('@/lib/auth/api-auth', () => ({ apiAuth: authMock }))
+
+const session = {
+  id: 'student-1',
+  userId: 'student-1',
+  role: 'STUDENT' as const,
+  profile: {
+    id: 'student-1',
+    displayName: 'Học viên kiểm thử',
+    email: 'student@example.test',
+    status: 'ACTIVE' as const,
+    phone: null,
+    avatarUrl: null,
+  },
+}
+
 function SessionControls() {
-  const { status, session, logout } = useAuthSession()
+  const { status, session: activeSession, logout } = useAuthSession()
   return (
     <>
       <p data-testid="session-state">
-        {status} {session?.profile.displayName}
+        {status} {activeSession?.profile.displayName}
       </p>
       <button onClick={() => void logout()}>Log out</button>
     </>
@@ -39,14 +62,15 @@ function renderSession(client: QueryClient, children: React.ReactNode) {
   )
 }
 
-describe('demo auth session boundary', () => {
+describe('API auth session boundary', () => {
   beforeEach(() => {
-    window.sessionStorage.clear()
-    studentDemoRepositories.auth.clearSession()
+    authMock.restoreSession.mockReset().mockResolvedValue(null)
+    authMock.logout.mockReset().mockResolvedValue(undefined)
+    authMock.clearLocalSession.mockReset()
   })
 
-  it('logs out and removes protected student query data', async () => {
-    const session = await studentDemoRepositories.auth.signInWithDemoAccount('active-student')
+  it('restores the API session, then logs out and removes protected query data', async () => {
+    authMock.restoreSession.mockResolvedValueOnce(session)
     const client = createClient()
     const key = ['student', 'dashboard', session.id]
     client.setQueryData(key, { private: 'student data' })
@@ -59,11 +83,11 @@ describe('demo auth session boundary', () => {
 
     await waitFor(() => expect(screen.getByTestId('session-state')).toHaveTextContent('anonymous'))
     expect(client.getQueryData(key)).toBeUndefined()
-    expect(window.sessionStorage.getItem('deutsch-a11.demo-session-user')).toBeNull()
+    expect(authMock.logout).toHaveBeenCalledOnce()
   })
 
-  it('clears session and student cache after the revoked-session event', async () => {
-    const session = await studentDemoRepositories.auth.signInWithDemoAccount('active-student')
+  it('clears session and student cache after a SESSION_REVOKED event', async () => {
+    authMock.restoreSession.mockResolvedValueOnce(session)
     const client = createClient()
     const key = ['student', 'dashboard', session.id]
     client.setQueryData(key, { private: 'student data' })
@@ -76,11 +100,11 @@ describe('demo auth session boundary', () => {
 
     await waitFor(() => expect(screen.getByTestId('session-state')).toHaveTextContent('anonymous'))
     expect(client.getQueryData(key)).toBeUndefined()
-    expect(window.sessionStorage.getItem('deutsch-a11.demo-session-user')).toBeNull()
-    expect(screen.getByText('Phiên demo đã bị thu hồi')).toBeInTheDocument()
+    expect(authMock.clearLocalSession).toHaveBeenCalledOnce()
+    expect(screen.getByText('Phiên đăng nhập đã bị thay thế hoặc thu hồi')).toBeInTheDocument()
   })
 
-  it('redirects a guest deep link to login with an internal return path', async () => {
+  it('redirects an anonymous guest deep link to login with an internal return path', async () => {
     const client = createClient()
     renderSession(
       client,
