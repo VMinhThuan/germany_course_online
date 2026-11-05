@@ -687,6 +687,7 @@ export function createStudentProductRepositories(
             lessonNumber: itemSection.lessons.findIndex((row) => row.id === item.id) + 1,
           })),
           solutionVideos: [],
+          solutionVideo: null,
           hasRestrictedSolutionVideos: false,
           canCompleteLesson: unlocked && required.length === 0 && status !== 'COMPLETED',
           isCompleted: status === 'COMPLETED',

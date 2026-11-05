@@ -435,6 +435,11 @@ export class LearningService {
         lesson.video?.provider === "YOUTUBE" && lesson.video.videoId
           ? { provider: "YOUTUBE", videoId: lesson.video.videoId }
           : null,
+      solutionVideo:
+        lesson.solutionVideo?.provider === "YOUTUBE" &&
+        lesson.solutionVideo.videoId
+          ? { provider: "YOUTUBE", videoId: lesson.solutionVideo.videoId }
+          : null,
       lessonType: lesson.lessonType,
       estimatedMinutes: lesson.estimatedMinutes,
       countsTowardProgress: lesson.countsTowardProgress,

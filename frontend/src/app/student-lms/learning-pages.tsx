@@ -300,9 +300,18 @@ export function LearningLessonPage() {
                   title="Đáp án bài tập"
                   description="Video chữa bài giúp bạn đối chiếu cách làm."
                 />
-                {lesson.data.solutionVideos?.length ? (
+                {lesson.data.solutionVideo || lesson.data.solutionVideos?.length ? (
                   <div className="grid min-w-0 gap-5">
-                    {lesson.data.solutionVideos.map((solution) => (
+                    {lesson.data.solutionVideo && (
+                      <div className="grid gap-2">
+                        <p className="font-semibold">Video chữa bài · {lesson.data.lesson.title}</p>
+                        <YouTubeLessonPlayer
+                          video={lesson.data.solutionVideo}
+                          title={`Video chữa bài · ${lesson.data.lesson.title}`}
+                        />
+                      </div>
+                    )}
+                    {(lesson.data.solutionVideos ?? []).map((solution) => (
                       <div
                         key={`${solution.exerciseId}-${solution.media.id}`}
                         className="grid gap-2"

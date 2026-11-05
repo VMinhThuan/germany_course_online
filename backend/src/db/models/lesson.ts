@@ -30,6 +30,7 @@ const lessonSchema = new Schema(
     description: { type: String, default: "" },
     content: { type: Schema.Types.Mixed, default: null, select: false },
     video: { type: lessonVideoSchema, default: null },
+    solutionVideo: { type: lessonVideoSchema, default: null },
     lessonType: { type: String, enum: ["LECTURE", "PRACTICE"], required: true },
     estimatedMinutes: {
       type: Number,

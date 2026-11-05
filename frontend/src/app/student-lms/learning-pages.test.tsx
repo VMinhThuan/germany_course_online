@@ -52,6 +52,7 @@ const lessonData = {
   lessonNumber: 2,
   paragraphs: [],
   video: null,
+  solutionVideo: null,
   media: [],
   access: { kind: 'available' as const, label: 'Quyền học đang hoạt động' },
   exercises: [],
@@ -164,6 +165,22 @@ describe('LearningLessonPage', () => {
     renderLesson()
 
     expect(screen.getByLabelText('Video chữa bài · Vorstellung üben')).toBeVisible()
+  })
+
+  it('renders a YouTube lesson solution video', () => {
+    mocks.useProductLesson.mockReturnValue({
+      data: {
+        ...lessonData,
+        solutionVideo: { provider: 'YOUTUBE', videoId: 'lamg3tUwct4' },
+      },
+      isPending: false,
+      isError: false,
+    })
+    renderLesson()
+
+    expect(
+      screen.getByRole('button', { name: 'Tải video: Video chữa bài · Sich vorstellen' }),
+    ).toBeVisible()
   })
 
   it('navigates to the previous and next lesson', async () => {

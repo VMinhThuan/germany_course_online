@@ -469,6 +469,7 @@ export class AdminService {
             description: input.description ?? "",
             content: input.content ?? null,
             video: input.video ?? null,
+            solutionVideo: input.solutionVideo ?? null,
             estimatedMinutes: input.estimatedMinutes ?? null,
             deletedAt: null,
           },

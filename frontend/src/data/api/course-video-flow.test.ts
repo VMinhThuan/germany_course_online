@@ -74,6 +74,7 @@ describe('A1.1 real API data mapping', () => {
         description: '',
         content: { version: 1, paragraphs: [] },
         video: { provider: 'YOUTUBE', videoId: 'lamg3tUwct4' },
+        solutionVideo: null,
         lessonType: 'LECTURE',
         estimatedMinutes: null,
         countsTowardProgress: true,
@@ -122,6 +123,7 @@ describe('A1.1 real API data mapping', () => {
     const lesson = await apiStudentRepositories.learning.getLesson('session-id', 'lesson-id')
 
     expect(lesson.video).toEqual({ provider: 'YOUTUBE', videoId: 'lamg3tUwct4' })
+    expect(lesson.solutionVideo).toBeNull()
     expect(lesson.lesson.title).toBe('Begrüßung und Abschied')
   })
 
@@ -135,6 +137,7 @@ describe('A1.1 real API data mapping', () => {
         description: '',
         content: { version: 1, paragraphs: [] },
         video: null,
+        solutionVideo: null,
         lessonType: 'LECTURE',
         estimatedMinutes: null,
         countsTowardProgress: true,

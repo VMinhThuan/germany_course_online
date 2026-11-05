@@ -13,6 +13,7 @@ import type { ExerciseViewModel } from '@/domains/exercises/models'
 import type { EnrollmentSummaryViewModel } from '@/domains/enrollment/models'
 import type { LessonContentViewModel, CourseTreeViewModel } from '@/domains/learning/models'
 import type { MediaViewModel } from '@/domains/media/models'
+import type { ApiLessonVideo } from '@/lib/api/types'
 import type {
   CourseProgressViewModel,
   LessonProgressItemViewModel,
@@ -52,6 +53,7 @@ export interface StudentLessonWorkspaceViewModel extends LessonContentViewModel 
   sectionId: string
   sectionTitle?: string
   lessonNumber?: number
+  solutionVideo: ApiLessonVideo | null
   exercises: readonly StudentExerciseSummaryViewModel[]
   progressItems: readonly LessonProgressItemViewModel[]
   solutionVideos?: readonly StudentSolutionVideoViewModel[]

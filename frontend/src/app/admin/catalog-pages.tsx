@@ -3,8 +3,9 @@ import { Link, useNavigate } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { Check, ChevronRight, ExternalLink, Plus, Save, Trash2 } from 'lucide-react'
 import { adminRepository } from '@/data/api/admin-repository'
-import type { ApiAdminCourse } from '@/lib/api/types'
+import type { ApiAdminCourse, ApiAdminExercise } from '@/lib/api/types'
 import { formatVnd } from '@/shared/lib/format'
+import { parseYouTubeVideoId, YouTubeLessonPlayer } from '@/domains/learning/youtube-lesson-player'
 import { useDialogs } from '@/shared/ui/dialogs'
 import { useNotifications } from '@/shared/ui/notifications'
 import { Button, EmptyState, Pagination } from '@/shared/ui'
@@ -19,6 +20,7 @@ import {
   useAdminMutation,
   useStableIdempotencyKey,
 } from './shared'
+import { AdminExercisePdfManager } from './media-exercise-manager'
 
 function splitLines(value: string) {
   return value
@@ -26,6 +28,58 @@ function splitLines(value: string) {
     .map((line) => line.trim())
     .filter(Boolean)
 }
+
+function YouTubeLessonField({
+  label,
+  value,
+  onChange,
+  title,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  title: string
+}) {
+  const videoId = parseYouTubeVideoId(value)
+  const invalid = Boolean(value.trim()) && !videoId
+  return (
+    <div className="grid min-w-0 gap-2 rounded-xl border border-border-subtle bg-surface-muted p-3">
+      <label className="grid gap-1.5 text-sm font-semibold text-ink-primary">
+        <span>{label} · YouTube</span>
+        <input
+          className="min-h-11 w-full rounded-xl border border-border-subtle bg-white px-3 font-normal outline-none focus-visible:ring-2 focus-visible:ring-action-primary"
+          type="text"
+          inputMode="url"
+          autoComplete="off"
+          spellCheck={false}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder="https://www.youtube.com/watch?v=…"
+          aria-invalid={invalid}
+          aria-describedby={invalid ? `${label}-youtube-error` : undefined}
+        />
+      </label>
+      {invalid ? (
+        <p id={`${label}-youtube-error`} role="alert" className="text-sm text-danger-foreground">
+          Nhập link YouTube hợp lệ hoặc video ID gồm 11 ký tự.
+        </p>
+      ) : (
+        <p className="text-xs leading-5 text-ink-secondary">
+          Dán link YouTube để xem trước. Khi lưu, hệ thống chỉ lưu provider YOUTUBE và videoId.
+        </p>
+      )}
+      {videoId && (
+        <YouTubeLessonPlayer
+          key={videoId}
+          eager
+          video={{ provider: 'YOUTUBE', videoId }}
+          title={title}
+        />
+      )}
+    </div>
+  )
+}
+
 function statusTone(status: string) {
   return status === 'PUBLISHED' || status === 'ACTIVE'
     ? 'text-success-foreground'
@@ -567,6 +621,7 @@ export function AdminSectionEditorPage({
   sectionId: string
 }) {
   const dialogs = useDialogs()
+  const notifications = useNotifications()
   const [lessonPage, setLessonPage] = useState(1)
   const sections = useQuery({
     queryKey: ['admin', 'sections', courseId],
@@ -644,10 +699,11 @@ export function AdminSectionEditorPage({
       status: 'DRAFT',
     }
     try {
-      await create.mutateAsync({ input, key: idempotency.get(input) })
+      const lesson = await create.mutateAsync({ input, key: idempotency.get(input) })
       idempotency.clear()
       setNewLesson('')
-      setSuccess('Đã tạo bài học nháp.')
+      notifications.success('Đã tạo bài học nháp. Thêm video và PDF trong màn hình bài học.')
+      navigate(lessonPath(courseId, sectionId, lesson.id))
     } catch {
       /* error shown */
     }
@@ -773,7 +829,7 @@ export function AdminLessonEditorPage({
   })
   const exercises = useQuery({
     queryKey: ['admin', 'exercises', lessonId, exercisePage],
-    queryFn: () => adminRepository.listExercises(lessonId, { page: exercisePage, pageSize: 20 }),
+    queryFn: () => adminRepository.listExercises(lessonId, { page: exercisePage, pageSize: 100 }),
     retry: false,
   })
   const update = useAdminMutation(({ id, input }: { id: string; input: Record<string, unknown> }) =>
@@ -790,7 +846,8 @@ export function AdminLessonEditorPage({
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [paragraphs, setParagraphs] = useState('')
-  const [youtubeVideoId, setYoutubeVideoId] = useState('')
+  const [lectureVideoUrl, setLectureVideoUrl] = useState('')
+  const [solutionVideoUrl, setSolutionVideoUrl] = useState('')
   const [lessonType, setLessonType] = useState<'LECTURE' | 'PRACTICE'>('LECTURE')
   const [estimatedMinutes, setEstimatedMinutes] = useState('')
   const [sortOrder, setSortOrder] = useState(0)
@@ -807,7 +864,16 @@ export function AdminLessonEditorPage({
       setTitle(lesson.title)
       setDescription(lesson.description ?? '')
       setParagraphs(lesson.content?.paragraphs.join('\n\n') ?? '')
-      setYoutubeVideoId(lesson.video?.provider === 'YOUTUBE' ? lesson.video.videoId : '')
+      setLectureVideoUrl(
+        lesson.video?.provider === 'YOUTUBE'
+          ? `https://www.youtube.com/watch?v=${lesson.video.videoId}`
+          : '',
+      )
+      setSolutionVideoUrl(
+        lesson.solutionVideo?.provider === 'YOUTUBE'
+          ? `https://www.youtube.com/watch?v=${lesson.solutionVideo.videoId}`
+          : '',
+      )
       setLessonType(lesson.lessonType)
       setEstimatedMinutes(lesson.estimatedMinutes == null ? '' : String(lesson.estimatedMinutes))
       setSortOrder(lesson.sortOrder)
@@ -829,6 +895,13 @@ export function AdminLessonEditorPage({
   async function save(event: FormEvent) {
     event.preventDefault()
     setSuccess('')
+    const lectureVideoId = parseYouTubeVideoId(lectureVideoUrl)
+    const solutionVideoId = parseYouTubeVideoId(solutionVideoUrl)
+    if (
+      (lectureVideoUrl.trim() && !lectureVideoId) ||
+      (solutionVideoUrl.trim() && !solutionVideoId)
+    )
+      return
     const content = {
       version: 1,
       paragraphs: paragraphs
@@ -843,9 +916,8 @@ export function AdminLessonEditorPage({
           title,
           description: description || null,
           content,
-          video: youtubeVideoId.trim()
-            ? { provider: 'YOUTUBE', videoId: youtubeVideoId.trim() }
-            : null,
+          video: lectureVideoId ? { provider: 'YOUTUBE', videoId: lectureVideoId } : null,
+          solutionVideo: solutionVideoId ? { provider: 'YOUTUBE', videoId: solutionVideoId } : null,
           lessonType,
           estimatedMinutes: estimatedMinutes ? Number(estimatedMinutes) : null,
           countsTowardProgress,
@@ -884,6 +956,22 @@ export function AdminLessonEditorPage({
       /* error shown */
     }
   }
+  async function createPdfExercise(): Promise<ApiAdminExercise> {
+    if (!lesson) throw new Error('Không tìm thấy bài học.')
+    const input = {
+      title: `Bài tập PDF · ${title.trim() || lesson.title}`,
+      description: null,
+      instructions: 'Mở tệp PDF và hoàn thành bài tập.',
+      exerciseType: 'FILE_BASED',
+      completionMode: 'MANUAL',
+      isRequired: true,
+      sortOrder: exercises.data?.total ?? 0,
+      status: 'DRAFT',
+    }
+    const result = await create.mutateAsync({ input, key: idempotency.get(input) })
+    idempotency.clear()
+    return result
+  }
   function deleteSelectedLesson() {
     dialogs.confirm({
       title: 'Xóa mềm bài học này?',
@@ -915,12 +1003,17 @@ export function AdminLessonEditorPage({
             onChange={setParagraphs}
             rows={8}
           />
-          <AdminField
-            label="YouTube Video ID"
-            value={youtubeVideoId}
-            onChange={setYoutubeVideoId}
-            maxLength={11}
-            placeholder="Ví dụ: lamg3tUwct4"
+          <YouTubeLessonField
+            label="Video bài giảng"
+            value={lectureVideoUrl}
+            onChange={setLectureVideoUrl}
+            title={`Bài giảng · ${title || lesson.title}`}
+          />
+          <YouTubeLessonField
+            label="Video giải bài tập"
+            value={solutionVideoUrl}
+            onChange={setSolutionVideoUrl}
+            title={`Video chữa bài · ${title || lesson.title}`}
           />
           <div className="grid gap-3 sm:grid-cols-3">
             <AdminSelect
@@ -999,6 +1092,11 @@ export function AdminLessonEditorPage({
         {!exercises.data?.items.length && (
           <EmptyState title="Chưa có bài tập" description="Thêm FILE_BASED hoặc QUIZ." />
         )}
+        <AdminExercisePdfManager
+          lessonTitle={lesson.title}
+          exercises={exercises.data?.items ?? []}
+          onCreateExercise={createPdfExercise}
+        />
         <form
           className="grid gap-3 border-t border-border-subtle pt-4 sm:grid-cols-[minmax(0,1fr)_12rem_auto] sm:items-end"
           onSubmit={(event) => void addExercise(event)}

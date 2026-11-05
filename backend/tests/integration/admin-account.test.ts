@@ -324,6 +324,7 @@ describe("BE-03B Admin CMS, media, account security, enrollment and audit APIs",
       description: "Greeting",
       content: { version: 1, paragraphs: ["Hallo!"] },
       video: { provider: "YOUTUBE", videoId: "lamg3tUwct4" },
+      solutionVideo: { provider: "YOUTUBE", videoId: "p2qX6g71ZgI" },
       lessonType: "LECTURE",
       estimatedMinutes: 5,
       countsTowardProgress: true,
@@ -334,6 +335,10 @@ describe("BE-03B Admin CMS, media, account security, enrollment and audit APIs",
     expect(lesson.body.data.video).toEqual({
       provider: "YOUTUBE",
       videoId: "lamg3tUwct4",
+    });
+    expect(lesson.body.data.solutionVideo).toEqual({
+      provider: "YOUTUBE",
+      videoId: "p2qX6g71ZgI",
     });
     const before = await request(app).get(
       `/api/v1/courses/${created.body.data.slug}`,

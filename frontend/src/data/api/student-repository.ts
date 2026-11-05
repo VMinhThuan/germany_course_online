@@ -404,6 +404,7 @@ const learning: StudentLearningRepository = {
         : {}),
       paragraphs: extractParagraphs(workspace.content),
       video: workspace.video,
+      solutionVideo: workspace.solutionVideo,
       media,
       access: toAccess(course.access),
       exercises: workspace.exercises.map(toExerciseSummary),

@@ -10261,6 +10261,10 @@ components:
           oneOf:
             - $ref: "#/components/schemas/LessonVideo"
             - type: "null"
+        solutionVideo:
+          oneOf:
+            - $ref: "#/components/schemas/LessonVideo"
+            - type: "null"
         lessonType:
           type: string
           enum:
@@ -10298,6 +10302,7 @@ components:
         - description
         - content
         - video
+        - solutionVideo
         - lessonType
         - estimatedMinutes
         - countsTowardProgress
@@ -12255,6 +12260,10 @@ components:
           oneOf:
             - $ref: "#/components/schemas/LessonVideo"
             - type: "null"
+        solutionVideo:
+          oneOf:
+            - $ref: "#/components/schemas/LessonVideo"
+            - type: "null"
         lessonType:
           type: string
           enum:
@@ -13205,6 +13214,10 @@ components:
           oneOf:
             - $ref: "#/components/schemas/LessonVideo"
             - type: "null"
+        solutionVideo:
+          oneOf:
+            - $ref: "#/components/schemas/LessonVideo"
+            - type: "null"
         lessonType:
           type: string
           enum:
@@ -13245,6 +13258,7 @@ components:
         - description
         - content
         - video
+        - solutionVideo
         - lessonType
         - estimatedMinutes
         - countsTowardProgress
@@ -13268,6 +13282,10 @@ components:
             - $ref: "#/components/schemas/AdminLessonContent"
             - type: "null"
         video:
+          oneOf:
+            - $ref: "#/components/schemas/LessonVideo"
+            - type: "null"
+        solutionVideo:
           oneOf:
             - $ref: "#/components/schemas/LessonVideo"
             - type: "null"

@@ -208,6 +208,7 @@ export interface ApiLessonWorkspace {
   description: string
   content: unknown
   video: ApiLessonVideo | null
+  solutionVideo: ApiLessonVideo | null
   lessonType: 'LECTURE' | 'PRACTICE'
   estimatedMinutes: number | null
   countsTowardProgress: boolean
@@ -401,6 +402,7 @@ export interface ApiAdminLesson {
   description: string | null
   content: { version: number; paragraphs: string[] } | null
   video: ApiLessonVideo | null
+  solutionVideo: ApiLessonVideo | null
   lessonType: 'LECTURE' | 'PRACTICE'
   estimatedMinutes: number | null
   countsTowardProgress: boolean

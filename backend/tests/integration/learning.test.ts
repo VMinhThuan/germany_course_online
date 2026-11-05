@@ -189,6 +189,7 @@ describe("BE-02 student learning APIs", () => {
         nested: { storageKey: "must-not-leak-either" },
       },
       video: { provider: "YOUTUBE", videoId: "lamg3tUwct4" },
+      solutionVideo: { provider: "YOUTUBE", videoId: "p2qX6g71ZgI" },
       lessonType: "LECTURE",
       estimatedMinutes: 8,
       countsTowardProgress: true,
@@ -328,6 +329,10 @@ describe("BE-02 student learning APIs", () => {
     expect(lesson.body.data.video).toEqual({
       provider: "YOUTUBE",
       videoId: "lamg3tUwct4",
+    });
+    expect(lesson.body.data.solutionVideo).toEqual({
+      provider: "YOUTUBE",
+      videoId: "p2qX6g71ZgI",
     });
     expect(JSON.stringify(lesson.body)).not.toContain("must-not-leak");
     expect(lesson.body.data.assets[0].role).toBe("LECTURE_VIDEO");

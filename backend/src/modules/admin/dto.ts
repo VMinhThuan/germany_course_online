@@ -52,20 +52,21 @@ export function sectionDto(value: Doc) {
 }
 
 export function lessonDto(value: Doc) {
-  const video =
-    value.video && typeof value.video === "object"
-      ? (value.video as Doc)
+  const lessonVideoDto = (input: unknown) => {
+    if (!input || typeof input !== "object") return null;
+    const video = input as Doc;
+    return video.provider === "YOUTUBE" && typeof video.videoId === "string"
+      ? { provider: "YOUTUBE", videoId: video.videoId }
       : null;
+  };
   return {
     id: id(value._id),
     sectionId: id(value.sectionId),
     title: String(value.title),
     description: String(value.description ?? ""),
     content: safeContent(value.content),
-    video:
-      video && video.provider === "YOUTUBE" && typeof video.videoId === "string"
-        ? { provider: "YOUTUBE", videoId: video.videoId }
-        : null,
+    video: lessonVideoDto(value.video),
+    solutionVideo: lessonVideoDto(value.solutionVideo),
     lessonType: String(value.lessonType),
     estimatedMinutes: value.estimatedMinutes ?? null,
     countsTowardProgress: Boolean(value.countsTowardProgress),

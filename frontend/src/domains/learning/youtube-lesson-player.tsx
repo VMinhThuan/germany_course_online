@@ -4,21 +4,58 @@ import type { ApiLessonVideo } from '@/lib/api/types'
 
 const YOUTUBE_VIDEO_ID = /^[A-Za-z0-9_-]{11}$/
 
+const YOUTUBE_HOSTS = new Set([
+  'youtu.be',
+  'www.youtu.be',
+  'youtube.com',
+  'www.youtube.com',
+  'm.youtube.com',
+  'music.youtube.com',
+  'youtube-nocookie.com',
+  'www.youtube-nocookie.com',
+])
+
+export function parseYouTubeVideoId(input: string): string | null {
+  const value = input.trim()
+  if (YOUTUBE_VIDEO_ID.test(value)) return value
+  if (!value) return null
+
+  let url: URL
+  try {
+    url = new URL(/^[a-z][a-z\d+.-]*:\/\//i.test(value) ? value : `https://${value}`)
+  } catch {
+    return null
+  }
+  if (!YOUTUBE_HOSTS.has(url.hostname.toLowerCase())) return null
+
+  const segments = url.pathname.split('/').filter(Boolean)
+  const candidate = url.hostname.toLowerCase().endsWith('youtu.be')
+    ? segments[0]
+    : url.pathname === '/watch'
+      ? url.searchParams.get('v')
+      : ['embed', 'shorts', 'live', 'v'].includes(segments[0] ?? '')
+        ? segments[1]
+        : null
+  return candidate && YOUTUBE_VIDEO_ID.test(candidate) ? candidate : null
+}
+
 export function YouTubeLessonPlayer({
   video,
   title,
+  eager = false,
 }: {
   video: ApiLessonVideo | null
   title: string
+  eager?: boolean
 }) {
-  const [loaded, setLoaded] = useState(false)
+  const [loaded, setLoaded] = useState(eager)
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const videoId =
     video?.provider === 'YOUTUBE' && YOUTUBE_VIDEO_ID.test(video.videoId) ? video.videoId : null
 
   useEffect(() => {
-    if (loaded) iframeRef.current?.focus()
-  }, [loaded])
+    if (loaded && !eager) iframeRef.current?.focus()
+  }, [eager, loaded])
 
   if (!videoId) return null
 
@@ -41,7 +78,7 @@ export function YouTubeLessonPlayer({
             ref={iframeRef}
             src={`https://www.youtube-nocookie.com/embed/${videoId}?rel=0`}
             title={title}
-            loading="lazy"
+            loading={eager ? 'eager' : 'lazy'}
             referrerPolicy="strict-origin-when-cross-origin"
             allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             allowFullScreen
