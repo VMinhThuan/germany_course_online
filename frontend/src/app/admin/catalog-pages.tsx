@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { Check, ChevronRight, ExternalLink, Plus, Save, Trash2 } from 'lucide-react'
 import { adminRepository } from '@/data/api/admin-repository'
-import type { ApiAdminCourse, ApiAdminExercise } from '@/lib/api/types'
+import type { ApiAdminCourse } from '@/lib/api/types'
 import { formatVnd } from '@/shared/lib/format'
 import { parseYouTubeVideoId, YouTubeLessonPlayer } from '@/domains/learning/youtube-lesson-player'
 import { useDialogs } from '@/shared/ui/dialogs'
@@ -856,6 +856,7 @@ export function AdminLessonEditorPage({
   const [newExercise, setNewExercise] = useState('')
   const [newExerciseInstructions, setNewExerciseInstructions] = useState('')
   const [exerciseType, setExerciseType] = useState<'FILE_BASED' | 'QUIZ'>('FILE_BASED')
+  const [selectedPdfExerciseId, setSelectedPdfExerciseId] = useState('')
   const [success, setSuccess] = useState('')
   // These editors initialize a local draft from a server-owned document.
   useEffect(() => {
@@ -948,6 +949,7 @@ export function AdminLessonEditorPage({
       setNewExercise('')
       setNewExerciseInstructions('')
       setSuccess('Đã tạo bài tập nháp.')
+      if (result.exerciseType === 'FILE_BASED') setSelectedPdfExerciseId(result.id)
       if (result.exerciseType === 'QUIZ') {
         notifications.success('Đã tạo bài tập nháp.')
         navigate(exercisePath(courseId, sectionId, lessonId, result.id))
@@ -955,22 +957,6 @@ export function AdminLessonEditorPage({
     } catch {
       /* error shown */
     }
-  }
-  async function createPdfExercise(): Promise<ApiAdminExercise> {
-    if (!lesson) throw new Error('Không tìm thấy bài học.')
-    const input = {
-      title: `Bài tập PDF · ${title.trim() || lesson.title}`,
-      description: null,
-      instructions: 'Mở tệp PDF và hoàn thành bài tập.',
-      exerciseType: 'FILE_BASED',
-      completionMode: 'MANUAL',
-      isRequired: true,
-      sortOrder: exercises.data?.total ?? 0,
-      status: 'DRAFT',
-    }
-    const result = await create.mutateAsync({ input, key: idempotency.get(input) })
-    idempotency.clear()
-    return result
   }
   function deleteSelectedLesson() {
     dialogs.confirm({
@@ -1067,7 +1053,7 @@ export function AdminLessonEditorPage({
       </AdminCard>
       <AdminCard
         title="Bài tập"
-        description="FILE_BASED hỗ trợ đánh dấu thủ công; QUIZ hoàn tất khi nộp theo kết quả backend."
+        description="Tạo bài tập ở biểu mẫu bên dưới. Chọn “Bài tập PDF” nếu có tệp đề; chọn “Trắc nghiệm” nếu học viên trả lời câu hỏi trên hệ thống."
       >
         {exercises.data?.items.map((exercise) => (
           <div
@@ -1077,57 +1063,80 @@ export function AdminLessonEditorPage({
             <span>
               <strong>{exercise.title}</strong>
               <span className="mt-1 block text-xs text-ink-secondary">
-                {exercise.exerciseType} · {exercise.status}
+                {exercise.exerciseType === 'FILE_BASED' ? 'Bài tập PDF' : 'Trắc nghiệm'} ·{' '}
+                {exercise.status === 'DRAFT'
+                  ? 'Bản nháp'
+                  : exercise.status === 'PUBLISHED'
+                    ? 'Đã xuất bản'
+                    : 'Đã ẩn'}
               </span>
             </span>
             <Link
               className="text-sm font-semibold text-action-primary"
               to={exercisePath(courseId, sectionId, lessonId, exercise.id)}
             >
-              {exercise.exerciseType === 'QUIZ' ? 'Mở Quiz' : 'Chỉnh sửa'}{' '}
+              {exercise.exerciseType === 'QUIZ' ? 'Quản lý câu hỏi' : 'Chỉnh sửa bài tập'}{' '}
               <ChevronRight aria-hidden="true" className="inline size-4" />
             </Link>
           </div>
         ))}
         {!exercises.data?.items.length && (
-          <EmptyState title="Chưa có bài tập" description="Thêm FILE_BASED hoặc QUIZ." />
+          <EmptyState
+            title="Chưa có bài tập"
+            description="Điền biểu mẫu bên dưới. Chọn Bài tập PDF nếu cần tải hoặc gắn tệp đề."
+          />
         )}
-        <AdminExercisePdfManager
-          lessonTitle={lesson.title}
-          exercises={exercises.data?.items ?? []}
-          onCreateExercise={createPdfExercise}
-        />
         <form
           className="grid gap-3 border-t border-border-subtle pt-4 sm:grid-cols-[minmax(0,1fr)_12rem_auto] sm:items-end"
           onSubmit={(event) => void addExercise(event)}
         >
-          <AdminField label="Tên bài tập" value={newExercise} onChange={setNewExercise} required />
+          <AdminField
+            label="Tên bài tập"
+            value={newExercise}
+            onChange={setNewExercise}
+            required
+            placeholder="Ví dụ: Arbeitsblatt – Sich vorstellen"
+          />
           <AdminSelect
-            label="Loại"
+            label="Loại bài tập"
             value={exerciseType}
             onChange={(value) => setExerciseType(value as typeof exerciseType)}
             options={[
-              { value: 'FILE_BASED', label: 'FILE_BASED' },
-              { value: 'QUIZ', label: 'QUIZ' },
+              { value: 'FILE_BASED', label: 'Bài tập PDF' },
+              { value: 'QUIZ', label: 'Trắc nghiệm' },
             ]}
           />
           <div className="sm:col-span-3">
             <AdminTextArea
-              label="Hướng dẫn bài tập"
+              label="Hướng dẫn cho học viên"
               value={newExerciseInstructions}
               onChange={setNewExerciseInstructions}
               rows={2}
               required
-              placeholder="Mô tả ngắn cách học viên hoàn thành bài tập."
+              placeholder={
+                exerciseType === 'FILE_BASED'
+                  ? 'Ví dụ: Mở PDF đề bài, hoàn thành các câu hỏi rồi đánh dấu đã làm.'
+                  : 'Ví dụ: Chọn đáp án đúng cho từng câu hỏi.'
+              }
             />
           </div>
+          <p className="text-xs leading-5 text-ink-secondary sm:col-span-3">
+            {exerciseType === 'FILE_BASED'
+              ? 'Sau khi tạo, phần gắn PDF sẽ xuất hiện ngay bên dưới.'
+              : 'Sau khi tạo, bạn sẽ được chuyển đến màn hình quản lý câu hỏi trắc nghiệm.'}
+          </p>
           <Button type="submit" loading={create.isPending}>
-            Thêm bài
+            Tạo bài tập
           </Button>
           <div className="sm:col-span-3">
             <AdminFeedback error={create.error} success={success} />
           </div>
         </form>
+        <AdminExercisePdfManager
+          exercises={exercises.data?.items ?? []}
+          selectedExerciseId={selectedPdfExerciseId}
+          onExerciseSelect={setSelectedPdfExerciseId}
+        />
       </AdminCard>
       {exercises.data && exercises.data.total > exercises.data.pageSize && (
         <div className="xl:col-start-2">

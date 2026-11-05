@@ -18,25 +18,23 @@ import {
 const MAX_PDF_BYTES = 40 * 1024 * 1024
 
 export function AdminExercisePdfManager({
-  lessonTitle,
   exercises,
-  onCreateExercise,
+  selectedExerciseId,
+  onExerciseSelect,
 }: {
-  lessonTitle: string
   exercises: readonly ApiAdminExercise[]
-  onCreateExercise?: () => Promise<ApiAdminExercise>
+  selectedExerciseId?: string
+  onExerciseSelect?: (exerciseId: string) => void
 }) {
   const dialogs = useDialogs()
   const notifications = useNotifications()
   const queryClient = useQueryClient()
-  const [selectedExerciseId, setSelectedExerciseId] = useState('')
-  const [createdExercise, setCreatedExercise] = useState<ApiAdminExercise | null>(null)
+  const [localSelectedExerciseId, setLocalSelectedExerciseId] = useState('')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [selectedAssetId, setSelectedAssetId] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [fileError, setFileError] = useState<Error | undefined>()
-  const [creatingExercise, setCreatingExercise] = useState(false)
   const [progress, setProgress] = useState<number | null>(null)
   const [uploadStage, setUploadStage] = useState<'preparing' | 'transferring' | null>(null)
   const uploadController = useRef<AbortController | null>(null)
@@ -60,17 +58,10 @@ export function AdminExercisePdfManager({
     retry: false,
   })
 
-  const availableExercises = [
-    ...exercises.filter((exercise) => exercise.exerciseType === 'FILE_BASED'),
-    ...(createdExercise &&
-    createdExercise.exerciseType === 'FILE_BASED' &&
-    !exercises.some((exercise) => exercise.id === createdExercise.id)
-      ? [createdExercise]
-      : []),
-  ]
+  const availableExercises = exercises.filter((exercise) => exercise.exerciseType === 'FILE_BASED')
+  const activeExerciseId = selectedExerciseId ?? localSelectedExerciseId
   const selectedExercise =
-    availableExercises.find((exercise) => exercise.id === selectedExerciseId) ??
-    availableExercises[0]
+    availableExercises.find((exercise) => exercise.id === activeExerciseId) ?? availableExercises[0]
   const associations = useQuery({
     queryKey: ['admin', 'exercise-assets', selectedExercise?.id],
     queryFn: () => adminRepository.listExerciseAssets(selectedExercise!.id),
@@ -186,22 +177,9 @@ export function AdminExercisePdfManager({
     }
   }
 
-  async function createFileExercise() {
-    if (!onCreateExercise || creatingExercise) return
-    setCreatingExercise(true)
-    try {
-      const exercise = await onCreateExercise()
-      setCreatedExercise(exercise)
-      setSelectedExerciseId(exercise.id)
-      notifications.success('Đã tạo bài tập để gắn PDF.')
-    } catch (error) {
-      notifications.error(
-        'Không tạo được bài tập',
-        error instanceof Error ? error.message : 'Thử lại sau.',
-      )
-    } finally {
-      setCreatingExercise(false)
-    }
+  function selectExercise(exerciseId: string) {
+    setLocalSelectedExerciseId(exerciseId)
+    onExerciseSelect?.(exerciseId)
   }
 
   function confirmUnlink(asset: ApiAssetAssociation) {
@@ -229,34 +207,27 @@ export function AdminExercisePdfManager({
 
   return (
     <AdminCard
-      title="PDF bài tập"
-      description="Chọn bài tập dạng FILE_BASED rồi tải PDF lên hoặc gắn một tệp PDF đã có trong Cloudinary."
+      title="Gắn PDF đề bài"
+      description="1. Tạo bài tập dạng PDF ở biểu mẫu phía trên. 2. Chọn bài tập đó tại đây. 3. Tải tệp lên hoặc chọn PDF đã có trên Cloudinary."
       className="min-w-0"
     >
       {availableExercises.length ? (
         <AdminSelect
           label="Bài tập nhận PDF"
           value={selectedExercise?.id ?? ''}
-          onChange={setSelectedExerciseId}
+          onChange={selectExercise}
           options={availableExercises.map((exercise) => ({
             value: exercise.id,
             label: exercise.title,
           }))}
         />
       ) : (
-        <div className="grid gap-3 rounded-xl border border-border-subtle bg-surface-muted p-4">
+        <div className="grid gap-1 rounded-xl border border-border-subtle bg-surface-muted p-4">
+          <p className="font-semibold">Chưa có bài tập dạng PDF</p>
           <p className="text-sm text-ink-secondary">
-            Tạo bài tập dạng FILE_BASED cho “{lessonTitle}” trước khi thêm PDF.
+            Tạo bài tập ở biểu mẫu phía trên và chọn loại “Bài tập PDF”. Bài vừa tạo sẽ xuất hiện
+            trong bộ chọn này.
           </p>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => void createFileExercise()}
-            loading={creatingExercise}
-            disabled={!onCreateExercise || creatingExercise}
-          >
-            Tạo bài tập FILE_BASED
-          </Button>
         </div>
       )}
 

@@ -53,7 +53,7 @@ const pdf: ApiAdminMediaAsset = {
   usageCount: 0,
 }
 
-function renderManager() {
+function renderManager(exercises: readonly ApiAdminExercise[] = [exercise]) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
@@ -61,7 +61,7 @@ function renderManager() {
     <NotificationProvider>
       <DialogProvider>
         <QueryClientProvider client={queryClient}>
-          <AdminExercisePdfManager lessonTitle="Sich vorstellen" exercises={[exercise]} />
+          <AdminExercisePdfManager exercises={exercises} />
         </QueryClientProvider>
       </DialogProvider>
     </NotificationProvider>,
@@ -105,6 +105,15 @@ describe('AdminExercisePdfManager', () => {
       progress(100)
     })
     vi.mocked(adminRepository.completeUpload).mockResolvedValue({ ...pdf, id: 'upload-1' })
+  })
+
+  it('explains how to create a file exercise before attaching its PDF', async () => {
+    renderManager([])
+
+    expect(await screen.findByText('Chưa có bài tập dạng PDF')).toBeVisible()
+    expect(screen.getByText(/Tạo bài tập ở biểu mẫu phía trên/)).toBeVisible()
+    expect(screen.queryByLabelText('Tệp PDF')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Tạo bài tập FILE_BASED' })).not.toBeInTheDocument()
   })
 
   it('attaches an existing Cloudinary PDF to the selected file exercise', async () => {
