@@ -511,7 +511,7 @@ export function AdminRenewalPlansPage() {
                       size="sm"
                       variant="outline"
                       disabled={plan.status === 'INACTIVE'}
-                      loading={deactivate.isPending}
+                      loading={deactivate.isPending && deactivate.variables === plan.id}
                       onClick={() => void turnOff(plan)}
                     >
                       Ngừng bán
@@ -732,7 +732,7 @@ export function AdminCouponsPage() {
                     size="sm"
                     variant="outline"
                     disabled={coupon.status === 'INACTIVE'}
-                    loading={deactivate.isPending}
+                    loading={deactivate.isPending && deactivate.variables === coupon.id}
                     onClick={() => void deactivateCoupon(coupon.id)}
                   >
                     Ngừng hoạt động

@@ -95,7 +95,9 @@ export function AdminStudentsPage({ userId }: { userId?: string }) {
             </p>
             <Button
               variant="outline"
-              loading={setStudentStatus.isPending}
+              loading={
+                setStudentStatus.isPending && setStudentStatus.variables?.userId === student.id
+              }
               onClick={() => void changeStatus()}
               startIcon={
                 student.status === 'ACTIVE' ? (
@@ -459,7 +461,7 @@ export function AdminEnrollmentsPage({ enrollmentId }: { enrollmentId?: string }
             {enrollment.status === 'ACTIVE' && (
               <Button
                 variant="outline"
-                loading={revoke.isPending}
+                loading={revoke.isPending && revoke.variables?.id === enrollment.id}
                 disabled={!reason.trim()}
                 onClick={() => void runAction('revoke')}
               >
@@ -468,7 +470,7 @@ export function AdminEnrollmentsPage({ enrollmentId }: { enrollmentId?: string }
             )}
             {(enrollment.status === 'REVOKED' || enrollment.status === 'EXPIRED') && (
               <Button
-                loading={restore.isPending}
+                loading={restore.isPending && restore.variables?.id === enrollment.id}
                 disabled={!reason.trim() || (expired && !extension)}
                 onClick={() => void runAction('restore')}
               >
@@ -477,7 +479,7 @@ export function AdminEnrollmentsPage({ enrollmentId }: { enrollmentId?: string }
             )}
             {enrollment.status === 'ACTIVE' && (
               <Button
-                loading={extend.isPending}
+                loading={extend.isPending && extend.variables?.id === enrollment.id}
                 disabled={!reason.trim() || !duration}
                 onClick={() => void runAction('extend')}
               >

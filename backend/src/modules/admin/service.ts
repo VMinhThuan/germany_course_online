@@ -1845,14 +1845,30 @@ export class AdminService {
 
   async getMediaCapabilities() {
     const provider = this.storage.provider ?? null;
+    const supportedMediaTypes =
+      provider === "CLOUDINARY"
+        ? (["PDF", "AUDIO"] as const)
+        : provider === "S3_COMPATIBLE"
+          ? (["IMAGE", "VIDEO", "PDF", "AUDIO"] as const)
+          : ([] as const);
+    const uploadFoldersByMediaType =
+      provider === "CLOUDINARY"
+        ? {
+            PDF: await this.storage.listUploadFolders?.("PDF"),
+            AUDIO: await this.storage.listUploadFolders?.("AUDIO"),
+          }
+        : undefined;
     return {
       activeProvider: provider,
-      supportedMediaTypes:
-        provider === "CLOUDINARY"
-          ? ["PDF", "AUDIO"]
-          : provider === "S3_COMPATIBLE"
-            ? ["IMAGE", "VIDEO", "PDF", "AUDIO"]
-            : [],
+      supportedMediaTypes,
+      ...(uploadFoldersByMediaType
+        ? {
+            uploadFoldersByMediaType: {
+              PDF: uploadFoldersByMediaType.PDF ?? [],
+              AUDIO: uploadFoldersByMediaType.AUDIO ?? [],
+            },
+          }
+        : {}),
     };
   }
 
@@ -1985,10 +2001,26 @@ export class AdminService {
       );
     const assetId = new Types.ObjectId();
     const provider = this.storage.provider ?? "S3_COMPATIBLE";
+    if (input.assetFolder && provider !== "CLOUDINARY")
+      throw new AppError(
+        422,
+        "MEDIA_FOLDER_UNSUPPORTED",
+        "Folder selection is only available for Cloudinary uploads.",
+      );
+    const allowedFolders = input.assetFolder
+      ? await this.storage.listUploadFolders?.(input.mediaType)
+      : undefined;
+    if (input.assetFolder && !allowedFolders?.includes(input.assetFolder))
+      throw new AppError(
+        422,
+        "MEDIA_FOLDER_UNAVAILABLE",
+        "The selected media folder is unavailable.",
+      );
     const storageKey =
       this.storage.createStorageKey?.(
         input.mediaType,
         randomUUID().replaceAll("-", ""),
+        input.assetFolder,
       ) ?? `media/${randomUUID()}`;
     const resourceType = cloudinaryResourceType(provider, input.mediaType);
     const deliveryType = provider === "CLOUDINARY" ? "authenticated" : null;

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { adminRepository } from '@/data/api/admin-repository'
@@ -77,6 +77,10 @@ describe('admin media library', () => {
     vi.mocked(adminRepository.getMediaCapabilities).mockResolvedValue({
       activeProvider: 'CLOUDINARY',
       supportedMediaTypes: ['PDF', 'AUDIO'],
+      uploadFoldersByMediaType: {
+        PDF: ['lesson-pdf', 'lesson-pdf/lektion-1'],
+        AUDIO: ['quiz-audio'],
+      },
     })
     vi.mocked(adminRepository.getMediaDetail).mockResolvedValue({
       media: uploadedAsset,
@@ -102,9 +106,9 @@ describe('admin media library', () => {
     const user = userEvent.setup()
     renderMediaPage()
 
-    await screen.findByText('CLOUDINARY')
-    await user.selectOptions(screen.getByLabelText('Provider'), 'CLOUDINARY')
-    await user.selectOptions(screen.getByLabelText('Trạng thái'), 'READY')
+    await screen.findByLabelText('Tìm kiếm')
+    await user.selectOptions(screen.getByLabelText('Nơi lưu'), 'CLOUDINARY')
+    await user.selectOptions(screen.getByLabelText('Tình trạng'), 'READY')
     await user.type(screen.getByLabelText('Tìm kiếm'), 'lesson')
 
     await waitFor(() =>
@@ -125,29 +129,33 @@ describe('admin media library', () => {
       name: 'PDF',
       file: () => new File(['%PDF-1.4 test'], 'lesson.pdf', { type: 'application/pdf' }),
       mediaType: 'PDF',
+      assetFolder: 'lesson-pdf/lektion-1',
     },
     {
       name: 'audio',
       file: () => new File(['mock audio'], 'question.mp3', { type: 'audio/mpeg' }),
       mediaType: 'AUDIO',
+      assetFolder: 'quiz-audio',
     },
   ])(
     'uploads a supported $name through the signed provider intent',
-    async ({ file, mediaType }) => {
+    async ({ file, mediaType, assetFolder }) => {
       const user = userEvent.setup()
       renderMediaPage()
       const selectedFile = file()
 
-      await screen.findByText('CLOUDINARY')
+      await screen.findByLabelText('Tìm kiếm')
+      await user.click(screen.getByRole('button', { name: 'Tải tệp lên' }))
       await user.upload(screen.getByLabelText('Tệp'), selectedFile)
       const fileInput = screen.getByLabelText('Tệp') as HTMLInputElement
       expect(fileInput.files?.[0]?.name).toBe(selectedFile.name)
-      fireEvent.submit(screen.getByRole('button', { name: 'Tải lên và xác minh' }).closest('form')!)
+      await user.selectOptions(screen.getByLabelText('Thư mục lưu'), assetFolder)
+      fireEvent.submit(document.getElementById('admin-media-upload')!)
       await waitFor(() => expect(adminRepository.createUploadIntent).toHaveBeenCalled())
 
-      expect(
-        await screen.findByText('Backend đã xác minh tệp và hoàn tất tài sản media.'),
-      ).toBeVisible()
+      expect(await screen.findByText('Tệp đã được thêm vào thư viện.')).toBeVisible()
+      await user.click(screen.getByRole('button', { name: 'Tải tệp lên' }))
+      expect((screen.getByLabelText('Tệp') as HTMLInputElement).files).toHaveLength(0)
       expect(adminRepository.createUploadIntent).toHaveBeenCalledWith(
         expect.objectContaining({
           originalName: selectedFile.name,
@@ -155,6 +163,7 @@ describe('admin media library', () => {
           mimeType: selectedFile.type,
           fileSize: selectedFile.size,
           visibility: 'ENROLLED',
+          assetFolder,
         }),
         expect.any(AbortSignal),
       )
@@ -168,19 +177,63 @@ describe('admin media library', () => {
     },
   )
 
+  it('shows delete progress only on the row being removed', async () => {
+    const user = userEvent.setup()
+    const secondAsset = {
+      ...uploadedAsset,
+      id: 'media-456',
+      originalName: 'second.pdf',
+      publicId: 'lesson-pdf/media-456',
+    }
+    vi.mocked(adminRepository.listMedia).mockResolvedValue({
+      ...emptyMediaPage,
+      items: [uploadedAsset, secondAsset],
+      total: 2,
+    })
+    let finishDelete: (() => void) | undefined
+    vi.mocked(adminRepository.deleteMedia).mockImplementation(
+      () => new Promise<void>((resolve) => (finishDelete = resolve)),
+    )
+    renderMediaPage()
+
+    const firstRow = await screen.findByRole('row', { name: /upload\.pdf/ })
+    const secondRow = screen.getByRole('row', { name: /second\.pdf/ })
+    await user.click(within(firstRow).getByRole('button', { name: 'Xóa' }))
+    await user.click(await screen.findByRole('button', { name: 'Xóa tệp' }))
+
+    await waitFor(() => expect(adminRepository.deleteMedia).toHaveBeenCalledWith('media-123'))
+    const firstDeleteButton = within(firstRow).getByRole('button', {
+      name: 'Xóa',
+      hidden: true,
+    })
+    const secondDeleteButton = within(secondRow).getByRole('button', {
+      name: 'Xóa',
+      hidden: true,
+    })
+    expect(firstDeleteButton).toHaveAttribute('aria-busy', 'true')
+    expect(secondDeleteButton).not.toHaveAttribute('aria-busy')
+    expect(secondDeleteButton).toBeEnabled()
+
+    finishDelete?.()
+    await waitFor(() =>
+      expect(firstDeleteButton).not.toHaveAttribute('aria-busy'),
+    )
+  })
+
   it('rejects a file whose MIME type does not match its extension before creating an intent', async () => {
     const user = userEvent.setup()
     renderMediaPage()
 
-    await screen.findByText('CLOUDINARY')
+    await screen.findByLabelText('Tìm kiếm')
+    await user.click(screen.getByRole('button', { name: 'Tải tệp lên' }))
     await user.upload(
       screen.getByLabelText('Tệp'),
       new File(['not a pdf'], 'lesson.pdf', { type: 'text/plain' }),
     )
-    fireEvent.submit(screen.getByRole('button', { name: 'Tải lên và xác minh' }).closest('form')!)
+    fireEvent.submit(document.getElementById('admin-media-upload')!)
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Định dạng hoặc dung lượng không được hỗ trợ',
+      'Tệp không đúng định dạng hoặc vượt quá dung lượng cho phép',
     )
     expect(adminRepository.createUploadIntent).not.toHaveBeenCalled()
   })

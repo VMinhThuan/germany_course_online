@@ -300,6 +300,13 @@ export const uploadIntentSchema = z
     mimeType: z.string().trim().toLowerCase().max(160),
     fileSize: z.number().int().min(1),
     visibility: z.enum(["PUBLIC", "ENROLLED"]),
+    assetFolder: z
+      .string()
+      .trim()
+      .min(1)
+      .max(255)
+      .regex(/^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/)
+      .optional(),
   })
   .superRefine((value, ctx) => {
     const allowed = mimeByType[value.mediaType] as readonly string[];

@@ -515,7 +515,9 @@ export function AdminExercisePdfManager({
                   variant="outline"
                   aria-label={`Gỡ ${asset.media.originalName}`}
                   onClick={() => confirmUnlink(asset)}
-                  loading={unlinkAsset.isPending}
+                  loading={
+                    unlinkAsset.isPending && unlinkAsset.variables?.assetId === asset.assetId
+                  }
                   startIcon={<Unlink aria-hidden="true" className="size-4" />}
                 >
                   Gỡ

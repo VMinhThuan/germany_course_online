@@ -395,13 +395,13 @@ export function AdminSectionsPage() {
           <VisibilityButton
             status={row.section.status}
             onClick={() => toggle(row.section)}
-            loading={update.isPending}
+            loading={update.isPending && update.variables?.id === row.section.id}
           />
           <Button
             type="button"
             size="sm"
             variant="outline"
-            loading={remove.isPending}
+            loading={remove.isPending && remove.variables === row.section.id}
             onClick={() => confirmDelete(row.section)}
             startIcon={<Trash2 aria-hidden="true" className="size-4" />}
           >
@@ -617,13 +617,13 @@ export function AdminLessonsPage() {
           <VisibilityButton
             status={row.lesson.status}
             onClick={() => toggle(row.lesson)}
-            loading={update.isPending}
+            loading={update.isPending && update.variables?.id === row.lesson.id}
           />
           <Button
             type="button"
             size="sm"
             variant="outline"
-            loading={remove.isPending}
+            loading={remove.isPending && remove.variables === row.lesson.id}
             onClick={() => confirmDelete(row.lesson)}
             startIcon={<Trash2 aria-hidden="true" className="size-4" />}
           >
@@ -859,13 +859,13 @@ export function AdminExercisesPage() {
           <VisibilityButton
             status={row.exercise.status}
             onClick={() => toggle(row.exercise)}
-            loading={update.isPending}
+            loading={update.isPending && update.variables?.id === row.exercise.id}
           />
           <Button
             type="button"
             size="sm"
             variant="outline"
-            loading={remove.isPending}
+            loading={remove.isPending && remove.variables === row.exercise.id}
             onClick={() => confirmDelete(row.exercise)}
             startIcon={<Trash2 aria-hidden="true" className="size-4" />}
           >

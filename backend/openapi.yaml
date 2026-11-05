@@ -12385,6 +12385,10 @@ components:
           enum:
             - PUBLIC
             - ENROLLED
+        assetFolder:
+          type: string
+          maxLength: 255
+          pattern: ^[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*$
       additionalProperties: false
       required:
         - originalName
@@ -13634,6 +13638,16 @@ components:
           items:
             type: string
             enum: [IMAGE, VIDEO, AUDIO, PDF]
+        uploadFoldersByMediaType:
+          type: object
+          properties:
+            PDF:
+              type: array
+              items: { type: string }
+            AUDIO:
+              type: array
+              items: { type: string }
+          additionalProperties: false
       required: [activeProvider, supportedMediaTypes]
       additionalProperties: false
     MediaPreviewAccess:

@@ -76,7 +76,12 @@ export type DeleteMediaInput = {
 export interface MediaStorageAdapter {
   readonly provider?: MediaProvider | undefined;
   resolve?(provider: MediaProvider): MediaStorageAdapter | undefined;
-  createStorageKey?(mediaType: string, uniqueId: string): string;
+  createStorageKey?(
+    mediaType: string,
+    uniqueId: string,
+    assetFolder?: string,
+  ): string;
+  listUploadFolders?(mediaType: string): Promise<string[]>;
   signRead(input: SignMediaInput): Promise<SignedMediaUrl>;
   createUpload?(input: CreateUploadInput): Promise<MediaUploadInstructions>;
   headObject?(storageKey: string): Promise<UploadedObjectMetadata | null>;
@@ -281,7 +286,8 @@ export class CloudinaryMediaStorage implements MediaStorageAdapter {
       !resourceType ||
       resourceType !== resourceTypeForMedia(input.mediaType) ||
       !folder ||
-      folder !== configuredFolder ||
+      !configuredFolder ||
+      !isValidCloudinaryFolder(folder, configuredFolder) ||
       !["PDF", "AUDIO"].includes(input.mediaType ?? "")
     ) {
       throw new AppError(
@@ -330,9 +336,46 @@ export class CloudinaryMediaStorage implements MediaStorageAdapter {
     };
   }
 
-  createStorageKey(mediaType: string, uniqueId: string): string {
-    const folder = folderForMedia(this.config, mediaType);
-    if (!folder) {
+  async listUploadFolders(mediaType: string): Promise<string[]> {
+    const rootFolder = folderForMedia(this.config, mediaType);
+    if (!rootFolder) return [];
+    try {
+      const response = await cloudinary.api.sub_folders(rootFolder, {
+        ...this.apiOptions({}),
+        max_results: 500,
+      });
+      const folders = Array.isArray(response.folders)
+        ? response.folders
+            .map((folder: unknown) =>
+              folder && typeof folder === "object" && "path" in folder
+                ? (folder as { path?: unknown }).path
+                : null,
+            )
+            .filter(
+              (folder: unknown): folder is string =>
+                typeof folder === "string" &&
+                isValidCloudinaryFolder(folder, rootFolder),
+            )
+        : [];
+      return [...new Set([rootFolder, ...folders])].sort();
+    } catch {
+      // Keep the configured destination usable if folder browsing is unavailable.
+      return [rootFolder];
+    }
+  }
+
+  createStorageKey(
+    mediaType: string,
+    uniqueId: string,
+    assetFolder?: string,
+  ): string {
+    const rootFolder = folderForMedia(this.config, mediaType);
+    const folder = assetFolder ?? rootFolder;
+    if (
+      !rootFolder ||
+      !folder ||
+      !isValidCloudinaryFolder(folder, rootFolder)
+    ) {
       throw new AppError(
         422,
         "MEDIA_TYPE_UNSUPPORTED",
@@ -471,10 +514,19 @@ export class MediaStorageRouter implements MediaStorageAdapter {
     return this.providers[provider];
   }
 
-  createStorageKey(mediaType: string, uniqueId: string): string {
+  createStorageKey(
+    mediaType: string,
+    uniqueId: string,
+    assetFolder?: string,
+  ): string {
     return (
-      this.active.createStorageKey?.(mediaType, uniqueId) ?? `media/${uniqueId}`
+      this.active.createStorageKey?.(mediaType, uniqueId, assetFolder) ??
+      `media/${uniqueId}`
     );
+  }
+
+  listUploadFolders(mediaType: string): Promise<string[]> {
+    return this.active.listUploadFolders?.(mediaType) ?? Promise.resolve([]);
   }
 
   signRead(input: SignMediaInput): Promise<SignedMediaUrl> {
@@ -623,6 +675,13 @@ function isValidCloudinaryPublicId(
     storageKey.length <= 255 &&
     /^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/.test(storageKey) &&
     storageKey.startsWith(`${folder}/`)
+  );
+}
+
+function isValidCloudinaryFolder(folder: string, rootFolder: string): boolean {
+  return (
+    /^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/.test(folder) &&
+    (folder === rootFolder || folder.startsWith(`${rootFolder}/`))
   );
 }
 

@@ -231,7 +231,7 @@ export function AdminCoursesPage() {
             type="button"
             size="sm"
             variant="outline"
-            loading={toggleStatus.isPending}
+            loading={toggleStatus.isPending && toggleStatus.variables?.courseId === course.id}
             onClick={() => void changeVisibility(course)}
             startIcon={
               course.status === 'PUBLISHED' ? (
@@ -251,7 +251,7 @@ export function AdminCoursesPage() {
             type="button"
             size="sm"
             variant="outline"
-            loading={remove.isPending}
+            loading={remove.isPending && remove.variables === course.id}
             onClick={() => confirmDelete(course)}
             startIcon={<Trash2 aria-hidden="true" className="size-4" />}
           >

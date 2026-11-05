@@ -143,6 +143,54 @@ describe("learning media storage adapters", () => {
     );
   });
 
+  it("lists configured Cloudinary folders and keeps selected destinations inside their root", async () => {
+    const storage = new CloudinaryMediaStorage(cloudinaryTestConfig);
+    const folders = vi.spyOn(cloudinary.api, "sub_folders").mockResolvedValue({
+      folders: [{ path: "lesson-pdf/lektion-1" }, { path: "outside-folder" }],
+    } as never);
+    try {
+      await expect(storage.listUploadFolders("PDF")).resolves.toEqual([
+        "lesson-pdf",
+        "lesson-pdf/lektion-1",
+      ]);
+      expect(
+        storage.createStorageKey("PDF", "unique-id", "lesson-pdf/lektion-1"),
+      ).toBe("lesson-pdf/lektion-1/unique-id");
+      expect(() =>
+        storage.createStorageKey("PDF", "unique-id", "outside-folder"),
+      ).toThrow();
+
+      const intent = await storage.createUpload({
+        storageKey: "lesson-pdf/lektion-1/65aabbccddeeff0011223344",
+        mimeType: "application/pdf",
+        fileSize: 1024,
+        expiresInSeconds: 600,
+        mediaType: "PDF",
+        resourceType: "image",
+        deliveryType: "authenticated",
+        assetFolder: "lesson-pdf/lektion-1",
+      });
+      expect(intent.fields).toMatchObject({
+        public_id: "lesson-pdf/lektion-1/65aabbccddeeff0011223344",
+        asset_folder: "lesson-pdf/lektion-1",
+      });
+      await expect(
+        storage.createUpload({
+          storageKey: "outside-folder/65aabbccddeeff0011223344",
+          mimeType: "application/pdf",
+          fileSize: 1024,
+          expiresInSeconds: 600,
+          mediaType: "PDF",
+          resourceType: "image",
+          deliveryType: "authenticated",
+          assetFolder: "outside-folder",
+        }),
+      ).rejects.toMatchObject({ code: "MEDIA_TYPE_UNSUPPORTED" });
+    } finally {
+      folders.mockRestore();
+    }
+  });
+
   it("switches Cloudinary accounts without changing canonical IDs and keeps provider routing available", async () => {
     const createAccountAdapter = (cloudName: string, apiKey: string) =>
       createMediaStorageAdapter(

@@ -666,4 +666,5 @@ export interface ApiMediaPreviewAccess {
 export interface ApiMediaCapabilities {
   activeProvider: 'S3_COMPATIBLE' | 'CLOUDINARY' | null
   supportedMediaTypes: Array<'IMAGE' | 'VIDEO' | 'AUDIO' | 'PDF'>
+  uploadFoldersByMediaType?: Partial<Record<'AUDIO' | 'PDF', string[]>>
 }

@@ -302,6 +302,7 @@ export const adminRepository = {
       mimeType: string
       fileSize: number
       visibility: 'PUBLIC' | 'ENROLLED'
+      assetFolder?: string
     },
     signal?: AbortSignal,
   ) {

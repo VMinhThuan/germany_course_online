@@ -694,6 +694,19 @@ describe("BE-03B Admin CMS, media, account security, enrollment and audit APIs",
       visibility: "ENROLLED",
     });
     expect(invalidSize.status).toBe(400);
+    const invalidFolder = await as(
+      admin,
+      "post",
+      "/api/v1/admin/media-assets/upload-intents",
+    ).send({
+      originalName: "x.pdf",
+      mediaType: "PDF",
+      mimeType: "application/pdf",
+      fileSize: 100,
+      visibility: "ENROLLED",
+      assetFolder: "lesson-pdf/../outside",
+    });
+    expect(invalidFolder.status).toBe(400);
     expect(await MediaAsset.countDocuments()).toBe(0);
   });
 
