@@ -37,13 +37,8 @@ export interface StudentLearningSectionViewModel {
   access: CourseAccessViewModel
 }
 
-export interface StudentExerciseSummaryViewModel {
-  id: string
+export interface StudentLessonExerciseViewModel extends ExerciseViewModel {
   lessonId: string
-  title: string
-  exerciseType: ExerciseViewModel['exerciseType']
-  status: ExerciseViewModel['status']
-  isRequired: boolean
   href: string
 }
 
@@ -54,7 +49,7 @@ export interface StudentLessonWorkspaceViewModel extends LessonContentViewModel 
   sectionTitle?: string
   lessonNumber?: number
   solutionVideo: ApiLessonVideo | null
-  exercises: readonly StudentExerciseSummaryViewModel[]
+  exercises: readonly StudentLessonExerciseViewModel[]
   progressItems: readonly LessonProgressItemViewModel[]
   solutionVideos?: readonly StudentSolutionVideoViewModel[]
   hasRestrictedSolutionVideos?: boolean

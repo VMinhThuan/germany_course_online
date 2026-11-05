@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, Minus, Plus } from 'lucide-react'
+import { useEffect, useId, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { ChevronLeft, ChevronRight, Minus, Plus, Scan } from 'lucide-react'
 import type { PDFDocumentLoadingTask, PDFDocumentProxy, RenderTask } from 'pdfjs-dist'
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
@@ -12,8 +12,17 @@ type DocumentState = {
 }
 
 export function ProtectedPdfViewer({ src, title }: { src: string; title: string }) {
+  const instructionsId = useId()
   const hostRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const dragRef = useRef<{
+    pointerId: number
+    x: number
+    y: number
+    left: number
+    top: number
+  } | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
   const [documentState, setDocumentState] = useState<DocumentState>(() => ({
     src,
     document: null,
@@ -28,6 +37,37 @@ export function ProtectedPdfViewer({ src, title }: { src: string; title: string 
   const { document, pageNumber, loading, error } = activeState
   const [zoom, setZoom] = useState(1)
   const [hostWidth, setHostWidth] = useState(0)
+
+  function startPan(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.pointerType !== 'mouse' || event.button !== 0 || loading || error) return
+    const host = event.currentTarget
+    dragRef.current = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      left: host.scrollLeft,
+      top: host.scrollTop,
+    }
+    host.setPointerCapture?.(event.pointerId)
+    setIsDragging(true)
+    event.preventDefault()
+  }
+
+  function movePan(event: ReactPointerEvent<HTMLDivElement>) {
+    const drag = dragRef.current
+    if (!drag || drag.pointerId !== event.pointerId) return
+    event.currentTarget.scrollLeft = drag.left - (event.clientX - drag.x)
+    event.currentTarget.scrollTop = drag.top - (event.clientY - drag.y)
+    event.preventDefault()
+  }
+
+  function stopPan(event: ReactPointerEvent<HTMLDivElement>) {
+    if (dragRef.current?.pointerId !== event.pointerId) return
+    dragRef.current = null
+    setIsDragging(false)
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId))
+      event.currentTarget.releasePointerCapture?.(event.pointerId)
+  }
 
   useEffect(() => {
     let disposed = false
@@ -183,6 +223,17 @@ export function ProtectedPdfViewer({ src, title }: { src: string; title: string 
           </span>
           <button
             type="button"
+            className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border-subtle px-3 text-sm font-medium disabled:opacity-40"
+            aria-label="Vừa khung"
+            title="Đưa tài liệu vừa khung"
+            disabled={zoom === 1}
+            onClick={() => setZoom(1)}
+          >
+            <Scan aria-hidden="true" className="size-4" />
+            <span className="hidden sm:inline">Vừa khung</span>
+          </button>
+          <button
+            type="button"
             className="min-h-11 min-w-11 rounded-lg border border-border-subtle disabled:opacity-40"
             aria-label="Phóng to tài liệu"
             disabled={zoom >= 2}
@@ -194,24 +245,39 @@ export function ProtectedPdfViewer({ src, title }: { src: string; title: string 
       </div>
       <div
         ref={hostRef}
-        className="grid min-h-80 max-h-[min(72vh,52rem)] place-items-start justify-center overflow-auto rounded-xl border border-border-subtle bg-surface-muted p-3"
+        className={`min-h-80 max-h-[min(72vh,52rem)] min-w-0 overflow-auto overscroll-contain rounded-xl border border-border-subtle bg-surface-muted ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
         aria-label={`Trình xem PDF: ${title}`}
+        role="region"
+        tabIndex={0}
+        aria-describedby={instructionsId}
+        onPointerDown={startPan}
+        onPointerMove={movePan}
+        onPointerUp={stopPan}
+        onPointerCancel={stopPan}
+        onLostPointerCapture={stopPan}
       >
-        {loading ? (
-          <p role="status" className="p-6 text-sm text-ink-secondary">
-            Đang tải tài liệu PDF
-          </p>
-        ) : error ? (
-          <p role="alert" className="p-6 text-sm text-danger-foreground">
-            {error}
-          </p>
-        ) : (
-          <canvas ref={canvasRef} aria-label={`${title}, trang ${pageNumber}`} />
-        )}
+        <div className="grid min-h-full w-max min-w-full place-items-start justify-center p-3">
+          {loading ? (
+            <p role="status" className="p-6 text-sm text-ink-secondary">
+              Đang tải tài liệu PDF
+            </p>
+          ) : error ? (
+            <p role="alert" className="p-6 text-sm text-danger-foreground">
+              {error}
+            </p>
+          ) : (
+            <canvas
+              ref={canvasRef}
+              aria-label={`${title}, trang ${pageNumber}`}
+              className="block max-w-none select-none rounded-sm bg-white shadow-md ring-1 ring-border-subtle"
+              draggable={false}
+            />
+          )}
+        </div>
       </div>
-      <p className="text-xs text-ink-muted">
-        Tài liệu được hiển thị trong trình xem. Việc ẩn nút tải xuống không ngăn chụp màn hình hoặc
-        sao chép nội dung.
+      <p id={instructionsId} className="text-xs text-ink-muted">
+        Kéo chuột để di chuyển trang khi phóng to. Tài liệu hiển thị trong trình xem; việc ẩn nút
+        tải xuống không ngăn chụp màn hình hoặc sao chép nội dung.
       </p>
     </div>
   )

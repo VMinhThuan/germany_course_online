@@ -66,9 +66,11 @@ export function ExerciseAssetList({ exercise }: { exercise: ExerciseViewModel })
 export function FileExercisePanel({
   exercise,
   onComplete,
+  showSolutions = true,
 }: {
   exercise: ExerciseViewModel
   onComplete?: () => Promise<void> | void
+  showSolutions?: boolean
 }) {
   return (
     <Card className="grid gap-5 p-5 sm:p-6">
@@ -79,7 +81,7 @@ export function FileExercisePanel({
       <ExerciseInstruction>{exercise.instructions}</ExerciseInstruction>
       <ExerciseAssetList exercise={exercise} />
       <ExerciseCompletionAction exercise={exercise} {...(onComplete ? { onComplete } : {})} />
-      <ExerciseSolutionPanel exercise={exercise} />
+      {showSolutions && <ExerciseSolutionPanel exercise={exercise} />}
     </Card>
   )
 }

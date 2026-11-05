@@ -35,7 +35,7 @@ import type { CourseProgressViewModel } from '@/domains/progress/models'
 import type { StudentCourseRecord, StudentRepository } from '@/data/student-demo/types'
 import type {
   StudentAccountRepository,
-  StudentExerciseSummaryViewModel,
+  StudentLessonExerciseViewModel,
   StudentLearningRepository,
   StudentOrderDetailViewModel,
   StudentProductRepositories,
@@ -266,14 +266,45 @@ async function getSignedMedia(
   }
 }
 
-function toExerciseSummary(exercise: ApiExercise): StudentExerciseSummaryViewModel {
+async function toLessonExercise(exercise: ApiExercise): Promise<StudentLessonExerciseViewModel> {
+  const questionAssets =
+    exercise.exerciseType === 'FILE_BASED'
+      ? exercise.assets.filter(
+          (asset) => asset.role === 'QUESTION_PDF' || asset.role === 'QUESTION_AUDIO',
+        )
+      : []
+  const media = await Promise.all(
+    questionAssets.map((asset) => getSignedMedia(asset, { exerciseId: exercise.id })),
+  )
   return {
     id: exercise.id,
     lessonId: exercise.lessonId,
     title: exercise.title,
+    ...(exercise.description ? { description: exercise.description } : {}),
+    instructions: exercise.instructions,
     exerciseType: exercise.exerciseType,
+    completionMode: exercise.completionMode,
     status: exercise.progress?.status ?? 'NOT_STARTED',
     isRequired: exercise.isRequired,
+    assets: questionAssets.map((asset, index) => ({
+      id: asset.assetId,
+      title: asset.title || asset.role,
+      role: asset.role,
+      mediaType: asset.mediaType,
+      ...(media[index]?.src ? { src: media[index].src } : {}),
+      canDownload:
+        Boolean(media[index]?.src) && (asset.mediaType === 'PDF' || asset.mediaType === 'AUDIO'),
+      ...(media[index]
+        ? {
+            availability: media[index].availability,
+            ...(media[index].signedUrlExpiresAt
+              ? { signedUrlExpiresAt: media[index].signedUrlExpiresAt }
+              : {}),
+            ...(media[index].message ? { message: media[index].message } : {}),
+          }
+        : {}),
+    })),
+    capabilities: exercise.capabilities,
     href: `/learn/exercises/${exercise.id}`,
   }
 }
@@ -346,7 +377,7 @@ const learning: StudentLearningRepository = {
     const workspace = await apiRequest<ApiLessonWorkspace>(
       `/learn/lessons/${encodeURIComponent(lessonId)}`,
     )
-    const [course, media, solutionVideos] = await Promise.all([
+    const [course, media, solutionVideos, exercises] = await Promise.all([
       apiRequest<ApiStudentCourseOverview>(`/me/courses/${encodeURIComponent(workspace.courseId)}`),
       Promise.all(
         (workspace.media.length ? workspace.media : workspace.assets).map((asset) =>
@@ -369,6 +400,7 @@ const learning: StudentLearningRepository = {
             : [],
         ),
       ),
+      Promise.all(workspace.exercises.map(toLessonExercise)),
     ])
     const courseLessons = course.sections.flatMap((section) =>
       section.lessons.map((item, index) => ({
@@ -407,7 +439,7 @@ const learning: StudentLearningRepository = {
       solutionVideo: workspace.solutionVideo,
       media,
       access: toAccess(course.access),
-      exercises: workspace.exercises.map(toExerciseSummary),
+      exercises,
       solutionVideos,
       hasRestrictedSolutionVideos: workspace.exercises.some(
         (exercise) =>

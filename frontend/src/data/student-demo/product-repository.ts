@@ -22,7 +22,7 @@ import {
 import type {
   StudentAccountRepository,
   StudentCheckoutContextViewModel,
-  StudentExerciseSummaryViewModel,
+  StudentLessonExerciseViewModel,
   StudentLearningRepository,
   StudentOrderDetailViewModel,
   StudentProductRepositories,
@@ -638,16 +638,10 @@ export function createStudentProductRepositories(
         const unlocked = access.kind === 'available'
         const exercises = unlocked
           ? exerciseDefinitions(lessonId).map((exercise) => ({
-              id: exercise.id,
+              ...exercise,
               lessonId,
-              title: exercise.title,
-              exerciseType: exercise.exerciseType,
               status: state.exerciseProgress[exercise.id] ?? 'NOT_STARTED',
-              isRequired: exercise.isRequired,
-              href:
-                exercise.exerciseType === 'QUIZ'
-                  ? `/learn/exercises/${exercise.id}`
-                  : `/learn/exercises/${exercise.id}`,
+              href: `/learn/exercises/${exercise.id}`,
             }))
           : []
         const required = exerciseDefinitions(lessonId).filter((exercise) => exercise.isRequired)
@@ -1118,14 +1112,10 @@ export function getDemoCourseSection(sectionId: string): CourseSectionModel | un
 
 export function getMockExerciseSummaries(
   lessonId: string,
-): readonly StudentExerciseSummaryViewModel[] {
+): readonly StudentLessonExerciseViewModel[] {
   return exerciseDefinitions(lessonId).map((exercise) => ({
-    id: exercise.id,
+    ...exercise,
     lessonId,
-    title: exercise.title,
-    exerciseType: exercise.exerciseType,
-    status: exercise.status,
-    isRequired: exercise.isRequired,
     href: `/learn/exercises/${exercise.id}`,
   }))
 }

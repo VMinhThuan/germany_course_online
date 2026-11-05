@@ -188,6 +188,7 @@ export function LearningLessonPage() {
   const note = useProductLessonNote(session?.id ?? '', lessonId)
   const saveNote = useSaveLessonNote(session?.id ?? '', lessonId)
   const completeLesson = useCompleteLesson(session?.id ?? '')
+  const completeExercise = useCompleteExercise(session?.id ?? '')
   const [noteValue, setNoteValue] = useState<string>()
   const navigate = useNavigate()
   const notifications = useNotifications()
@@ -258,10 +259,21 @@ export function LearningLessonPage() {
                   description="Bài bắt buộc cần hoàn thành để mở trạng thái hoàn tất bài học."
                 />
                 {lesson.data.exercises.length ? (
-                  <ul className="grid gap-3 sm:grid-cols-2">
-                    {lesson.data.exercises.map((exercise) => (
-                      <li key={exercise.id}>
+                  <div className="grid min-w-0 gap-4">
+                    {lesson.data.exercises.map((exercise) =>
+                      exercise.exerciseType === 'FILE_BASED' ? (
+                        <FileExercisePanel
+                          key={exercise.id}
+                          exercise={exercise}
+                          showSolutions={false}
+                          onComplete={async () => {
+                            await completeExercise.mutateAsync(exercise.id)
+                            notifications.success('Bài tập đã hoàn thành')
+                          }}
+                        />
+                      ) : (
                         <Link
+                          key={exercise.id}
                           to={exercise.href}
                           className="flex min-h-24 items-center justify-between gap-3 rounded-2xl border border-border-subtle bg-card-surface p-4 hover:border-action-primary"
                         >
@@ -281,9 +293,9 @@ export function LearningLessonPage() {
                             className="size-4 shrink-0 text-action-primary"
                           />
                         </Link>
-                      </li>
-                    ))}
-                  </ul>
+                      ),
+                    )}
+                  </div>
                 ) : lesson.data.access.kind !== 'available' ? (
                   <Card className="flex items-center gap-3 p-4">
                     <LockKeyhole aria-hidden="true" className="size-5 text-warning-foreground" />

@@ -278,4 +278,115 @@ describe('A1.1 real API data mapping', () => {
       }),
     ])
   })
+
+  it('loads signed question PDFs into the lesson exercise view model', async () => {
+    requestMock
+      .mockResolvedValueOnce({
+        id: 'lesson-id',
+        courseId: 'course-id',
+        sectionId: 'section-id',
+        title: 'Begrüßung und Abschied',
+        description: '',
+        content: { version: 1, paragraphs: [] },
+        video: null,
+        solutionVideo: null,
+        lessonType: 'LECTURE',
+        estimatedMinutes: null,
+        countsTowardProgress: true,
+        assets: [],
+        media: [],
+        exercises: [
+          {
+            id: 'exercise-id',
+            lessonId: 'lesson-id',
+            title: 'Arbeitsblatt · Begrüßung',
+            description: null,
+            instructions: 'Lies das PDF und beantworte die Fragen.',
+            exerciseType: 'FILE_BASED',
+            completionMode: 'MANUAL',
+            isRequired: true,
+            sortOrder: 0,
+            assets: [
+              {
+                assetId: 'question-pdf-id',
+                role: 'QUESTION_PDF',
+                title: 'Arbeitsblatt.pdf',
+                mediaType: 'PDF',
+                mimeType: 'application/pdf',
+                fileSize: 2048,
+                durationSeconds: null,
+              },
+            ],
+            progress: {
+              exerciseId: 'exercise-id',
+              status: 'NOT_STARTED',
+              completionSource: null,
+              completedAt: null,
+            },
+            capabilities: { canMarkComplete: true, canViewSolutions: false },
+          },
+        ],
+        canCompleteLesson: false,
+        outstandingRequiredCount: 1,
+      })
+      .mockResolvedValueOnce({
+        course: { id: 'course-id', slug: 'niveau-a1-1', title: 'Niveau A1.1', level: 'A1.1' },
+        sections: [
+          {
+            id: 'section-id',
+            title: 'Lektion 1',
+            description: '',
+            sectionType: 'CHAPTER',
+            sortOrder: 1,
+            lessons: [
+              {
+                id: 'lesson-id',
+                title: 'Begrüßung und Abschied',
+                description: '',
+                lessonType: 'LECTURE',
+                estimatedMinutes: null,
+                countsTowardProgress: true,
+                sortOrder: 1,
+                progress: {
+                  lessonId: 'lesson-id',
+                  status: 'NOT_STARTED',
+                  completedAt: null,
+                },
+              },
+            ],
+          },
+        ],
+        access: 'ACTIVE',
+        progress: { courseId: 'course-id', percent: 0, completedLessons: 0, totalLessons: 1 },
+      })
+      .mockResolvedValueOnce({
+        assetId: 'question-pdf-id',
+        url: 'https://media.example.test/question.pdf',
+        expiresAt: '2026-11-05T00:00:00.000Z',
+        mediaType: 'PDF',
+      })
+
+    const lesson = await apiStudentRepositories.learning.getLesson('session-id', 'lesson-id')
+
+    expect(lesson.exercises[0]).toMatchObject({
+      id: 'exercise-id',
+      title: 'Arbeitsblatt · Begrüßung',
+      instructions: 'Lies das PDF und beantworte die Fragen.',
+      exerciseType: 'FILE_BASED',
+      assets: [
+        {
+          id: 'question-pdf-id',
+          title: 'Arbeitsblatt.pdf',
+          role: 'QUESTION_PDF',
+          mediaType: 'PDF',
+          src: 'https://media.example.test/question.pdf',
+          availability: 'ready',
+        },
+      ],
+    })
+    expect(requestMock).toHaveBeenCalledWith('/learn/media-access', {
+      method: 'POST',
+      body: { assetId: 'question-pdf-id', exerciseId: 'exercise-id' },
+    })
+  })
 })

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ProtectedPdfViewer } from './protected-pdf-viewer'
@@ -61,5 +61,52 @@ describe('ProtectedPdfViewer', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Không tải được PDF. Hãy kiểm tra quyền truy cập hoặc thử lại.',
     )
+  })
+
+  it('supports mouse drag panning and resets zoom to fit the viewer', async () => {
+    const user = userEvent.setup()
+    const getPage = vi.fn(async () => ({
+      getViewport: ({ scale }: { scale: number }) => ({
+        width: 900 * scale,
+        height: 1200 * scale,
+      }),
+      render: () => ({ promise: Promise.resolve(), cancel: vi.fn() }),
+    }))
+    const task = { promise: Promise.resolve({ numPages: 1, getPage }), destroy: vi.fn() }
+    pdfjs.getDocument.mockReturnValue(task)
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
+      {} as CanvasRenderingContext2D,
+    )
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(640)
+
+    render(<ProtectedPdfViewer src="https://media.example.test/signed.pdf" title="Bài tập" />)
+
+    const viewer = await screen.findByRole('region', { name: 'Trình xem PDF: Bài tập' })
+    await waitFor(() => expect(screen.getByText('1 / 1')).toBeVisible())
+    Object.defineProperty(viewer, 'scrollLeft', { configurable: true, writable: true, value: 120 })
+    Object.defineProperty(viewer, 'scrollTop', { configurable: true, writable: true, value: 200 })
+
+    fireEvent.pointerDown(viewer, {
+      pointerId: 4,
+      pointerType: 'mouse',
+      button: 0,
+      clientX: 300,
+      clientY: 300,
+    })
+    fireEvent.pointerMove(viewer, {
+      pointerId: 4,
+      pointerType: 'mouse',
+      clientX: 250,
+      clientY: 220,
+    })
+
+    expect(viewer.scrollLeft).toBe(170)
+    expect(viewer.scrollTop).toBe(280)
+
+    fireEvent.pointerUp(viewer, { pointerId: 4, pointerType: 'mouse', button: 0 })
+    await user.click(screen.getByRole('button', { name: 'Phóng to tài liệu' }))
+    expect(screen.getByText('115%')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Vừa khung' }))
+    expect(screen.getByText('100%')).toBeVisible()
   })
 })

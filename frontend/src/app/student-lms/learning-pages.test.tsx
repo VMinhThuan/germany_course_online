@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   useProductLesson: vi.fn(),
   useProductLessonNote: vi.fn(),
   useSaveLessonNote: vi.fn(),
+  useCompleteExercise: vi.fn(),
+  completeExercise: vi.fn(),
   useCompleteLesson: vi.fn(),
   completeLesson: vi.fn(),
 }))
@@ -21,6 +23,7 @@ vi.mock('@/data/student-demo/product-queries', () => ({
   useProductLesson: mocks.useProductLesson,
   useProductLessonNote: mocks.useProductLessonNote,
   useSaveLessonNote: mocks.useSaveLessonNote,
+  useCompleteExercise: mocks.useCompleteExercise,
   useCompleteLesson: mocks.useCompleteLesson,
 }))
 
@@ -117,6 +120,12 @@ describe('LearningLessonPage', () => {
     mocks.useProductLesson.mockReturnValue({ data: lessonData, isPending: false, isError: false })
     mocks.useProductLessonNote.mockReturnValue({ data: '', isPending: false, isError: false })
     mocks.useSaveLessonNote.mockReturnValue({ mutateAsync: vi.fn() })
+    mocks.completeExercise.mockResolvedValue(undefined)
+    mocks.useCompleteExercise.mockReturnValue({
+      mutateAsync: mocks.completeExercise,
+      isPending: false,
+      isError: false,
+    })
     mocks.completeLesson.mockResolvedValue(undefined)
     mocks.useCompleteLesson.mockReturnValue({
       mutateAsync: mocks.completeLesson,
@@ -165,6 +174,53 @@ describe('LearningLessonPage', () => {
     renderLesson()
 
     expect(screen.getByLabelText('Video chữa bài · Vorstellung üben')).toBeVisible()
+  })
+
+  it('renders file-based exercises and their PDFs directly in the lesson', async () => {
+    const user = userEvent.setup()
+    mocks.useProductLesson.mockReturnValue({
+      data: {
+        ...lessonData,
+        exercises: [
+          {
+            id: 'exercise-1',
+            lessonId: 'lesson-2',
+            title: 'Arbeitsblatt · Sich vorstellen',
+            description: 'Bài tập PDF của Lektion 1.',
+            instructions: 'Mở PDF và hoàn thành các câu hỏi.',
+            exerciseType: 'FILE_BASED',
+            completionMode: 'MANUAL',
+            status: 'NOT_STARTED',
+            isRequired: true,
+            assets: [
+              {
+                id: 'question-pdf-1',
+                title: 'Arbeitsblatt.pdf',
+                role: 'QUESTION_PDF',
+                mediaType: 'PDF',
+                canDownload: false,
+                availability: 'unavailable',
+              },
+            ],
+            capabilities: { canMarkComplete: true, canViewSolutions: false },
+            href: '/learn/exercises/exercise-1',
+          },
+        ],
+      },
+      isPending: false,
+      isError: false,
+    })
+
+    renderLesson()
+
+    expect(screen.getByRole('heading', { name: 'Arbeitsblatt · Sich vorstellen' })).toBeVisible()
+    expect(screen.getByText('Mở PDF và hoàn thành các câu hỏi.')).toBeVisible()
+    expect(screen.getByRole('region', { name: 'Arbeitsblatt.pdf' })).toBeVisible()
+
+    await user.click(screen.getByRole('button', { name: 'Đánh dấu hoàn thành' }))
+
+    expect(mocks.completeExercise).toHaveBeenCalledWith('exercise-1')
+    expect(await screen.findByText('Bài tập đã hoàn thành')).toBeVisible()
   })
 
   it('renders a YouTube lesson solution video', () => {
