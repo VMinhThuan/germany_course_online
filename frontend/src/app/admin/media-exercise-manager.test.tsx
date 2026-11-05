@@ -112,8 +112,23 @@ describe('AdminExercisePdfManager', () => {
 
     expect(await screen.findByText('Chưa có bài tập dạng PDF')).toBeVisible()
     expect(screen.getByText(/Tạo bài tập ở biểu mẫu phía trên/)).toBeVisible()
-    expect(screen.queryByLabelText('Tệp PDF')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Tệp PDF')).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Tải PDF lên thư viện media' })).toBeVisible()
     expect(screen.queryByRole('button', { name: 'Tạo bài tập FILE_BASED' })).not.toBeInTheDocument()
+  })
+
+  it('stores a PDF in the media library before an exercise exists', async () => {
+    const user = userEvent.setup()
+    renderManager([])
+    const file = new File(['%PDF'], 'neu.pdf', { type: 'application/pdf' })
+
+    await screen.findByText(/Provider: CLOUDINARY/)
+    await user.upload(screen.getByLabelText('Tệp PDF'), file)
+    await user.click(screen.getByRole('button', { name: 'Tải PDF lên thư viện media' }))
+
+    expect(await screen.findByText('Đã tải PDF lên thư viện media.')).toBeVisible()
+    expect(adminRepository.completeUpload).toHaveBeenCalledWith('upload-1')
+    expect(adminRepository.linkExerciseAsset).not.toHaveBeenCalled()
   })
 
   it('attaches an existing Cloudinary PDF to the selected file exercise', async () => {

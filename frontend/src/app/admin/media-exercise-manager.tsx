@@ -51,7 +51,6 @@ export function AdminExercisePdfManager({
         page,
         pageSize: 20,
         mediaType: 'PDF',
-        provider: 'CLOUDINARY',
         uploadStatus: 'READY',
         ...(search.trim() ? { q: search.trim() } : {}),
       }),
@@ -121,7 +120,7 @@ export function AdminExercisePdfManager({
 
   async function uploadAndAttach() {
     setFileError(undefined)
-    if (!selectedExercise || !file) return
+    if (!file) return
     if (
       !file.name.toLowerCase().endsWith('.pdf') ||
       file.type !== 'application/pdf' ||
@@ -156,15 +155,24 @@ export function AdminExercisePdfManager({
       await adminRepository.uploadFile(intent, file, setProgress, controller.signal)
       await adminRepository.completeUpload(assetId)
       uploadCompleted = true
-      await linkAsset.mutateAsync({
-        exerciseId: selectedExercise.id,
-        assetId,
-        title: file.name,
-        sortOrder: questionPdfs.length,
-      })
       setFile(null)
-      setSelectedAssetId('')
-      notifications.success('Đã tải PDF lên và gắn vào bài tập.')
+      setSelectedAssetId(assetId)
+      if (selectedExercise) {
+        await linkAsset.mutateAsync({
+          exerciseId: selectedExercise.id,
+          assetId,
+          title: file.name,
+          sortOrder: questionPdfs.length,
+        })
+        setSelectedAssetId('')
+        notifications.success('Đã tải PDF lên và gắn vào bài tập.')
+      } else {
+        await queryClient.invalidateQueries({ queryKey: ['admin', 'media'] })
+        notifications.success(
+          'Đã tải PDF lên thư viện media.',
+          'Tạo bài tập dạng PDF, chọn tệp này trong thư viện rồi bấm “Gắn PDF”.',
+        )
+      }
     } catch (error) {
       if (controller.signal.aborted && assetId && !uploadCompleted)
         await adminRepository.deleteMedia(assetId).catch(() => undefined)
@@ -208,7 +216,7 @@ export function AdminExercisePdfManager({
   return (
     <AdminCard
       title="Gắn PDF đề bài"
-      description="1. Tạo bài tập dạng PDF ở biểu mẫu phía trên. 2. Chọn bài tập đó tại đây. 3. Tải tệp lên hoặc chọn PDF đã có trên Cloudinary."
+      description="Có thể tải PDF lên thư viện trước. Khi đã có bài tập dạng PDF, chọn bài đó để gắn tệp làm đề bài."
       className="min-w-0"
     >
       {availableExercises.length ? (
@@ -225,208 +233,203 @@ export function AdminExercisePdfManager({
         <div className="grid gap-1 rounded-xl border border-border-subtle bg-surface-muted p-4">
           <p className="font-semibold">Chưa có bài tập dạng PDF</p>
           <p className="text-sm text-ink-secondary">
-            Tạo bài tập ở biểu mẫu phía trên và chọn loại “Bài tập PDF”. Bài vừa tạo sẽ xuất hiện
-            trong bộ chọn này.
+            Tạo bài tập ở biểu mẫu phía trên và chọn loại “Bài tập PDF”. Bạn vẫn có thể tải PDF lên
+            ngay; sau đó chọn bài tập và bấm “Gắn PDF”.
           </p>
         </div>
       )}
 
       {selectedExercise && (
-        <>
-          <section aria-label="PDF đã gắn" className="grid gap-2">
-            <h3 className="text-sm font-semibold">PDF đang dùng</h3>
-            {associations.isPending ? (
-              <AdminLoading label="Đang tải PDF của bài tập" />
-            ) : associations.isError ? (
-              <AdminLoadError
-                error={associations.error}
-                retry={() => void associations.refetch()}
-              />
-            ) : questionPdfs.length ? (
-              questionPdfs.map((asset) => (
-                <div
-                  key={`${asset.assetId}-${asset.assetRole}`}
-                  className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-border-subtle bg-white p-3"
-                >
-                  <span className="min-w-0">
-                    <strong className="block truncate text-sm">
-                      {asset.title || asset.media.originalName}
-                    </strong>
-                    <span className="text-xs text-ink-secondary">
-                      {(asset.media.fileSize / 1024 / 1024).toFixed(2)} MB ·{' '}
-                      {asset.media.provider ?? 'UNKNOWN'}
-                    </span>
+        <section aria-label="PDF đã gắn" className="grid gap-2">
+          <h3 className="text-sm font-semibold">PDF đang dùng</h3>
+          {associations.isPending ? (
+            <AdminLoading label="Đang tải PDF của bài tập" />
+          ) : associations.isError ? (
+            <AdminLoadError error={associations.error} retry={() => void associations.refetch()} />
+          ) : questionPdfs.length ? (
+            questionPdfs.map((asset) => (
+              <div
+                key={`${asset.assetId}-${asset.assetRole}`}
+                className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-border-subtle bg-white p-3"
+              >
+                <span className="min-w-0">
+                  <strong className="block truncate text-sm">
+                    {asset.title || asset.media.originalName}
+                  </strong>
+                  <span className="text-xs text-ink-secondary">
+                    {(asset.media.fileSize / 1024 / 1024).toFixed(2)} MB ·{' '}
+                    {asset.media.provider ?? 'UNKNOWN'}
                   </span>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    aria-label={`Gỡ ${asset.media.originalName}`}
-                    onClick={() => confirmUnlink(asset)}
-                    loading={unlinkAsset.isPending}
-                    startIcon={<Unlink aria-hidden="true" className="size-4" />}
-                  >
-                    Gỡ
-                  </Button>
-                </div>
-              ))
-            ) : (
-              <p className="rounded-xl bg-surface-muted p-3 text-sm text-ink-secondary">
-                Chưa gắn PDF cho bài tập này.
-              </p>
-            )}
-          </section>
-
-          <form
-            className="grid gap-3 border-t border-border-subtle pt-4"
-            onSubmit={(event) => {
-              event.preventDefault()
-              void uploadAndAttach()
-            }}
-          >
-            <h3 className="font-semibold">Tải PDF từ máy</h3>
-            <p className="text-xs leading-5 text-ink-secondary">
-              Provider: {capabilities.data?.activeProvider ?? 'chưa cấu hình'} · PDF tối đa 40 MB.
-              Tệp sẽ được xác minh trước khi gắn vào bài tập.
-            </p>
-            <label className="grid gap-1.5 text-sm font-semibold text-ink-primary">
-              <span>Tệp PDF</span>
-              <input
-                className="min-h-11 w-full rounded-xl border border-border-subtle bg-white p-2 font-normal outline-none focus-visible:ring-2 focus-visible:ring-action-primary disabled:bg-surface-muted"
-                type="file"
-                accept="application/pdf,.pdf"
-                onChange={(event) => {
-                  setFile(event.target.files?.[0] ?? null)
-                  setFileError(undefined)
-                }}
-                disabled={progress !== null || capabilities.isPending}
-              />
-            </label>
-            {uploadStage === 'preparing' && (
-              <p role="status" className="text-sm text-ink-secondary">
-                Đang chuẩn bị lượt tải lên an toàn…
-              </p>
-            )}
-            {uploadStage === 'transferring' && progress !== null && (
-              <div className="text-sm">
-                <p role="status">Đang tải lên {progress}%</p>
-                <progress className="mt-2 block w-full" value={progress} max={100} />
+                </span>
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
-                  className="mt-2"
-                  onClick={() => uploadController.current?.abort()}
+                  aria-label={`Gỡ ${asset.media.originalName}`}
+                  onClick={() => confirmUnlink(asset)}
+                  loading={unlinkAsset.isPending}
+                  startIcon={<Unlink aria-hidden="true" className="size-4" />}
                 >
-                  Hủy tải lên
+                  Gỡ
                 </Button>
               </div>
-            )}
-            <AdminFeedback error={fileError} />
-            <Button
-              type="submit"
-              loading={progress !== null || linkAsset.isPending}
-              disabled={
-                !file ||
-                progress !== null ||
-                linkAsset.isPending ||
-                !capabilities.data?.activeProvider ||
-                !capabilities.data.supportedMediaTypes.includes('PDF')
-              }
-              startIcon={<FileUp aria-hidden="true" className="size-4" />}
-            >
-              Tải lên và gắn PDF
-            </Button>
-          </form>
-
-          <section
-            aria-label="Chọn PDF trong Cloudinary"
-            className="grid gap-3 border-t border-border-subtle pt-4"
-          >
-            <div>
-              <h3 className="font-semibold">Chọn từ Cloudinary</h3>
-              <p className="mt-1 text-xs leading-5 text-ink-secondary">
-                Chỉ hiển thị PDF đã tải lên và được backend xác minh.
-              </p>
-            </div>
-            <label className="grid gap-1.5 text-sm font-semibold text-ink-primary">
-              <span>Tìm PDF</span>
-              <input
-                className="min-h-11 w-full rounded-xl border border-border-subtle bg-white px-3 font-normal outline-none focus-visible:ring-2 focus-visible:ring-action-primary"
-                value={search}
-                onChange={(event) => {
-                  setSearch(event.target.value)
-                  setPage(1)
-                  setSelectedAssetId('')
-                }}
-                placeholder="Tên tệp PDF"
-              />
-            </label>
-            {media.isPending ? (
-              <AdminLoading label="Đang tải thư viện PDF Cloudinary" />
-            ) : media.isError ? (
-              <AdminLoadError error={media.error} retry={() => void media.refetch()} />
-            ) : media.data.items.length ? (
-              <div className="grid gap-2">
-                {media.data.items.map((asset) => {
-                  const linked = linkedAssetIds.has(asset.id)
-                  const selected = selectedAssetId === asset.id
-                  return (
-                    <div
-                      key={asset.id}
-                      className={`flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-xl border p-3 ${selected ? 'border-action-primary bg-surface-blue' : 'border-border-subtle bg-white'}`}
-                    >
-                      <button
-                        type="button"
-                        aria-pressed={selected}
-                        onClick={() => setSelectedAssetId(selected ? '' : asset.id)}
-                        className="min-w-0 flex-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-action-primary"
-                      >
-                        <strong className="block truncate text-sm">{asset.originalName}</strong>
-                        <span className="text-xs text-ink-secondary">
-                          {(asset.fileSize / 1024 / 1024).toFixed(2)} MB · CLOUDINARY
-                        </span>
-                      </button>
-                      {linked ? (
-                        <span className="text-xs font-semibold text-success-foreground">
-                          Đã gắn
-                        </span>
-                      ) : (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={!selected || linkAsset.isPending}
-                          loading={selected && linkAsset.isPending}
-                          onClick={() => void attachAsset(asset)}
-                          startIcon={<Link2 aria-hidden="true" className="size-4" />}
-                        >
-                          Gắn PDF
-                        </Button>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <EmptyState
-                title="Chưa có PDF trên Cloudinary"
-                description="Tải một tệp PDF ở phần trên hoặc thêm PDF vào thư viện media trước."
-              />
-            )}
-            {media.data && media.data.total > media.data.pageSize && (
-              <Pagination
-                page={media.data.page}
-                pages={Math.ceil(media.data.total / media.data.pageSize)}
-                onPageChange={(nextPage) => {
-                  setPage(nextPage)
-                  setSelectedAssetId('')
-                }}
-              />
-            )}
-          </section>
-        </>
+            ))
+          ) : (
+            <p className="rounded-xl bg-surface-muted p-3 text-sm text-ink-secondary">
+              Chưa gắn PDF cho bài tập này.
+            </p>
+          )}
+        </section>
       )}
+
+      <form
+        className="grid gap-3 border-t border-border-subtle pt-4"
+        onSubmit={(event) => {
+          event.preventDefault()
+          void uploadAndAttach()
+        }}
+      >
+        <h3 className="font-semibold">Tải PDF từ máy</h3>
+        <p className="text-xs leading-5 text-ink-secondary">
+          Provider: {capabilities.data?.activeProvider ?? 'chưa cấu hình'} · PDF tối đa 40 MB.
+          {selectedExercise
+            ? ' Tệp sẽ được xác minh rồi gắn vào bài tập đã chọn.'
+            : ' Tệp sẽ được xác minh và lưu vào thư viện để gắn sau.'}
+        </p>
+        <label className="grid gap-1.5 text-sm font-semibold text-ink-primary">
+          <span>Tệp PDF</span>
+          <input
+            className="min-h-11 w-full rounded-xl border border-border-subtle bg-white p-2 font-normal outline-none focus-visible:ring-2 focus-visible:ring-action-primary disabled:bg-surface-muted"
+            type="file"
+            accept="application/pdf,.pdf"
+            onChange={(event) => {
+              setFile(event.target.files?.[0] ?? null)
+              setFileError(undefined)
+            }}
+            disabled={progress !== null || capabilities.isPending}
+          />
+        </label>
+        {uploadStage === 'preparing' && (
+          <p role="status" className="text-sm text-ink-secondary">
+            Đang chuẩn bị lượt tải lên an toàn…
+          </p>
+        )}
+        {uploadStage === 'transferring' && progress !== null && (
+          <div className="text-sm">
+            <p role="status">Đang tải lên {progress}%</p>
+            <progress className="mt-2 block w-full" value={progress} max={100} />
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="mt-2"
+              onClick={() => uploadController.current?.abort()}
+            >
+              Hủy tải lên
+            </Button>
+          </div>
+        )}
+        <AdminFeedback error={fileError} />
+        <Button
+          type="submit"
+          loading={progress !== null || linkAsset.isPending}
+          disabled={
+            !file ||
+            progress !== null ||
+            linkAsset.isPending ||
+            !capabilities.data?.activeProvider ||
+            !capabilities.data.supportedMediaTypes.includes('PDF')
+          }
+          startIcon={<FileUp aria-hidden="true" className="size-4" />}
+        >
+          {selectedExercise ? 'Tải lên và gắn PDF' : 'Tải PDF lên thư viện media'}
+        </Button>
+      </form>
+
+      <section
+        aria-label="Chọn PDF trong thư viện media"
+        className="grid gap-3 border-t border-border-subtle pt-4"
+      >
+        <div>
+          <h3 className="font-semibold">Chọn PDF có sẵn</h3>
+          <p className="mt-1 text-xs leading-5 text-ink-secondary">
+            Chỉ hiển thị PDF đã tải lên và được backend xác minh. Provider hiển thị cạnh tên tệp.
+          </p>
+        </div>
+        <label className="grid gap-1.5 text-sm font-semibold text-ink-primary">
+          <span>Tìm PDF</span>
+          <input
+            className="min-h-11 w-full rounded-xl border border-border-subtle bg-white px-3 font-normal outline-none focus-visible:ring-2 focus-visible:ring-action-primary"
+            value={search}
+            onChange={(event) => {
+              setSearch(event.target.value)
+              setPage(1)
+              setSelectedAssetId('')
+            }}
+            placeholder="Tên tệp PDF"
+          />
+        </label>
+        {media.isPending ? (
+          <AdminLoading label="Đang tải thư viện PDF Cloudinary" />
+        ) : media.isError ? (
+          <AdminLoadError error={media.error} retry={() => void media.refetch()} />
+        ) : media.data.items.length ? (
+          <div className="grid gap-2">
+            {media.data.items.map((asset) => {
+              const linked = linkedAssetIds.has(asset.id)
+              const selected = selectedAssetId === asset.id
+              return (
+                <div
+                  key={asset.id}
+                  className={`flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-xl border p-3 ${selected ? 'border-action-primary bg-surface-blue' : 'border-border-subtle bg-white'}`}
+                >
+                  <button
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => setSelectedAssetId(selected ? '' : asset.id)}
+                    className="min-w-0 flex-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-action-primary"
+                  >
+                    <strong className="block truncate text-sm">{asset.originalName}</strong>
+                    <span className="text-xs text-ink-secondary">
+                      {(asset.fileSize / 1024 / 1024).toFixed(2)} MB · {asset.provider ?? 'UNKNOWN'}
+                    </span>
+                  </button>
+                  {linked ? (
+                    <span className="text-xs font-semibold text-success-foreground">Đã gắn</span>
+                  ) : (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={!selected || !selectedExercise || linkAsset.isPending}
+                      loading={selected && linkAsset.isPending}
+                      onClick={() => void attachAsset(asset)}
+                      startIcon={<Link2 aria-hidden="true" className="size-4" />}
+                    >
+                      Gắn PDF
+                    </Button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        ) : (
+          <EmptyState
+            title="Chưa có PDF trong thư viện"
+            description="Tải một tệp PDF ở phần trên hoặc thêm PDF vào thư viện media trước."
+          />
+        )}
+        {media.data && media.data.total > media.data.pageSize && (
+          <Pagination
+            page={media.data.page}
+            pages={Math.ceil(media.data.total / media.data.pageSize)}
+            onPageChange={(nextPage) => {
+              setPage(nextPage)
+              setSelectedAssetId('')
+            }}
+          />
+        )}
+      </section>
     </AdminCard>
   )
 }
