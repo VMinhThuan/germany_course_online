@@ -1,10 +1,17 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { FileUp, Unlink } from 'lucide-react'
+import { Eye, FileUp, Unlink, X } from 'lucide-react'
 import { adminRepository } from '@/data/api/admin-repository'
-import type { ApiAdminSiteSettings, ApiAssetAssociation } from '@/lib/api/types'
+import type {
+  ApiAdminSiteSettings,
+  ApiAssetAssociation,
+  ApiMediaPreviewAccess,
+} from '@/lib/api/types'
 import { formatDateTimeInTimezone } from '@/shared/lib/format'
+import { useDialogs } from '@/shared/ui/dialogs'
 import { Button, EmptyState, Pagination } from '@/shared/ui'
+import { AudioPlayer, PDFViewer, VideoPlayer } from '@/domains/media/components'
+import type { MediaViewModel } from '@/domains/media'
 import {
   AdminCard,
   AdminField,
@@ -17,17 +24,36 @@ import {
 } from './shared'
 
 export function AdminMediaPage() {
+  const dialogs = useDialogs()
   const [search, setSearch] = useState('')
   const [mediaType, setMediaType] = useState('')
+  const [uploadStatus, setUploadStatus] = useState('')
+  const [provider, setProvider] = useState('')
   const [page, setPage] = useState(1)
+  const [selectedAssetId, setSelectedAssetId] = useState('')
+  const [preview, setPreview] = useState<ApiMediaPreviewAccess | null>(null)
+  const [previewError, setPreviewError] = useState('')
+  const capabilities = useQuery({
+    queryKey: ['admin', 'media-capabilities'],
+    queryFn: () => adminRepository.getMediaCapabilities(),
+    retry: false,
+  })
+  const detail = useQuery({
+    queryKey: ['admin', 'media-detail', selectedAssetId],
+    queryFn: () => adminRepository.getMediaDetail(selectedAssetId),
+    enabled: Boolean(selectedAssetId),
+    retry: false,
+  })
   const assets = useQuery({
-    queryKey: ['admin', 'media', search, mediaType, page],
+    queryKey: ['admin', 'media', search, mediaType, uploadStatus, provider, page],
     queryFn: () =>
       adminRepository.listMedia({
         page,
         pageSize: 20,
         ...(search ? { q: search } : {}),
         ...(mediaType ? { mediaType } : {}),
+        ...(uploadStatus ? { uploadStatus } : {}),
+        ...(provider ? { provider } : {}),
       }),
     retry: false,
   })
@@ -65,8 +91,10 @@ export function AdminMediaPage() {
   const [file, setFile] = useState<File | null>(null)
   const [visibility, setVisibility] = useState<'PUBLIC' | 'ENROLLED'>('ENROLLED')
   const [progress, setProgress] = useState<number | null>(null)
+  const [uploadStage, setUploadStage] = useState<'preparing' | 'transferring' | null>(null)
   const [uploadError, setUploadError] = useState<unknown>()
   const [uploadSuccess, setUploadSuccess] = useState('')
+  const uploadController = useRef<AbortController | null>(null)
   const [ownerType, setOwnerType] = useState<'lesson' | 'exercise'>('lesson')
   const [ownerId, setOwnerId] = useState('')
   const [assetId, setAssetId] = useState('')
@@ -88,9 +116,12 @@ export function AdminMediaPage() {
     event.preventDefault()
     setUploadError(undefined)
     setUploadSuccess('')
-    setProgress(0)
     if (!file) {
       setUploadError(new Error('Chọn tệp trước khi tải lên.'))
+      return
+    }
+    if (file.size <= 0) {
+      setUploadError(new Error('Tệp trống không thể tải lên.'))
       return
     }
     const type = file.type.startsWith('image/')
@@ -102,39 +133,103 @@ export function AdminMediaPage() {
           : file.type === 'application/pdf'
             ? 'PDF'
             : null
-    if (!type) {
+    const extension = file.name.split('.').at(-1)?.toLowerCase()
+    const acceptedExtensions: Record<string, string[]> = {
+      IMAGE: ['png', 'jpg', 'jpeg', 'webp'],
+      VIDEO: ['mp4'],
+      AUDIO: ['mp3', 'm4a', 'mp4', 'wav', 'ogg'],
+      PDF: ['pdf'],
+    }
+    const mimeByExtension: Record<string, string> = {
+      png: 'image/png',
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg',
+      webp: 'image/webp',
+      mp4: type === 'AUDIO' ? 'audio/mp4' : 'video/mp4',
+      mp3: 'audio/mpeg',
+      m4a: 'audio/mp4',
+      wav: 'audio/wav',
+      ogg: 'audio/ogg',
+      pdf: 'application/pdf',
+    }
+    const maxBytes: Record<string, number> = {
+      IMAGE: 20 * 1024 * 1024,
+      VIDEO: 250 * 1024 * 1024,
+      AUDIO: 50 * 1024 * 1024,
+      PDF: 40 * 1024 * 1024,
+    }
+    if (
+      !type ||
+      !(acceptedExtensions[type] ?? []).includes(extension ?? '') ||
+      mimeByExtension[extension ?? ''] !== file.type ||
+      !capabilities.data?.supportedMediaTypes.includes(type) ||
+      file.size > maxBytes[type]!
+    ) {
       setUploadError(
-        new Error('Chỉ hỗ trợ ảnh, video, audio hoặc PDF theo MIME type của trình duyệt.'),
+        new Error(
+          `Định dạng hoặc dung lượng không được hỗ trợ. Provider hiện tại cho phép: ${capabilities.data?.supportedMediaTypes.join(', ') || 'chưa cấu hình'}.`,
+        ),
       )
       return
     }
+    const controller = new AbortController()
+    uploadController.current = controller
+    setProgress(0)
+    setUploadStage('preparing')
+    let createdAssetId = ''
     try {
-      const intent = await adminRepository.createUploadIntent({
-        originalName: file.name,
-        mediaType: type,
-        mimeType: file.type,
-        fileSize: file.size,
-        visibility,
-      })
-      await adminRepository.uploadFile(intent.uploadUrl, file, setProgress)
+      const intent = await adminRepository.createUploadIntent(
+        {
+          originalName: file.name,
+          mediaType: type,
+          mimeType: file.type,
+          fileSize: file.size,
+          visibility,
+        },
+        controller.signal,
+      )
+      createdAssetId = intent.assetId
+      setUploadStage('transferring')
+      await adminRepository.uploadFile(intent, file, setProgress, controller.signal)
       await adminRepository.completeUpload(intent.assetId)
       setUploadSuccess('Backend đã xác minh tệp và hoàn tất tài sản media.')
       setFile(null)
       await assets.refetch()
+      setSelectedAssetId(intent.assetId)
     } catch (error) {
+      if (controller.signal.aborted && createdAssetId)
+        await adminRepository.deleteMedia(createdAssetId).catch(() => undefined)
       setUploadError(error)
       setUploadSuccess('')
     } finally {
+      uploadController.current = null
       setProgress(null)
+      setUploadStage(null)
     }
   }
-  async function removeAsset(id: string) {
-    if (!window.confirm('Xóa media này? Backend sẽ kiểm tra các liên kết trước khi xóa.')) return
+  async function previewAsset(id: string) {
+    setPreview(null)
+    setPreviewError('')
     try {
-      await deleteAsset.mutateAsync(id)
-    } catch {
-      /* API error below */
+      setPreview(await adminRepository.createMediaPreviewAccess(id))
+    } catch (error) {
+      setPreviewError(error instanceof Error ? error.message : 'Không thể tạo bản xem trước.')
     }
+  }
+  function removeAsset(id: string) {
+    dialogs.confirm({
+      title: 'Xóa media này?',
+      description: 'Backend sẽ kiểm tra các liên kết trước khi xóa.',
+      confirmLabel: 'Xóa media',
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await deleteAsset.mutateAsync(id)
+        } catch {
+          /* API error below */
+        }
+      },
+    })
   }
   async function attach(event: FormEvent) {
     event.preventDefault()
@@ -155,30 +250,32 @@ export function AdminMediaPage() {
       /* API errors shown */
     }
   }
-  async function detach(item: ApiAssetAssociation) {
-    if (
-      !window.confirm(
-        `Gỡ liên kết ${item.assetRole} khỏi nội dung này? Tệp vẫn còn trong thư viện.`,
-      )
-    )
-      return
-    try {
-      if (ownerType === 'lesson')
-        await unlinkLesson.mutateAsync({
-          lessonId: ownerId,
-          assetId: item.assetId,
-          role: item.assetRole,
-        })
-      else
-        await unlinkExercise.mutateAsync({
-          exerciseId: ownerId,
-          assetId: item.assetId,
-          role: item.assetRole,
-        })
-      await associations.refetch()
-    } catch {
-      /* API error below */
-    }
+  function detach(item: ApiAssetAssociation) {
+    dialogs.confirm({
+      title: 'Gỡ liên kết media?',
+      description: `Gỡ liên kết ${item.assetRole} khỏi nội dung này? Tệp vẫn còn trong thư viện.`,
+      confirmLabel: 'Gỡ liên kết',
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          if (ownerType === 'lesson')
+            await unlinkLesson.mutateAsync({
+              lessonId: ownerId,
+              assetId: item.assetId,
+              role: item.assetRole,
+            })
+          else
+            await unlinkExercise.mutateAsync({
+              exerciseId: ownerId,
+              assetId: item.assetId,
+              role: item.assetRole,
+            })
+          await associations.refetch()
+        } catch {
+          /* API error below */
+        }
+      },
+    })
   }
   const mutationError =
     linkLesson.error ?? linkExercise.error ?? unlinkLesson.error ?? unlinkExercise.error
@@ -194,7 +291,7 @@ export function AdminMediaPage() {
           title="Thư viện media"
           description="Chỉ tài sản đã được backend xác minh mới xuất hiện. Storage key và credential không được trả về."
         >
-          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_12rem]">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <AdminField
               label="Tìm kiếm"
               value={search}
@@ -216,6 +313,34 @@ export function AdminMediaPage() {
                 ...['IMAGE', 'VIDEO', 'AUDIO', 'PDF'].map((value) => ({ value, label: value })),
               ]}
             />
+            <AdminSelect
+              label="Trạng thái"
+              value={uploadStatus}
+              onChange={(value) => {
+                setUploadStatus(value)
+                setPage(1)
+              }}
+              options={[
+                { value: '', label: 'Mọi trạng thái' },
+                ...['PENDING', 'READY', 'DELETING', 'DELETED'].map((value) => ({
+                  value,
+                  label: value,
+                })),
+              ]}
+            />
+            <AdminSelect
+              label="Provider"
+              value={provider}
+              onChange={(value) => {
+                setProvider(value)
+                setPage(1)
+              }}
+              options={[
+                { value: '', label: 'Mọi provider' },
+                { value: 'S3_COMPATIBLE', label: 'S3 Compatible' },
+                { value: 'CLOUDINARY', label: 'Cloudinary' },
+              ]}
+            />
           </div>
           {assets.isPending ? (
             <AdminLoading />
@@ -226,26 +351,140 @@ export function AdminMediaPage() {
               {assets.data.items.map((asset) => (
                 <div
                   key={asset.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border-subtle bg-white p-3"
+                  className="grid gap-3 rounded-xl border border-border-subtle bg-white p-3"
                 >
-                  <span className="min-w-0">
-                    <strong className="block truncate">{asset.originalName}</strong>
-                    <span className="text-xs text-ink-secondary">
-                      {asset.mediaType} · {asset.mimeType} ·{' '}
-                      {(asset.fileSize / 1024 / 1024).toFixed(2)} MB · {asset.visibility}
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <span className="min-w-0">
+                      <strong className="block truncate">{asset.originalName}</strong>
+                      <span className="text-xs text-ink-secondary">
+                        {asset.mediaType} · {asset.mimeType} ·{' '}
+                        {(asset.fileSize / 1024 / 1024).toFixed(2)} MB · {asset.visibility}
+                      </span>
+                      <span className="mt-1 block text-xs text-ink-secondary">
+                        {asset.provider ?? 'UNKNOWN'} · {asset.uploadStatus ?? 'READY'} ·{' '}
+                        {formatDateTimeInTimezone(asset.createdAt)} · Dùng tại{' '}
+                        {asset.usageCount ?? 0} vị trí
+                      </span>
+                      <code className="mt-1 block break-all text-[11px] text-ink-muted">
+                        Asset ID: {asset.id}
+                      </code>
                     </span>
-                    <code className="mt-1 block break-all text-[11px] text-ink-muted">
-                      Asset ID: {asset.id}
-                    </code>
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    loading={deleteAsset.isPending}
-                    onClick={() => void removeAsset(asset.id)}
-                  >
-                    Xóa
-                  </Button>
+                    <span className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedAssetId(asset.id)
+                          setPreview(null)
+                          setPreviewError('')
+                        }}
+                        startIcon={<Eye aria-hidden="true" className="size-4" />}
+                      >
+                        Chi tiết
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={(asset.usageCount ?? 0) > 0 || asset.uploadStatus !== 'READY'}
+                        loading={deleteAsset.isPending}
+                        onClick={() => void removeAsset(asset.id)}
+                      >
+                        Xóa
+                      </Button>
+                    </span>
+                  </div>
+                  {selectedAssetId === asset.id && (
+                    <div className="grid gap-3 rounded-xl bg-surface-muted p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <h3 className="font-semibold">Chi tiết tài sản</h3>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          aria-label="Đóng chi tiết media"
+                          onClick={() => {
+                            setSelectedAssetId('')
+                            setPreview(null)
+                          }}
+                        >
+                          <X aria-hidden="true" className="size-4" />
+                        </Button>
+                      </div>
+                      {detail.isPending ? (
+                        <AdminLoading />
+                      ) : detail.isError ? (
+                        <AdminLoadError error={detail.error} retry={() => void detail.refetch()} />
+                      ) : detail.data ? (
+                        <>
+                          <dl className="grid gap-2 text-sm sm:grid-cols-2">
+                            <div>
+                              <dt className="text-ink-muted">Public ID</dt>
+                              <dd>
+                                <code className="break-all">
+                                  {detail.data.media.publicId ?? '—'}
+                                </code>
+                              </dd>
+                            </div>
+                            <div>
+                              <dt className="text-ink-muted">Provider / resource</dt>
+                              <dd>
+                                {detail.data.media.provider} ·{' '}
+                                {detail.data.media.resourceType ?? '—'} ·{' '}
+                                {detail.data.media.deliveryType ?? '—'}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt className="text-ink-muted">Định dạng / trạng thái</dt>
+                              <dd>
+                                {detail.data.media.format ?? detail.data.media.mimeType} ·{' '}
+                                {detail.data.media.uploadStatus}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt className="text-ink-muted">Số tham chiếu</dt>
+                              <dd>{detail.data.references.length}</dd>
+                            </div>
+                          </dl>
+                          <div className="grid gap-2">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <h4 className="font-semibold">Nội dung đang sử dụng</h4>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={detail.data.media.uploadStatus !== 'READY'}
+                                onClick={() => void previewAsset(asset.id)}
+                              >
+                                Tạo bản xem trước tạm thời
+                              </Button>
+                            </div>
+                            {detail.data.references.length ? (
+                              <ul className="grid gap-1 text-sm">
+                                {detail.data.references.map((reference, index) => (
+                                  <li
+                                    key={`${reference.kind}-${reference.parentId}-${reference.role}-${index}`}
+                                  >
+                                    {reference.kind} · {reference.title ?? reference.parentId} ·{' '}
+                                    {reference.role}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="text-sm text-ink-secondary">
+                                Tài sản chưa được liên kết.
+                              </p>
+                            )}
+                          </div>
+                          {previewError && (
+                            <p role="alert" className="text-sm text-danger-foreground">
+                              {previewError}
+                            </p>
+                          )}
+                          {preview?.assetId === asset.id && (
+                            <MediaAssetPreview access={preview} title={asset.originalName} />
+                          )}
+                        </>
+                      ) : null}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -268,14 +507,27 @@ export function AdminMediaPage() {
           title="Tải media lên"
           description="Quy trình gồm upload intent, upload trực tiếp và xác minh hoàn tất từ backend. Tài sản không READY chỉ vì trình duyệt báo tải xong."
         >
+          <p className="rounded-xl bg-surface-muted p-3 text-sm text-ink-secondary">
+            Provider đang hoạt động:{' '}
+            <strong>{capabilities.data?.activeProvider ?? 'chưa cấu hình'}</strong>
+            {capabilities.data && (
+              <> · Loại tệp: {capabilities.data.supportedMediaTypes.join(', ') || 'không có'}</>
+            )}
+          </p>
           <form className="grid gap-3" onSubmit={(event) => void upload(event)}>
             <label className="grid gap-1.5 text-sm font-semibold">
               Tệp
               <input
                 className="min-h-11 w-full rounded-xl border border-border-subtle bg-white p-2 font-normal"
                 type="file"
-                accept="image/*,video/*,audio/*,application/pdf"
-                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                accept={mediaAccept(capabilities.data?.supportedMediaTypes ?? [])}
+                onChange={(event) => {
+                  setFile(event.target.files?.[0] ?? null)
+                  setUploadError(undefined)
+                }}
+                disabled={
+                  progress !== null || capabilities.isPending || !capabilities.data?.activeProvider
+                }
                 required
               />
             </label>
@@ -288,16 +540,33 @@ export function AdminMediaPage() {
                 { value: 'PUBLIC', label: 'Công khai' },
               ]}
             />
-            {progress !== null && (
-              <div role="status" className="text-sm">
-                Đang tải lên {progress}%{' '}
+            {uploadStage === 'preparing' && (
+              <p role="status" className="text-sm text-ink-secondary">
+                Đang tạo lượt tải lên an toàn…
+              </p>
+            )}
+            {uploadStage === 'transferring' && progress !== null && (
+              <div className="text-sm">
+                <p role="status">Đang tải lên {progress}%</p>
                 <progress className="mt-2 block w-full" value={progress} max={100} />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="mt-2"
+                  onClick={() => uploadController.current?.abort()}
+                >
+                  Hủy tải lên
+                </Button>
               </div>
             )}
             <AdminFeedback error={uploadError} success={uploadSuccess} />
             <Button
               type="submit"
               loading={progress !== null}
+              disabled={
+                capabilities.isPending || !capabilities.data?.activeProvider || progress !== null
+              }
               startIcon={<FileUp aria-hidden="true" className="size-4" />}
             >
               Tải lên và xác minh
@@ -415,6 +684,44 @@ export function AdminMediaPage() {
         </div>
       </AdminCard>
     </div>
+  )
+}
+
+function mediaAccept(types: readonly string[]): string {
+  const accepted = new Set<string>()
+  if (types.includes('IMAGE')) accepted.add('.jpg,.jpeg,.png,.webp')
+  if (types.includes('VIDEO')) accepted.add('.mp4')
+  if (types.includes('AUDIO')) accepted.add('.mp3,.m4a,.wav,.ogg')
+  if (types.includes('PDF')) accepted.add('.pdf')
+  return [...accepted].join(',')
+}
+
+function MediaAssetPreview({ access, title }: { access: ApiMediaPreviewAccess; title: string }) {
+  const media: MediaViewModel = {
+    id: access.assetId,
+    title,
+    mediaType: access.mediaType,
+    src: access.url,
+    signedUrlExpiresAt: access.expiresAt,
+    canDownload: false,
+    availability: 'ready',
+  }
+  return (
+    <section className="grid gap-2 rounded-xl border border-border-subtle bg-white p-3">
+      <p className="text-xs text-ink-muted">
+        Bản xem trước · hết hạn {formatDateTimeInTimezone(access.expiresAt)}
+      </p>
+      {access.mediaType === 'PDF' ? <PDFViewer media={media} /> : null}
+      {access.mediaType === 'AUDIO' ? <AudioPlayer media={media} /> : null}
+      {access.mediaType === 'VIDEO' ? <VideoPlayer media={media} /> : null}
+      {access.mediaType === 'IMAGE' ? (
+        <img
+          src={access.url}
+          alt={title}
+          className="max-h-96 max-w-full rounded-lg object-contain"
+        />
+      ) : null}
+    </section>
   )
 }
 

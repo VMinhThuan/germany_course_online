@@ -237,19 +237,33 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
 }
 
 export async function uploadWithProgress(
-  url: string,
+  instruction: {
+    url: string
+    method: 'PUT' | 'POST'
+    headers?: Record<string, string>
+    fields?: Record<string, string>
+  },
   file: File,
   onProgress: (percent: number) => void,
   signal?: AbortSignal,
 ) {
   return new Promise<void>((resolve, reject) => {
     const request = new XMLHttpRequest()
-    request.open('PUT', url)
-    request.setRequestHeader('Content-Type', file.type)
+    const cleanup = () => signal?.removeEventListener('abort', abort)
+    const abort = () => request.abort()
+    request.open(instruction.method, instruction.url)
+    for (const [name, value] of Object.entries(instruction.headers ?? {}))
+      request.setRequestHeader(name, value)
+    const body = new FormData()
+    if (instruction.method === 'POST') {
+      for (const [name, value] of Object.entries(instruction.fields ?? {})) body.append(name, value)
+      body.append('file', file, file.name)
+    }
     request.upload.onprogress = (event) => {
       if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100))
     }
     request.onload = () => {
+      cleanup()
       if (request.status >= 200 && request.status < 300) resolve()
       else
         reject(
@@ -260,7 +274,8 @@ export async function uploadWithProgress(
           }),
         )
     }
-    request.onerror = () =>
+    request.onerror = () => {
+      cleanup()
       reject(
         new ApiError({
           status: 0,
@@ -268,12 +283,20 @@ export async function uploadWithProgress(
           message: 'Không thể kết nối nhà cung cấp lưu trữ tệp.',
         }),
       )
-    request.onabort = () =>
+    }
+    request.onabort = () => {
+      cleanup()
       reject(
         new ApiError({ status: 0, code: 'REQUEST_ABORTED', message: 'Lượt tải lên đã bị hủy.' }),
       )
-    if (signal?.aborted) request.abort()
-    else signal?.addEventListener('abort', () => request.abort(), { once: true })
-    request.send(file)
+    }
+    if (signal?.aborted) {
+      reject(
+        new ApiError({ status: 0, code: 'REQUEST_ABORTED', message: 'Lượt tải lên đã bị hủy.' }),
+      )
+      return
+    }
+    signal?.addEventListener('abort', abort, { once: true })
+    request.send(instruction.method === 'PUT' ? file : body)
   })
 }

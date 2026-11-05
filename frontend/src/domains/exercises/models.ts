@@ -4,12 +4,15 @@ import type {
   ExerciseType,
   ProgressStatus,
 } from '@/domains/contracts/backend-enums'
+import type { MediaType } from '@/domains/contracts/backend-enums'
 
 export interface ExerciseAssetViewModel {
   id: string
   title: string
   role: ExerciseAssetRole
+  mediaType?: MediaType
   src?: string
+  signedUrlExpiresAt?: string
   canDownload: boolean
   availability?: 'ready' | 'loading' | 'error' | 'unavailable'
   message?: string

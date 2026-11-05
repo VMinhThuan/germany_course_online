@@ -2,6 +2,7 @@ import { BookOpenText, CircleHelp, ExternalLink, ShieldAlert, TriangleAlert } fr
 import { brandConfig } from '@/config/brand'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { BaseDialog } from '@/shared/ui/dialogs'
+import { useNotifications } from '@/shared/ui/notifications'
 import { Badge, Button, Card, Container, PageHeader, SelectField } from '@/shared/ui'
 import {
   AccountEmptyState,
@@ -147,9 +148,9 @@ export function LmsKitPage() {
   const [storedData, setData] = useState<DemoData | undefined>()
   const [attempt, setAttempt] = useState<QuizAttemptViewModel>()
   const [noteValue, setNoteValue] = useState('')
-  const [demoNotice, setDemoNotice] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
   const requestSequence = useRef(0)
+  const notifications = useNotifications()
 
   const repository: LmsRepository = useMemo(
     () =>
@@ -352,14 +353,6 @@ export function LmsKitPage() {
                 },
               ]}
             />
-            {demoNotice && (
-              <p
-                role="status"
-                className="rounded-xl bg-surface-blue p-3 text-sm text-ink-secondary"
-              >
-                {demoNotice}
-              </p>
-            )}
             <div id="course-grid" className="scroll-mt-6 space-y-4">
               <h3 className="font-display text-xl font-bold">Khóa học có sẵn</h3>
               <CourseGrid
@@ -367,7 +360,8 @@ export function LmsKitPage() {
                 loading={isLoading}
                 {...(data.error ? { error: data.error.message } : {})}
                 onOpenCourse={(course) => {
-                  setDemoNotice(
+                  notifications.info(
+                    'Đã chọn khóa học',
                     `Đã chọn ${course.code}; phần chi tiết được trình bày ngay bên dưới.`,
                   )
                   jumpTo('course-outline')
@@ -522,7 +516,9 @@ export function LmsKitPage() {
                 <MediaLoadingState />
                 <MediaErrorState
                   message="URL tạm thời không còn hoạt động."
-                  onRetry={() => setDemoNotice('Đã chạy callback thử lại media.')}
+                  onRetry={() =>
+                    notifications.info('Đã thử lại media', 'Callback thử lại đã chạy.')
+                  }
                 />
                 <MediaUnavailableState />
               </div>
@@ -543,7 +539,8 @@ export function LmsKitPage() {
                   onComplete={async () => {
                     const next = await repository.completeExercise(data.exercise!.id)
                     setData((previous) => (previous ? { ...previous, exercise: next } : previous))
-                    setDemoNotice(
+                    notifications.success(
+                      'Đã hoàn thành bài tập',
                       'Mock repository trả về trạng thái COMPLETED và capability xem lời giải.',
                     )
                   }}
@@ -583,7 +580,8 @@ export function LmsKitPage() {
                 result={MOCK_QUIZ_RESULT}
                 onRetry={() => {
                   setScenario('quiz_in_progress')
-                  setDemoNotice(
+                  notifications.info(
+                    'Đã mở lượt làm mới',
                     'Đã chuyển sang kịch bản có attempt mới theo capability retry của fixture.',
                   )
                 }}
@@ -698,7 +696,10 @@ export function LmsKitPage() {
                     status: 'ACTIVE',
                   }}
                   onSelect={() =>
-                    setDemoNotice('Gói gia hạn chỉ được chọn trong UI; không tạo order.')
+                    notifications.info(
+                      'Đã chọn gói gia hạn',
+                      'Gói chỉ được chọn trong giao diện demo; không tạo đơn hàng.',
+                    )
                   }
                 />
               </div>
@@ -912,7 +913,7 @@ export function LmsKitPage() {
                   onClick={() => {
                     setScenario('payment_pending')
                     setResponseMode('success')
-                    setDemoNotice('Đã nạp lại đơn PENDING: chưa có enrollment.')
+                    notifications.info('Đã nạp đơn chờ', 'Đơn PENDING chưa có enrollment.')
                   }}
                 >
                   Xem đơn đang chờ
@@ -922,7 +923,10 @@ export function LmsKitPage() {
                   onClick={() => {
                     setScenario('payment_confirmed')
                     setResponseMode('success')
-                    setDemoNotice('Đã nạp fixture payment_confirmed và enrollment ACTIVE.')
+                    notifications.success(
+                      'Đã nạp đơn đã xác nhận',
+                      'Fixture payment_confirmed có enrollment ACTIVE.',
+                    )
                   }}
                 >
                   Nạp fixture đã xác nhận
@@ -955,14 +959,6 @@ export function LmsKitPage() {
                     </div>
                   </div>
                 </div>
-              )}
-              {demoNotice && (
-                <p
-                  role="status"
-                  className="rounded-xl bg-card-surface p-3 text-sm text-ink-secondary"
-                >
-                  {demoNotice}
-                </p>
               )}
             </Card>
           </section>

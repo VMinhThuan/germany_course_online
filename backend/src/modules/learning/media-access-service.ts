@@ -4,10 +4,14 @@ import {
   LessonAsset,
   MediaAsset,
 } from "../../db/models/index.js";
+import type { MediaProvider } from "../../config/env.js";
 import { AppError, notFound } from "../../shared/errors.js";
 import type { MediaAccessBody } from "./schemas.js";
 import type { LearningService } from "./service.js";
-import type { MediaStorageAdapter } from "./media-storage.js";
+import type {
+  MediaResourceType,
+  MediaStorageAdapter,
+} from "./media-storage.js";
 
 export class MediaAccessService {
   constructor(
@@ -45,22 +49,30 @@ export class MediaAccessService {
       deletedAt: null,
       uploadStatus: { $nin: ["PENDING", "DELETING", "DELETED"] },
     })
-      .select("+provider +storageKey")
+      .select(
+        "+provider +storageKey +resourceType +deliveryType +providerAssetId",
+      )
       .lean();
     if (!asset) throw notFound();
     if (!roleMatchesMediaType(role, asset.mediaType)) throw notFound();
-    if (asset.provider !== "S3_COMPATIBLE") {
+    const adapter = resolveMediaStorage(this.storage, asset.provider);
+    if (!adapter) {
       throw new AppError(
         503,
         "MEDIA_STORAGE_UNAVAILABLE",
-        "Protected media delivery is not configured for this asset.",
+        "Protected media delivery is not configured for the provider stored on this asset.",
       );
     }
 
     try {
-      const signed = await this.storage.signRead({
+      const signed = await adapter.signRead({
         storageKey: asset.storageKey,
         mimeType: asset.mimeType,
+        mediaType: asset.mediaType,
+        resourceType: asset.resourceType as MediaResourceType | null,
+        deliveryType: asset.deliveryType as
+          "upload" | "private" | "authenticated" | null,
+        format: asset.format ?? null,
       });
       return {
         assetId: asset._id.toString(),
@@ -77,6 +89,20 @@ export class MediaAccessService {
       );
     }
   }
+}
+
+function resolveMediaStorage(
+  storage: MediaStorageAdapter,
+  providerValue: unknown,
+): MediaStorageAdapter | undefined {
+  if (providerValue !== "S3_COMPATIBLE" && providerValue !== "CLOUDINARY")
+    return undefined;
+  const provider = providerValue as MediaProvider;
+  const resolved = storage.resolve?.(provider);
+  if (resolved) return resolved;
+  if (!storage.resolve && (!storage.provider || storage.provider === provider))
+    return storage;
+  return undefined;
 }
 
 function roleMatchesMediaType(role: string, mediaType: string): boolean {

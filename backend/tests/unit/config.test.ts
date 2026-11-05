@@ -195,6 +195,53 @@ describe("parseEnvironment", () => {
     ).toBe("https://objects.example.test");
   });
 
+  it("requires one selected, complete Cloudinary account and validates managed folders", () => {
+    const cloudinary = {
+      MEDIA_PROVIDER: "CLOUDINARY",
+      CLOUDINARY_CLOUD_NAME: "cloud-test-123",
+      CLOUDINARY_API_KEY: "test-api-key",
+      CLOUDINARY_API_SECRET: "test-only-cloudinary-secret",
+    };
+    expect(parseEnvironment({ ...baseEnv, ...cloudinary })).toMatchObject({
+      mediaProvider: "CLOUDINARY",
+      cloudinaryMedia: {
+        cloudName: "cloud-test-123",
+        pdfFolder: "lesson-pdf",
+        audioFolder: "quiz-audio",
+        folderMode: "dynamic",
+      },
+    });
+    expect(() =>
+      parseEnvironment({
+        ...baseEnv,
+        CLOUDINARY_CLOUD_NAME: "cloud-test-123",
+        CLOUDINARY_API_KEY: "test-api-key",
+        CLOUDINARY_API_SECRET: "test-only-cloudinary-secret",
+      }),
+    ).toThrow(/MEDIA_PROVIDER/);
+    expect(() =>
+      parseEnvironment({
+        ...baseEnv,
+        ...cloudinary,
+        CLOUDINARY_PDF_FOLDER: "../outside",
+      }),
+    ).toThrow(/CLOUDINARY_PDF_FOLDER/);
+    expect(() =>
+      parseEnvironment({
+        ...baseEnv,
+        ...cloudinary,
+        CLOUDINARY_AUDIO_FOLDER: "lesson-pdf",
+      }),
+    ).toThrow(/folders must be different/);
+    expect(() =>
+      parseEnvironment({
+        ...baseEnv,
+        ...cloudinary,
+        CLOUDINARY_AUDIO_FOLDER: "lesson-pdf/audio",
+      }),
+    ).toThrow(/folders must be different/);
+  });
+
   it("requires HTTPS for production origins and password-reset links", () => {
     const production = {
       ...baseEnv,

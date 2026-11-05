@@ -1,7 +1,8 @@
 import { CheckCircle2, FileQuestion, LockKeyhole } from 'lucide-react'
 import { useState } from 'react'
 import { Badge, Button, Card, CardHeader, InlineAlert } from '@/shared/ui'
-import { MediaFallbackLink } from '@/domains/media/components'
+import { AudioPlayer, PDFViewer, VideoPlayer } from '@/domains/media/components'
+import type { MediaViewModel } from '@/domains/media'
 import type { ExerciseViewModel } from './models'
 import { SemanticHeading, type HeadingLevel } from '@/domains/shared/heading'
 
@@ -54,29 +55,11 @@ export function ExerciseAssetList({ exercise }: { exercise: ExerciseViewModel })
       </p>
     )
   return (
-    <ul aria-label="Tài liệu bài tập" className="grid gap-2">
+    <div aria-label="Tài liệu bài tập" className="grid gap-4">
       {questionAssets.map((asset) => (
-        <li
-          key={asset.id}
-          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border-subtle p-3"
-        >
-          <span className="flex min-w-0 items-center gap-2 font-medium">
-            <FileQuestion aria-hidden="true" className="size-4 shrink-0 text-action-primary" />
-            {asset.title}
-          </span>
-          <MediaFallbackLink
-            {...(asset.src ? { src: asset.src } : {})}
-            title={asset.title}
-            canDownload={asset.canDownload}
-          />
-          {asset.availability && asset.availability !== 'ready' && (
-            <span className="basis-full text-xs leading-5 text-ink-secondary">
-              {asset.message ?? 'Tài liệu media tạm thời chưa sẵn sàng.'}
-            </span>
-          )}
-        </li>
+        <ExerciseAssetPlayer key={asset.id} asset={asset} />
       ))}
-    </ul>
+    </div>
   )
 }
 
@@ -178,18 +161,7 @@ export function ExerciseSolutionPanel({ exercise }: { exercise: ExerciseViewMode
         <ul className="grid gap-2">
           {solutions.map((asset) => (
             <li key={asset.id}>
-              <div className="grid gap-1">
-                {asset.availability && asset.availability !== 'ready' && (
-                  <p className="text-xs leading-5 text-ink-secondary">
-                    {asset.message ?? 'Tài liệu lời giải tạm thời chưa sẵn sàng.'}
-                  </p>
-                )}
-                <MediaFallbackLink
-                  {...(asset.src ? { src: asset.src } : {})}
-                  title={asset.title}
-                  canDownload={asset.canDownload}
-                />
-              </div>
+              <ExerciseAssetPlayer asset={asset} />
             </li>
           ))}
         </ul>
@@ -197,5 +169,30 @@ export function ExerciseSolutionPanel({ exercise }: { exercise: ExerciseViewMode
         <p className="text-sm text-ink-secondary">Chưa có lời giải cho bài tập này.</p>
       )}
     </section>
+  )
+}
+
+function ExerciseAssetPlayer({ asset }: { asset: ExerciseViewModel['assets'][number] }) {
+  const mediaType =
+    asset.mediaType ??
+    (asset.role.includes('VIDEO') ? 'VIDEO' : asset.role.includes('AUDIO') ? 'AUDIO' : 'PDF')
+  const media: MediaViewModel = {
+    id: asset.id,
+    title: asset.title,
+    mediaType,
+    ...(asset.src ? { src: asset.src } : {}),
+    ...(asset.signedUrlExpiresAt ? { signedUrlExpiresAt: asset.signedUrlExpiresAt } : {}),
+    canDownload: false,
+    availability: asset.availability ?? (asset.src ? 'ready' : 'unavailable'),
+    ...(asset.message ? { message: asset.message } : {}),
+  }
+  if (mediaType === 'PDF') return <PDFViewer media={media} />
+  if (mediaType === 'AUDIO') return <AudioPlayer media={media} />
+  if (mediaType === 'VIDEO') return <VideoPlayer media={media} />
+  return (
+    <p className="rounded-xl border border-border-subtle p-3 text-sm text-ink-secondary">
+      <FileQuestion aria-hidden="true" className="mr-2 inline size-4" />
+      {asset.title}
+    </p>
   )
 }

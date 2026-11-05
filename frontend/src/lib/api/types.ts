@@ -207,6 +207,7 @@ export interface ApiLessonWorkspace {
   title: string
   description: string
   content: unknown
+  video: ApiLessonVideo | null
   lessonType: 'LECTURE' | 'PRACTICE'
   estimatedMinutes: number | null
   countsTowardProgress: boolean
@@ -215,6 +216,11 @@ export interface ApiLessonWorkspace {
   exercises: ApiExercise[]
   canCompleteLesson: boolean
   outstandingRequiredCount: number
+}
+
+export interface ApiLessonVideo {
+  provider: 'YOUTUBE'
+  videoId: string
 }
 
 export interface ApiMediaAccess {
@@ -394,6 +400,7 @@ export interface ApiAdminLesson {
   title: string
   description: string | null
   content: { version: number; paragraphs: string[] } | null
+  video: ApiLessonVideo | null
   lessonType: 'LECTURE' | 'PRACTICE'
   estimatedMinutes: number | null
   countsTowardProgress: boolean
@@ -595,6 +602,14 @@ export interface ApiAdminMediaAsset {
   visibility: 'PUBLIC' | 'ENROLLED'
   uploadedById: string | null
   createdAt: string
+  provider?: 'S3_COMPATIBLE' | 'CLOUDINARY' | 'UNKNOWN'
+  publicId?: string | null
+  resourceType?: 'image' | 'video' | 'raw' | null
+  deliveryType?: 'upload' | 'private' | 'authenticated' | null
+  format?: string | null
+  uploadStatus?: 'PENDING' | 'READY' | 'DELETING' | 'DELETED'
+  uploadExpiresAt?: string | null
+  usageCount?: number
 }
 
 export interface ApiAssetAssociation {
@@ -620,6 +635,33 @@ export interface ApiAuditLog {
 
 export interface ApiMediaUploadIntent {
   assetId: string
+  provider: 'S3_COMPATIBLE' | 'CLOUDINARY'
   uploadUrl: string
+  uploadMethod: 'PUT' | 'POST'
+  uploadHeaders: Record<string, string>
+  uploadFields: Record<string, string>
   expiresAt: string
+}
+
+export interface ApiAdminMediaDetail {
+  media: ApiAdminMediaAsset
+  references: Array<{
+    kind: 'LESSON' | 'EXERCISE' | 'COURSE' | 'USER_PROFILE' | 'SITE_SETTINGS'
+    parentId: string
+    role: string
+    title: string | null
+  }>
+}
+
+export interface ApiMediaPreviewAccess {
+  assetId: string
+  url: string
+  expiresAt: string
+  mediaType: 'IMAGE' | 'VIDEO' | 'AUDIO' | 'PDF'
+  mimeType: string
+}
+
+export interface ApiMediaCapabilities {
+  activeProvider: 'S3_COMPATIBLE' | 'CLOUDINARY' | null
+  supportedMediaTypes: Array<'IMAGE' | 'VIDEO' | 'AUDIO' | 'PDF'>
 }

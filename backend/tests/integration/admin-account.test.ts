@@ -64,7 +64,10 @@ class FakeMediaStorage implements MediaStorageAdapter {
       contentType: input.mimeType,
     });
     return {
+      provider: "S3_COMPATIBLE" as const,
+      method: "PUT" as const,
       url: `https://storage.example.test/upload/${encodeURIComponent(input.storageKey)}`,
+      headers: { "Content-Type": input.mimeType },
       expiresAt: new Date(Date.now() + input.expiresInSeconds * 1000),
     };
   }
@@ -320,6 +323,7 @@ describe("BE-03B Admin CMS, media, account security, enrollment and audit APIs",
       title: "Hallo",
       description: "Greeting",
       content: { version: 1, paragraphs: ["Hallo!"] },
+      video: { provider: "YOUTUBE", videoId: "lamg3tUwct4" },
       lessonType: "LECTURE",
       estimatedMinutes: 5,
       countsTowardProgress: true,
@@ -327,6 +331,10 @@ describe("BE-03B Admin CMS, media, account security, enrollment and audit APIs",
       status: "PUBLISHED",
     });
     expect(lesson.status).toBe(201);
+    expect(lesson.body.data.video).toEqual({
+      provider: "YOUTUBE",
+      videoId: "lamg3tUwct4",
+    });
     const before = await request(app).get(
       `/api/v1/courses/${created.body.data.slug}`,
     );
@@ -415,6 +423,19 @@ describe("BE-03B Admin CMS, media, account security, enrollment and audit APIs",
       status: "DRAFT",
     });
     expect(large.status).toBe(400);
+    const invalidVideo = await as(
+      admin,
+      "post",
+      `/api/v1/admin/sections/${section.id}/lessons`,
+    ).send({
+      title: "invalid video",
+      video: { provider: "YOUTUBE", videoId: "too-short" },
+      lessonType: "LECTURE",
+      countsTowardProgress: true,
+      sortOrder: 2,
+      status: "DRAFT",
+    });
+    expect(invalidVideo.status).toBe(400);
   });
 
   it("rejects impossible exercise modes and publishes valid required quizzes", async () => {

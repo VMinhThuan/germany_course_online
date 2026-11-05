@@ -5,6 +5,7 @@ import { ChevronRight, CircleCheck } from 'lucide-react'
 import { adminRepository } from '@/data/api/admin-repository'
 import type { ApiRenewalPlan } from '@/lib/api/types'
 import { formatDateTimeInTimezone, formatVnd } from '@/shared/lib/format'
+import { useDialogs } from '@/shared/ui/dialogs'
 import { Button, EmptyState, Pagination } from '@/shared/ui'
 import {
   AdminCard,
@@ -19,6 +20,7 @@ import {
 } from './shared'
 
 export function AdminOrdersPage({ orderId }: { orderId?: string }) {
+  const dialogs = useDialogs()
   const [page, setPage] = useState(1)
   const [status, setStatus] = useState('')
   const [transferSubmitted, setTransferSubmitted] = useState('')
@@ -72,39 +74,50 @@ export function AdminOrdersPage({ orderId }: { orderId?: string }) {
         />
       )
     const { order, student, course, couponReservation, existingEnrollment } = detail.data
-    async function approveFunds() {
+    function approveFunds() {
       if (order.status !== 'PENDING' || !order.paymentSubmittedAt) return
-      if (
-        !window.confirm(
-          'Bạn đã đối soát và xác nhận khoản tiền này thực sự vào tài khoản ngân hàng? Thao tác sẽ đánh dấu PAID và cấp/gia hạn Enrollment.',
-        )
-      )
-        return
-      try {
-        await approve.mutateAsync({ id: order.id, reviewNote: note.trim() })
-        setSuccess('Backend đã duyệt đơn và cập nhật quyền học.')
-      } catch {
-        /* API error below */
-      }
+      dialogs.confirm({
+        title: 'Duyệt đơn đã nhận tiền?',
+        description:
+          'Chỉ tiếp tục nếu bạn đã đối soát và xác nhận khoản tiền thực sự vào tài khoản ngân hàng. Thao tác sẽ đánh dấu PAID và cấp hoặc gia hạn Enrollment.',
+        confirmLabel: 'Duyệt đơn và cấp quyền học',
+        onConfirm: async () => {
+          try {
+            await approve.mutateAsync({ id: order.id, reviewNote: note.trim() })
+            setSuccess('Backend đã duyệt đơn và cập nhật quyền học.')
+          } catch {
+            /* API error below */
+          }
+        },
+      })
     }
-    async function cancelOrder(event: FormEvent) {
+    function cancelOrder(event: FormEvent) {
       event.preventDefault()
       if (order.status !== 'PENDING' || !reason.trim()) return
       const confirmation =
         reconciliation === 'REFUND_CONFIRMED_EXTERNALLY'
           ? 'Bạn xác nhận đã tự xử lý hoàn tiền bên ngoài ứng dụng?'
           : 'Bạn đã đối soát và xác nhận không nhận được tiền?'
-      if (!window.confirm(`${confirmation} API chỉ ghi nhận xác nhận, không thực hiện hoàn tiền.`))
-        return
-      try {
-        await cancel.mutateAsync({
-          id: order.id,
-          input: { reason: reason.trim(), reconciliationOutcome: reconciliation },
-        })
-        setSuccess('Đã cập nhật hủy đơn theo kết quả đối soát bạn xác nhận.')
-      } catch {
-        /* API error below */
-      }
+      dialogs.confirm({
+        title:
+          reconciliation === 'REFUND_CONFIRMED_EXTERNALLY'
+            ? 'Xác nhận đã hoàn tiền bên ngoài?'
+            : 'Xác nhận không nhận được tiền?',
+        description: `${confirmation} API chỉ ghi nhận xác nhận; không thực hiện hoàn tiền.`,
+        confirmLabel: 'Xác nhận kết quả đối soát',
+        destructive: true,
+        onConfirm: async () => {
+          try {
+            await cancel.mutateAsync({
+              id: order.id,
+              input: { reason: reason.trim(), reconciliationOutcome: reconciliation },
+            })
+            setSuccess('Đã cập nhật hủy đơn theo kết quả đối soát bạn xác nhận.')
+          } catch {
+            /* API error below */
+          }
+        },
+      })
     }
     return (
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(19rem,0.75fr)]">
@@ -356,6 +369,7 @@ export function AdminOrdersPage({ orderId }: { orderId?: string }) {
 }
 
 export function AdminRenewalPlansPage() {
+  const dialogs = useDialogs()
   const courses = useQuery({
     queryKey: ['admin', 'courses'],
     queryFn: () => adminRepository.listCourses(),
@@ -427,14 +441,21 @@ export function AdminRenewalPlansPage() {
       /* errors shown */
     }
   }
-  async function turnOff(plan: ApiRenewalPlan) {
-    if (!window.confirm(`Ngừng bán gói “${plan.title}”?`)) return
-    try {
-      await deactivate.mutateAsync(plan.id)
-      setSuccess('Đã ngừng bán gói.')
-    } catch {
-      /* API error below */
-    }
+  function turnOff(plan: ApiRenewalPlan) {
+    dialogs.confirm({
+      title: 'Ngừng bán gói này?',
+      description: `Ngừng bán gói “${plan.title}”?`,
+      confirmLabel: 'Ngừng bán gói',
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await deactivate.mutateAsync(plan.id)
+          setSuccess('Đã ngừng bán gói.')
+        } catch {
+          /* API error below */
+        }
+      },
+    })
   }
 
   return (
@@ -566,6 +587,7 @@ export function AdminRenewalPlansPage() {
 }
 
 export function AdminCouponsPage() {
+  const dialogs = useDialogs()
   const [page, setPage] = useState(1)
   const [filter, setFilter] = useState('')
   const [couponId, setCouponId] = useState('')
@@ -643,15 +665,21 @@ export function AdminCouponsPage() {
       /* API error below */
     }
   }
-  async function deactivateCoupon(id: string) {
-    if (!window.confirm('Ngừng sử dụng coupon này? Reservations hiện có được xử lý theo backend.'))
-      return
-    try {
-      await deactivate.mutateAsync(id)
-      setSuccess('Đã ngừng sử dụng coupon.')
-    } catch {
-      /* API error below */
-    }
+  function deactivateCoupon(id: string) {
+    dialogs.confirm({
+      title: 'Ngừng sử dụng coupon này?',
+      description: 'Reservations hiện có được xử lý theo backend.',
+      confirmLabel: 'Ngừng sử dụng coupon',
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await deactivate.mutateAsync(id)
+          setSuccess('Đã ngừng sử dụng coupon.')
+        } catch {
+          /* API error below */
+        }
+      },
+    })
   }
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,0.72fr)]">

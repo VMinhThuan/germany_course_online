@@ -7,6 +7,18 @@ import mongoose, {
 
 const models = mongoose.models;
 
+const lessonVideoSchema = new Schema(
+  {
+    provider: { type: String, enum: ["YOUTUBE"], required: true },
+    videoId: {
+      type: String,
+      required: true,
+      match: /^[A-Za-z0-9_-]{11}$/,
+    },
+  },
+  { _id: false, strict: "throw" },
+);
+
 const lessonSchema = new Schema(
   {
     sectionId: {
@@ -17,6 +29,7 @@ const lessonSchema = new Schema(
     title: { type: String, required: true, trim: true, maxlength: 180 },
     description: { type: String, default: "" },
     content: { type: Schema.Types.Mixed, default: null, select: false },
+    video: { type: lessonVideoSchema, default: null },
     lessonType: { type: String, enum: ["LECTURE", "PRACTICE"], required: true },
     estimatedMinutes: {
       type: Number,

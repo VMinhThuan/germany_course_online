@@ -5,6 +5,8 @@ import { Check, ChevronRight, ExternalLink, Plus, Save, Trash2 } from 'lucide-re
 import { adminRepository } from '@/data/api/admin-repository'
 import type { ApiAdminCourse } from '@/lib/api/types'
 import { formatVnd } from '@/shared/lib/format'
+import { useDialogs } from '@/shared/ui/dialogs'
+import { useNotifications } from '@/shared/ui/notifications'
 import { Button, EmptyState, Pagination } from '@/shared/ui'
 import {
   AdminCard,
@@ -45,6 +47,7 @@ function exercisePath(courseId: string, sectionId: string, lessonId: string, exe
 }
 
 export function AdminCoursesPage() {
+  const notifications = useNotifications()
   const [page, setPage] = useState(1)
   const courses = useQuery({
     queryKey: ['admin', 'courses', page],
@@ -102,6 +105,7 @@ export function AdminCoursesPage() {
       const course = await create.mutateAsync({ input, key: idempotency.get(input) })
       idempotency.clear()
       setSuccess('Đã tạo khóa học nháp.')
+      notifications.success('Đã tạo khóa học nháp.')
       navigate(coursePath(course.id))
     } catch {
       /* The API error is displayed below. */
@@ -239,6 +243,7 @@ export function AdminCoursesPage() {
 }
 
 export function AdminCourseEditorPage({ courseId }: { courseId: string }) {
+  const dialogs = useDialogs()
   const [sectionPage, setSectionPage] = useState(1)
   const course = useQuery({
     queryKey: ['admin', 'course', courseId],
@@ -328,14 +333,21 @@ export function AdminCourseEditorPage({ courseId }: { courseId: string }) {
       /* error shown below */
     }
   }
-  async function deleteCourse() {
-    if (!window.confirm('Xóa mềm khóa học này? Lịch sử học viên được giữ nguyên.')) return
-    try {
-      await remove.mutateAsync()
-      navigate('/admin/courses')
-    } catch {
-      /* error shown below */
-    }
+  function deleteCourse() {
+    dialogs.confirm({
+      title: 'Xóa mềm khóa học này?',
+      description: 'Lịch sử học viên được giữ nguyên.',
+      confirmLabel: 'Xóa mềm',
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await remove.mutateAsync()
+          navigate('/admin/courses')
+        } catch {
+          /* error shown below */
+        }
+      },
+    })
   }
 
   return (
@@ -554,6 +566,7 @@ export function AdminSectionEditorPage({
   courseId: string
   sectionId: string
 }) {
+  const dialogs = useDialogs()
   const [lessonPage, setLessonPage] = useState(1)
   const sections = useQuery({
     queryKey: ['admin', 'sections', courseId],
@@ -639,14 +652,21 @@ export function AdminSectionEditorPage({
       /* error shown */
     }
   }
-  async function deleteSelectedSection() {
-    if (!window.confirm('Xóa mềm chương này?')) return
-    try {
-      await remove.mutateAsync(sectionId)
-      navigate(coursePath(courseId))
-    } catch {
-      /* error shown */
-    }
+  function deleteSelectedSection() {
+    dialogs.confirm({
+      title: 'Xóa mềm chương này?',
+      description: 'Chương này sẽ không còn xuất hiện trong khóa học.',
+      confirmLabel: 'Xóa mềm',
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await remove.mutateAsync(sectionId)
+          navigate(coursePath(courseId))
+        } catch {
+          /* error shown */
+        }
+      },
+    })
   }
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(20rem,0.7fr)_minmax(0,1.3fr)]">
@@ -743,6 +763,8 @@ export function AdminLessonEditorPage({
   sectionId: string
   lessonId: string
 }) {
+  const dialogs = useDialogs()
+  const notifications = useNotifications()
   const [exercisePage, setExercisePage] = useState(1)
   const lessons = useQuery({
     queryKey: ['admin', 'lessons', sectionId],
@@ -768,6 +790,7 @@ export function AdminLessonEditorPage({
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [paragraphs, setParagraphs] = useState('')
+  const [youtubeVideoId, setYoutubeVideoId] = useState('')
   const [lessonType, setLessonType] = useState<'LECTURE' | 'PRACTICE'>('LECTURE')
   const [estimatedMinutes, setEstimatedMinutes] = useState('')
   const [sortOrder, setSortOrder] = useState(0)
@@ -784,6 +807,7 @@ export function AdminLessonEditorPage({
       setTitle(lesson.title)
       setDescription(lesson.description ?? '')
       setParagraphs(lesson.content?.paragraphs.join('\n\n') ?? '')
+      setYoutubeVideoId(lesson.video?.provider === 'YOUTUBE' ? lesson.video.videoId : '')
       setLessonType(lesson.lessonType)
       setEstimatedMinutes(lesson.estimatedMinutes == null ? '' : String(lesson.estimatedMinutes))
       setSortOrder(lesson.sortOrder)
@@ -819,6 +843,9 @@ export function AdminLessonEditorPage({
           title,
           description: description || null,
           content,
+          video: youtubeVideoId.trim()
+            ? { provider: 'YOUTUBE', videoId: youtubeVideoId.trim() }
+            : null,
           lessonType,
           estimatedMinutes: estimatedMinutes ? Number(estimatedMinutes) : null,
           countsTowardProgress,
@@ -849,20 +876,29 @@ export function AdminLessonEditorPage({
       setNewExercise('')
       setNewExerciseInstructions('')
       setSuccess('Đã tạo bài tập nháp.')
-      if (result.exerciseType === 'QUIZ')
+      if (result.exerciseType === 'QUIZ') {
+        notifications.success('Đã tạo bài tập nháp.')
         navigate(exercisePath(courseId, sectionId, lessonId, result.id))
+      }
     } catch {
       /* error shown */
     }
   }
-  async function deleteSelectedLesson() {
-    if (!window.confirm('Xóa mềm bài học này?')) return
-    try {
-      await remove.mutateAsync(lessonId)
-      navigate(sectionPath(courseId, sectionId))
-    } catch {
-      /* error shown */
-    }
+  function deleteSelectedLesson() {
+    dialogs.confirm({
+      title: 'Xóa mềm bài học này?',
+      description: 'Bài học này sẽ không còn xuất hiện trong chương.',
+      confirmLabel: 'Xóa mềm',
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await remove.mutateAsync(lessonId)
+          navigate(sectionPath(courseId, sectionId))
+        } catch {
+          /* error shown */
+        }
+      },
+    })
   }
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(20rem,0.8fr)_minmax(0,1.2fr)]">
@@ -878,6 +914,13 @@ export function AdminLessonEditorPage({
             value={paragraphs}
             onChange={setParagraphs}
             rows={8}
+          />
+          <AdminField
+            label="YouTube Video ID"
+            value={youtubeVideoId}
+            onChange={setYoutubeVideoId}
+            maxLength={11}
+            placeholder="Ví dụ: lamg3tUwct4"
           />
           <div className="grid gap-3 sm:grid-cols-3">
             <AdminSelect
@@ -1012,6 +1055,7 @@ export function AdminExerciseEditorPage({
   lessonId: string
   exerciseId: string
 }) {
+  const dialogs = useDialogs()
   const exercises = useQuery({
     queryKey: ['admin', 'exercises', lessonId],
     queryFn: () => adminRepository.listExercises(lessonId),
@@ -1071,14 +1115,21 @@ export function AdminExerciseEditorPage({
       /* error shown */
     }
   }
-  async function deleteSelected() {
-    if (!window.confirm('Xóa mềm bài tập này?')) return
-    try {
-      await remove.mutateAsync(exerciseId)
-      navigate(lessonPath(courseId, sectionId, lessonId))
-    } catch {
-      /* error shown */
-    }
+  function deleteSelected() {
+    dialogs.confirm({
+      title: 'Xóa mềm bài tập này?',
+      description: 'Bài tập này sẽ không còn xuất hiện trong bài học.',
+      confirmLabel: 'Xóa mềm',
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await remove.mutateAsync(exerciseId)
+          navigate(lessonPath(courseId, sectionId, lessonId))
+        } catch {
+          /* error shown */
+        }
+      },
+    })
   }
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(20rem,0.8fr)_minmax(0,1.2fr)]">

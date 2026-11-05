@@ -64,7 +64,35 @@ const environmentSchema = z.object({
     .min(60)
     .max(900)
     .default(300),
+  MEDIA_PROVIDER: optionalText.pipe(
+    z.enum(["S3_COMPATIBLE", "CLOUDINARY"]).optional(),
+  ),
+  CLOUDINARY_CLOUD_NAME: optionalText.pipe(
+    z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{1,120}$/)
+      .optional(),
+  ),
+  CLOUDINARY_API_KEY: optionalText,
+  CLOUDINARY_API_SECRET: optionalText,
+  CLOUDINARY_PDF_FOLDER: optionalText.pipe(
+    z
+      .string()
+      .max(230)
+      .regex(/^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/)
+      .optional(),
+  ),
+  CLOUDINARY_AUDIO_FOLDER: optionalText.pipe(
+    z
+      .string()
+      .max(230)
+      .regex(/^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/)
+      .optional(),
+  ),
+  CLOUDINARY_FOLDER_MODE: z.enum(["fixed", "dynamic"]).default("dynamic"),
 });
+
+export type MediaProvider = "S3_COMPATIBLE" | "CLOUDINARY";
 
 export type AppConfig = {
   nodeEnv: "development" | "test" | "production";
@@ -97,6 +125,18 @@ export type AppConfig = {
         region: string;
         accessKeyId: string;
         secretAccessKey: string;
+        signedUrlTtlSeconds: number;
+      }
+    | undefined;
+  mediaProvider: MediaProvider | undefined;
+  cloudinaryMedia:
+    | {
+        cloudName: string;
+        apiKey: string;
+        apiSecret: string;
+        pdfFolder: string;
+        audioFolder: string;
+        folderMode: "fixed" | "dynamic";
         signedUrlTtlSeconds: number;
       }
     | undefined;
@@ -257,6 +297,45 @@ export function parseEnvironment(
     }
   }
 
+  const cloudinaryValues = [
+    env.CLOUDINARY_CLOUD_NAME,
+    env.CLOUDINARY_API_KEY,
+    env.CLOUDINARY_API_SECRET,
+  ];
+  const anyCloudinary = cloudinaryValues.some((value) => value !== undefined);
+  if (anyCloudinary && cloudinaryValues.some((value) => value === undefined)) {
+    throw new Error(
+      "Invalid environment configuration: CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET are required together",
+    );
+  }
+  if (anyCloudinary && !env.MEDIA_PROVIDER) {
+    throw new Error(
+      "Invalid environment configuration: set MEDIA_PROVIDER=CLOUDINARY when Cloudinary credentials are configured",
+    );
+  }
+  if (env.MEDIA_PROVIDER === "CLOUDINARY" && !anyCloudinary) {
+    throw new Error(
+      "Invalid environment configuration: Cloudinary credentials are required when MEDIA_PROVIDER=CLOUDINARY",
+    );
+  }
+  if (env.MEDIA_PROVIDER === "S3_COMPATIBLE" && !anyMedia) {
+    throw new Error(
+      "Invalid environment configuration: complete MEDIA_S3_* settings are required when MEDIA_PROVIDER=S3_COMPATIBLE",
+    );
+  }
+  const mediaProvider =
+    env.MEDIA_PROVIDER ?? (anyMedia ? "S3_COMPATIBLE" : undefined);
+  const cloudinaryPdfFolder = env.CLOUDINARY_PDF_FOLDER ?? "lesson-pdf";
+  const cloudinaryAudioFolder = env.CLOUDINARY_AUDIO_FOLDER ?? "quiz-audio";
+  if (
+    anyCloudinary &&
+    foldersOverlap(cloudinaryPdfFolder, cloudinaryAudioFolder)
+  ) {
+    throw new Error(
+      "Invalid environment configuration: Cloudinary PDF and audio folders must be different",
+    );
+  }
+
   return {
     nodeEnv: env.NODE_ENV,
     port: env.PORT,
@@ -291,5 +370,27 @@ export function parseEnvironment(
           signedUrlTtlSeconds: env.MEDIA_SIGNED_URL_TTL_SECONDS,
         }
       : undefined,
+    mediaProvider,
+    cloudinaryMedia: anyCloudinary
+      ? {
+          cloudName: env.CLOUDINARY_CLOUD_NAME!,
+          apiKey: env.CLOUDINARY_API_KEY!,
+          apiSecret: env.CLOUDINARY_API_SECRET!,
+          pdfFolder: cloudinaryPdfFolder,
+          audioFolder: cloudinaryAudioFolder,
+          folderMode: env.CLOUDINARY_FOLDER_MODE,
+          signedUrlTtlSeconds: env.MEDIA_SIGNED_URL_TTL_SECONDS,
+        }
+      : undefined,
   };
+}
+
+function foldersOverlap(first: string, second: string): boolean {
+  const left = first.toLowerCase();
+  const right = second.toLowerCase();
+  return (
+    left === right ||
+    left.startsWith(`${right}/`) ||
+    right.startsWith(`${left}/`)
+  );
 }

@@ -1,5 +1,6 @@
 import { ExternalLink, FileText, Headphones, Video } from 'lucide-react'
 import { Card } from '@/shared/ui'
+import { ProtectedPdfViewer } from './protected-pdf-viewer'
 import { DomainState, safeMediaHref } from '@/domains/shared/presentation'
 import type { MediaViewModel } from './models'
 
@@ -121,27 +122,28 @@ export function VideoPlayer({ media, className }: { media: MediaViewModel; class
 
 export function AudioPlayer({ media }: { media: MediaViewModel }) {
   const src = safeMediaHref(media.src)
-  if (media.availability === 'loading') return <MediaLoadingState label="Đang tải âm thanh" />
-  if (media.availability === 'error')
-    return (
-      <MediaErrorState
-        title="Không thể phát âm thanh"
-        message={media.message ?? 'Đường dẫn âm thanh không hoạt động.'}
-      />
-    )
-  if (media.availability !== 'ready' || !src)
-    return <MediaUnavailableState {...(media.message ? { message: media.message } : {})} />
   return (
     <Card className="grid gap-3 p-4">
       <div className="flex items-center gap-2 font-semibold">
         <Headphones aria-hidden="true" className="size-5 text-action-primary" />
         {media.title}
       </div>
-      <audio controls preload="none" className="w-full" aria-label={media.title}>
-        <source src={src} />
-        Trình duyệt không hỗ trợ âm thanh.
-      </audio>
-      {media.transcript && (
+      {media.availability === 'loading' ? (
+        <MediaLoadingState label="Đang tải âm thanh" />
+      ) : media.availability === 'error' ? (
+        <MediaErrorState
+          title="Không thể phát âm thanh"
+          message={media.message ?? 'Đường dẫn âm thanh không hoạt động.'}
+        />
+      ) : media.availability !== 'ready' || !src ? (
+        <MediaUnavailableState {...(media.message ? { message: media.message } : {})} />
+      ) : (
+        <audio controls preload="none" className="w-full" aria-label={media.title}>
+          <source src={src} />
+          Trình duyệt không hỗ trợ âm thanh.
+        </audio>
+      )}
+      {media.transcript && media.availability === 'ready' && (
         <details>
           <summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold">
             Đọc bản chép lời
@@ -163,41 +165,30 @@ export function PDFViewer({
   embeddedSupported?: boolean
 }) {
   const src = safeMediaHref(media.src)
-  if (media.availability === 'loading') return <MediaLoadingState label="Đang tải tài liệu PDF" />
-  if (media.availability === 'error')
-    return (
-      <MediaErrorState
-        title="Không thể mở tài liệu"
-        message={media.message ?? 'Đường dẫn PDF không hoạt động.'}
-      />
-    )
-  if (media.availability !== 'ready' || !src)
-    return <MediaUnavailableState {...(media.message ? { message: media.message } : {})} />
   return (
     <section aria-label={media.title} className="grid min-w-0 gap-3">
       <div className="flex items-center gap-2 font-semibold">
         <FileText aria-hidden="true" className="size-5 text-action-primary" />
         {media.title}
       </div>
-      {embeddedSupported ? (
-        <object
-          data={src}
-          type="application/pdf"
-          aria-label={media.title}
-          className="h-[min(72vh,52rem)] min-h-80 w-full rounded-xl border border-border-subtle bg-surface-muted"
-        >
-          <p className="p-4 text-sm text-ink-secondary">
-            Trình duyệt này không hiển thị PDF nội tuyến.
-          </p>
-        </object>
+      {media.availability === 'loading' ? (
+        <MediaLoadingState label="Đang tải tài liệu PDF" />
+      ) : media.availability === 'error' ? (
+        <MediaErrorState
+          title="Không thể mở tài liệu"
+          message={media.message ?? 'Đường dẫn PDF không hoạt động.'}
+        />
+      ) : media.availability !== 'ready' || !src ? (
+        <MediaUnavailableState {...(media.message ? { message: media.message } : {})} />
+      ) : embeddedSupported ? (
+        <ProtectedPdfViewer src={src} title={media.title} />
       ) : (
         <Card className="grid min-h-48 place-items-center bg-surface-muted p-5 text-center">
           <p className="text-sm text-ink-secondary">
-            PDF không được nhúng trong trình duyệt này. Mở bản thay thế để tiếp tục.
+            Trình xem PDF không được hỗ trợ trong môi trường này.
           </p>
         </Card>
       )}
-      <MediaFallbackLink src={src} title={media.title} canDownload={media.canDownload} />
     </section>
   )
 }

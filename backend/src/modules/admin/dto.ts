@@ -52,12 +52,20 @@ export function sectionDto(value: Doc) {
 }
 
 export function lessonDto(value: Doc) {
+  const video =
+    value.video && typeof value.video === "object"
+      ? (value.video as Doc)
+      : null;
   return {
     id: id(value._id),
     sectionId: id(value.sectionId),
     title: String(value.title),
     description: String(value.description ?? ""),
     content: safeContent(value.content),
+    video:
+      video && video.provider === "YOUTUBE" && typeof video.videoId === "string"
+        ? { provider: "YOUTUBE", videoId: video.videoId }
+        : null,
     lessonType: String(value.lessonType),
     estimatedMinutes: value.estimatedMinutes ?? null,
     countsTowardProgress: Boolean(value.countsTowardProgress),
@@ -98,6 +106,20 @@ export function mediaDto(value: Doc) {
     visibility: String(value.visibility),
     uploadedById: id(value.uploadedById),
     createdAt: iso(value.createdAt),
+  };
+}
+
+export function adminMediaDto(value: Doc, usageCount = 0) {
+  return {
+    ...mediaDto(value),
+    provider: typeof value.provider === "string" ? value.provider : "UNKNOWN",
+    publicId: typeof value.storageKey === "string" ? value.storageKey : null,
+    resourceType: value.resourceType ?? null,
+    deliveryType: value.deliveryType ?? null,
+    format: value.format ?? null,
+    uploadStatus: String(value.uploadStatus),
+    uploadExpiresAt: iso(value.uploadExpiresAt),
+    usageCount,
   };
 }
 

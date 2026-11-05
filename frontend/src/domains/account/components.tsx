@@ -11,6 +11,7 @@ import {
   TextInput,
 } from '@/shared/ui'
 import { formatDateTimeInTimezone } from '@/shared/lib/format'
+import { useNotifications } from '@/shared/ui/notifications'
 import { DomainState } from '@/domains/shared/presentation'
 import type { SessionSummaryViewModel, StudentProfileViewModel } from './models'
 
@@ -50,16 +51,19 @@ export function ProfileForm({
 }) {
   const [displayName, setDisplayName] = useState(profile.displayName ?? '')
   const [pending, setPending] = useState(false)
-  const [message, setMessage] = useState<string>()
+  const notifications = useNotifications()
   async function submit(event: FormEvent) {
     event.preventDefault()
     setPending(true)
-    setMessage(undefined)
     try {
       await onSave({ displayName })
-      setMessage('Đã lưu hồ sơ.')
+      notifications.success('Đã lưu hồ sơ.')
     } catch {
-      setMessage('Chưa lưu được hồ sơ. Hãy thử lại.')
+      notifications.notify({
+        kind: 'error',
+        title: 'Chưa lưu được hồ sơ. Hãy thử lại.',
+        duration: 0,
+      })
     } finally {
       setPending(false)
     }
@@ -94,11 +98,6 @@ export function ProfileForm({
           />
         )}
       </FormField>
-      {message && (
-        <p role="status" className="text-sm text-ink-secondary">
-          {message}
-        </p>
-      )}
       <Button loading={pending} type="submit">
         Lưu thay đổi
       </Button>

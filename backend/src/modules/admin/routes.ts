@@ -268,9 +268,26 @@ export function createAdminRouter(
   );
 
   router.get(
+    "/admin/media-assets/capabilities",
+    endpoint((_, _res) => admin.getMediaCapabilities()),
+  );
+  router.get(
     "/admin/media-assets",
     validateRequest({ query: mediaListQuerySchema }),
     endpoint((_, res) => admin.listMedia(value(res, "query"))),
+  );
+  router.get(
+    "/admin/media-assets/:assetId",
+    validateRequest({ params: assetIdParamsSchema }),
+    endpoint((_, res) => admin.getMediaAssetDetail(param(res, "assetId"))),
+  );
+  router.post(
+    "/admin/media-assets/:assetId/preview-access",
+    validateRequest({ params: assetIdParamsSchema }),
+    endpoint((_, res) => {
+      res.setHeader("Cache-Control", "private, no-store");
+      return admin.createMediaPreviewAccess(param(res, "assetId"));
+    }),
   );
   router.post(
     "/admin/media-assets/upload-intents",

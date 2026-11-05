@@ -6,6 +6,9 @@ import type {
   ApiAdminExercise,
   ApiAdminLesson,
   ApiAdminMediaAsset,
+  ApiAdminMediaDetail,
+  ApiMediaCapabilities,
+  ApiMediaPreviewAccess,
   ApiAdminOrderDetail,
   ApiAdminOrderSummary,
   ApiAdminQuiz,
@@ -280,20 +283,56 @@ export const adminRepository = {
       `/admin/media-assets${queryString({ page: 1, pageSize: 100, ...filters })}`,
     )
   },
-  createUploadIntent(input: {
-    originalName: string
-    mediaType: string
-    mimeType: string
-    fileSize: number
-    visibility: 'PUBLIC' | 'ENROLLED'
-  }) {
+  getMediaCapabilities() {
+    return apiRequest<ApiMediaCapabilities>('/admin/media-assets/capabilities')
+  },
+  getMediaDetail(assetId: string) {
+    return apiRequest<ApiAdminMediaDetail>(`/admin/media-assets/${pathId(assetId)}`)
+  },
+  createMediaPreviewAccess(assetId: string) {
+    return apiRequest<ApiMediaPreviewAccess>(
+      `/admin/media-assets/${pathId(assetId)}/preview-access`,
+      { method: 'POST' },
+    )
+  },
+  createUploadIntent(
+    input: {
+      originalName: string
+      mediaType: string
+      mimeType: string
+      fileSize: number
+      visibility: 'PUBLIC' | 'ENROLLED'
+    },
+    signal?: AbortSignal,
+  ) {
     return apiRequest<ApiMediaUploadIntent>('/admin/media-assets/upload-intents', {
       method: 'POST',
       body: input,
+      ...(signal ? { signal } : {}),
     })
   },
-  uploadFile(url: string, file: File, onProgress: (percent: number) => void, signal?: AbortSignal) {
-    return uploadWithProgress(url, file, onProgress, signal)
+  uploadFile(
+    instruction: {
+      uploadUrl: string
+      uploadMethod: 'PUT' | 'POST'
+      uploadHeaders: Record<string, string>
+      uploadFields: Record<string, string>
+    },
+    file: File,
+    onProgress: (percent: number) => void,
+    signal?: AbortSignal,
+  ) {
+    return uploadWithProgress(
+      {
+        url: instruction.uploadUrl,
+        method: instruction.uploadMethod,
+        headers: instruction.uploadHeaders,
+        fields: instruction.uploadFields,
+      },
+      file,
+      onProgress,
+      signal,
+    )
   },
   completeUpload(assetId: string, providerUploadId?: string) {
     return apiRequest<ApiAdminMediaAsset>(

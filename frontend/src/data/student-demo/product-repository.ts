@@ -663,6 +663,7 @@ export function createStudentProductRepositories(
                 'Lặp lại “Guten Tag” thành tiếng, sau đó thử dùng câu hỏi “Wie geht es Ihnen?” trong một đoạn hội thoại ngắn.',
               ]
             : [],
+          video: null,
           media: unlocked ? clone(MOCK_MEDIA) : [],
           access,
         }

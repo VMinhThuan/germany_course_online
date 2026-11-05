@@ -374,6 +374,7 @@ const learning: StudentLearningRepository = {
       courseTitle: course.course.title,
       sectionId: workspace.sectionId,
       paragraphs: extractParagraphs(workspace.content),
+      video: workspace.video,
       media,
       access: toAccess(course.access),
       exercises: workspace.exercises.map(toExerciseSummary),
@@ -410,12 +411,16 @@ const learning: StudentLearningRepository = {
         id: asset.assetId,
         title: asset.title || asset.role,
         role: asset.role,
+        mediaType: asset.mediaType,
         ...(assets[index]?.src ? { src: assets[index].src } : {}),
         canDownload:
           Boolean(assets[index]?.src) && (asset.mediaType === 'PDF' || asset.mediaType === 'AUDIO'),
         ...(assets[index]
           ? {
               availability: assets[index].availability,
+              ...(assets[index].signedUrlExpiresAt
+                ? { signedUrlExpiresAt: assets[index].signedUrlExpiresAt }
+                : {}),
               ...(assets[index].message ? { message: assets[index].message } : {}),
             }
           : {}),

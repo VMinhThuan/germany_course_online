@@ -430,6 +430,25 @@ const noteProperties = noteRequest.properties as OpenApiObject;
 if (((noteProperties.content as OpenApiObject).maxLength as number) !== 10_000)
   throw new Error("LessonNoteRequest must enforce the 10,000-character limit.");
 
+const be07aOperations = [
+  ["get", "/admin/media-assets/capabilities", "adminMediaCapabilities"],
+  ["get", "/admin/media-assets/{assetId}", "adminGetMediaAsset"],
+  [
+    "post",
+    "/admin/media-assets/{assetId}/preview-access",
+    "createAdminMediaPreviewAccess",
+  ],
+] as const;
+for (const [method, path, operationId] of be07aOperations) {
+  const operation = (paths[path] as OpenApiObject | undefined)?.[method] as
+    OpenApiObject | undefined;
+  if (!operation || operation.operationId !== operationId)
+    throw new Error(`Missing or mismatched BE-07A operation: ${operationId}`);
+  const security = operation.security as Array<OpenApiObject> | undefined;
+  if (!security?.some((scheme) => Object.hasOwn(scheme, "AccessToken")))
+    throw new Error(`${operationId} must require an access token.`);
+}
+
 process.stdout.write(
   `OpenAPI 3.1 valid: ${Object.keys(paths).length} paths, ${referencesChecked} internal references, 11 BE-01 operations, 18 BE-02 operations, 10 BE-03A operations, 34 BE-03B operations, 7 BE-03B extensions, 12 BE-03C operations, 4 BE-03C extensions.\n`,
 );

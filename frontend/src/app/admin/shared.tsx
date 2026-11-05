@@ -1,9 +1,10 @@
-import { useCallback, useRef, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, type ReactNode } from 'react'
 import { ArrowLeft, BookOpenText, LogOut, Settings2 } from 'lucide-react'
 import { Link, NavLink, useLocation } from 'react-router'
 import { useQueryClient, useMutation } from '@tanstack/react-query'
 import { useAuthSession } from '@/app/auth/auth-session'
 import { Button, Card, ErrorState, Skeleton } from '@/shared/ui'
+import { useNotifications } from '@/shared/ui/notifications'
 import { ApiError } from '@/lib/api/client'
 
 const navigation = [
@@ -151,6 +152,7 @@ export function AdminField({
   min,
   max,
   step,
+  maxLength,
   disabled = false,
 }: {
   label: string
@@ -162,6 +164,7 @@ export function AdminField({
   min?: number
   max?: number
   step?: number
+  maxLength?: number
   disabled?: boolean
 }) {
   return (
@@ -177,6 +180,7 @@ export function AdminField({
         min={min}
         max={max}
         step={step}
+        maxLength={maxLength}
         disabled={disabled}
       />
     </label>
@@ -246,30 +250,30 @@ export function AdminTextArea({
 }
 
 export function AdminFeedback({ error, success }: { error?: unknown; success?: string }) {
-  if (error)
-    return (
-      <p
-        role="alert"
-        className="rounded-xl border border-danger-foreground/20 bg-danger-surface p-3 text-sm leading-6 text-danger-foreground"
-      >
-        {error instanceof ApiError
-          ? error.message
-          : error instanceof Error
-            ? error.message
-            : typeof error === 'string'
-              ? error
-              : 'Thao tác chưa hoàn tất. Thử lại sau.'}
-      </p>
-    )
-  if (success)
-    return (
-      <p
-        role="status"
-        className="rounded-xl border border-success-foreground/20 bg-success-surface p-3 text-sm leading-6 text-success-foreground"
-      >
-        {success}
-      </p>
-    )
+  const { notify } = useNotifications()
+  const errorMessage = error
+    ? error instanceof ApiError
+      ? error.message
+      : error instanceof Error
+        ? error.message
+        : typeof error === 'string'
+          ? error
+          : 'Thao tác chưa hoàn tất. Thử lại sau.'
+    : undefined
+
+  useEffect(() => {
+    if (errorMessage) {
+      notify({
+        kind: 'error',
+        title: 'Thao tác chưa hoàn tất',
+        description: errorMessage,
+        duration: 0,
+      })
+    } else if (success) {
+      notify({ kind: 'success', title: success })
+    }
+  }, [errorMessage, notify, success])
+
   return null
 }
 

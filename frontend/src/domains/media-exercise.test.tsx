@@ -23,13 +23,10 @@ describe('media components', () => {
     expect(document.querySelector('video')).not.toBeInTheDocument()
   })
 
-  it('provides a link when PDF embedding is unsupported', () => {
+  it('does not expose a direct PDF download link when embedded viewing is unavailable', () => {
     render(<PDFViewer media={MOCK_MEDIA[2]!} embeddedSupported={false} />)
-    expect(screen.getByText(/PDF không được nhúng/)).toBeVisible()
-    expect(screen.getByRole('link', { name: /Mở Phiếu bài tập mẫu/ })).toHaveAttribute(
-      'href',
-      expect.stringContaining('/demo-assets/a11-worksheet.pdf'),
-    )
+    expect(screen.getByText(/Trình xem PDF không được hỗ trợ/)).toBeVisible()
+    expect(screen.queryByRole('link', { name: /Phiếu bài tập mẫu/ })).not.toBeInTheDocument()
   })
 })
 
@@ -51,6 +48,9 @@ describe('exercise controls', () => {
       capabilities: { ...MOCK_EXERCISE.capabilities, canViewSolutions: true },
     }
     rerender(<ExerciseSolutionPanel exercise={authorized} />)
-    expect(screen.getByRole('link', { name: /Tải Lời giải bài luyện nghe/ })).toBeVisible()
+    expect(screen.getByText('Lời giải bài luyện nghe')).toBeVisible()
+    expect(
+      screen.queryByRole('link', { name: /Tải Lời giải bài luyện nghe/ }),
+    ).not.toBeInTheDocument()
   })
 })

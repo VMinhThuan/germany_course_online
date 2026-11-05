@@ -188,6 +188,7 @@ export function createMockRepository(
             'Lời chào thường đi cùng bối cảnh và thời điểm trong ngày.',
             'Hãy nghe mẫu, lặp lại thành tiếng và ghi lại cụm từ bạn muốn ôn.',
           ],
+          video: null,
           media: clone(MOCK_MEDIA),
           access: clone(fixture.access),
         }

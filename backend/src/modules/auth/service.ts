@@ -661,13 +661,20 @@ export class AuthService {
           deletedAt: null,
           uploadStatus: "READY",
         })
-          .select("+provider +storageKey")
+          .select("+provider +storageKey +resourceType +deliveryType +format")
           .lean();
-        if (asset?.provider === "S3_COMPATIBLE") {
+        const adapter = asset
+          ? resolveMediaStorage(this.mediaStorage, asset.provider)
+          : undefined;
+        if (asset && adapter) {
           avatarUrl = (
-            await this.mediaStorage.signRead({
+            await adapter.signRead({
               storageKey: asset.storageKey,
               mimeType: asset.mimeType,
+              mediaType: asset.mediaType,
+              resourceType: asset.resourceType ?? null,
+              deliveryType: asset.deliveryType ?? null,
+              format: asset.format ?? null,
             })
           ).url;
         }
@@ -709,4 +716,20 @@ function isDuplicateKeyError(error: unknown): error is { code: number } {
     "code" in error &&
     error.code === 11000
   );
+}
+
+function resolveMediaStorage(
+  storage: MediaStorageAdapter,
+  providerValue: unknown,
+): MediaStorageAdapter | undefined {
+  if (providerValue !== "S3_COMPATIBLE" && providerValue !== "CLOUDINARY")
+    return undefined;
+  const resolved = storage.resolve?.(providerValue);
+  if (resolved) return resolved;
+  if (
+    !storage.resolve &&
+    (!storage.provider || storage.provider === providerValue)
+  )
+    return storage;
+  return undefined;
 }

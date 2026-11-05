@@ -134,11 +134,16 @@ const lessonContent = z
       .max(100),
   })
   .nullable();
+const lessonVideo = z.strictObject({
+  provider: z.literal("YOUTUBE"),
+  videoId: z.string().regex(/^[A-Za-z0-9_-]{11}$/),
+});
 export const createLessonSchema = z
   .strictObject({
     title: text(180).min(1),
     description: nullableText(2_000).optional(),
     content: lessonContent.optional(),
+    video: lessonVideo.nullable().optional(),
     lessonType: z.enum(["LECTURE", "PRACTICE"]),
     estimatedMinutes: z.number().int().min(0).max(1440).nullable().optional(),
     countsTowardProgress: z.boolean(),
@@ -158,6 +163,7 @@ export const lessonPatchSchema = z
     title: text(180).min(1).optional(),
     description: nullableText(2_000).optional(),
     content: lessonContent.optional(),
+    video: lessonVideo.nullable().optional(),
     lessonType: z.enum(["LECTURE", "PRACTICE"]).optional(),
     estimatedMinutes: z.number().int().min(0).max(1440).nullable().optional(),
     countsTowardProgress: z.boolean().optional(),
@@ -323,6 +329,8 @@ export const mediaListQuerySchema = z.strictObject({
   q: text(120).optional(),
   mediaType: z.enum(["IMAGE", "VIDEO", "AUDIO", "PDF"]).optional(),
   visibility: z.enum(["PUBLIC", "ENROLLED"]).optional(),
+  uploadStatus: z.enum(["PENDING", "READY", "DELETING", "DELETED"]).optional(),
+  provider: z.enum(["S3_COMPATIBLE", "CLOUDINARY"]).optional(),
 });
 export const associationWriteSchema = z.strictObject({
   assetRole: z.enum([

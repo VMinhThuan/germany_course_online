@@ -4,6 +4,8 @@ import { useQuery } from '@tanstack/react-query'
 import { ChevronRight, ShieldAlert, ShieldCheck } from 'lucide-react'
 import { adminRepository } from '@/data/api/admin-repository'
 import { formatDateTimeInTimezone, formatVnd } from '@/shared/lib/format'
+import { useDialogs } from '@/shared/ui/dialogs'
+import { useNotifications } from '@/shared/ui/notifications'
 import { Button, EmptyState, Pagination } from '@/shared/ui'
 import {
   AdminCard,
@@ -18,6 +20,7 @@ import {
 } from './shared'
 
 export function AdminStudentsPage({ userId }: { userId?: string }) {
+  const dialogs = useDialogs()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [status, setStatus] = useState('')
@@ -54,26 +57,29 @@ export function AdminStudentsPage({ userId }: { userId?: string }) {
         />
       )
     const student = detail.data.user
-    async function changeStatus() {
+    function changeStatus() {
       const next = student.status === 'ACTIVE' ? 'BLOCKED' : 'ACTIVE'
-      if (
-        !window.confirm(
-          next === 'BLOCKED'
-            ? 'Khóa tài khoản này? Backend sẽ thu hồi các phiên hoạt động.'
-            : 'Mở lại tài khoản học viên này?',
-        )
-      )
-        return
-      try {
-        await setStudentStatus.mutateAsync({ userId: student.id, status: next })
-        setSuccess(
-          next === 'BLOCKED'
-            ? 'Đã khóa tài khoản; backend đã áp dụng quy tắc thu hồi phiên.'
-            : 'Đã mở lại tài khoản.',
-        )
-      } catch {
-        /* API error below */
-      }
+      const blocking = next === 'BLOCKED'
+      dialogs.confirm({
+        title: blocking ? 'Khóa tài khoản học viên?' : 'Mở lại tài khoản học viên?',
+        description: blocking
+          ? 'Backend sẽ thu hồi các phiên hoạt động.'
+          : 'Tài khoản sẽ được chuyển lại trạng thái ACTIVE.',
+        confirmLabel: blocking ? 'Khóa tài khoản' : 'Mở lại tài khoản',
+        destructive: blocking,
+        onConfirm: async () => {
+          try {
+            await setStudentStatus.mutateAsync({ userId: student.id, status: next })
+            setSuccess(
+              blocking
+                ? 'Đã khóa tài khoản; backend đã áp dụng quy tắc thu hồi phiên.'
+                : 'Đã mở lại tài khoản.',
+            )
+          } catch {
+            /* API error below */
+          }
+        },
+      })
     }
     return (
       <div className="grid gap-5">
@@ -240,6 +246,8 @@ export function AdminStudentsPage({ userId }: { userId?: string }) {
 }
 
 export function AdminEnrollmentsPage({ enrollmentId }: { enrollmentId?: string }) {
+  const dialogs = useDialogs()
+  const notifications = useNotifications()
   const [now] = useState(() => Date.now())
   const [status, setStatus] = useState('')
   const [page, setPage] = useState(1)
@@ -319,6 +327,7 @@ export function AdminEnrollmentsPage({ enrollmentId }: { enrollmentId?: string }
       const result = await grant.mutateAsync({ input, key: idempotency.get(input) })
       idempotency.clear()
       setSuccess('Đã cấp enrollment thủ công và ghi audit.')
+      notifications.success('Đã cấp enrollment thủ công và ghi audit.')
       navigate(`/admin/enrollments/${result.enrollment.id}`)
     } catch {
       /* API error below */
@@ -336,41 +345,51 @@ export function AdminEnrollmentsPage({ enrollmentId }: { enrollmentId?: string }
       )
     const enrollment = detail.data.enrollment
     const expired = enrollment.expiresAt ? Date.parse(enrollment.expiresAt) <= now : true
-    async function runAction(kind: 'revoke' | 'restore' | 'extend') {
+    function runAction(kind: 'revoke' | 'restore' | 'extend') {
       if (!reason.trim()) return
-      if (
-        !window.confirm(
-          kind === 'revoke'
-            ? 'Thu hồi quyền học này?'
-            : kind === 'restore'
-              ? 'Khôi phục quyền học này?'
-              : 'Gia hạn quyền học này?',
-        )
-      )
-        return
-      try {
-        if (kind === 'revoke') {
-          const input = { id: enrollment.id, reason: reason.trim() }
-          await revoke.mutateAsync({ ...input, key: idempotency.get(input) })
-          setSuccess('Đã thu hồi quyền học.')
-        }
-        if (kind === 'restore') {
-          const input = {
-            reason: reason.trim(),
-            ...(expired && extension ? { extensionMonths: Number(extension) } : {}),
+      const title =
+        kind === 'revoke'
+          ? 'Thu hồi quyền học này?'
+          : kind === 'restore'
+            ? 'Khôi phục quyền học này?'
+            : 'Gia hạn quyền học này?'
+      const confirmLabel =
+        kind === 'revoke'
+          ? 'Thu hồi quyền học'
+          : kind === 'restore'
+            ? 'Khôi phục quyền học'
+            : 'Gia hạn'
+      dialogs.confirm({
+        title,
+        description: 'Thao tác này sẽ cập nhật quyền truy cập khóa học của học viên.',
+        confirmLabel,
+        destructive: kind === 'revoke',
+        onConfirm: async () => {
+          try {
+            if (kind === 'revoke') {
+              const input = { id: enrollment.id, reason: reason.trim() }
+              await revoke.mutateAsync({ ...input, key: idempotency.get(input) })
+              setSuccess('Đã thu hồi quyền học.')
+            }
+            if (kind === 'restore') {
+              const input = {
+                reason: reason.trim(),
+                ...(expired && extension ? { extensionMonths: Number(extension) } : {}),
+              }
+              await restore.mutateAsync({ id: enrollment.id, input, key: idempotency.get(input) })
+              setSuccess('Đã khôi phục quyền học.')
+            }
+            if (kind === 'extend') {
+              const input = { reason: reason.trim(), durationMonths: Number(duration) }
+              await extend.mutateAsync({ id: enrollment.id, input, key: idempotency.get(input) })
+              setSuccess('Đã gia hạn quyền học.')
+            }
+            idempotency.clear()
+          } catch {
+            /* API error below */
           }
-          await restore.mutateAsync({ id: enrollment.id, input, key: idempotency.get(input) })
-          setSuccess('Đã khôi phục quyền học.')
-        }
-        if (kind === 'extend') {
-          const input = { reason: reason.trim(), durationMonths: Number(duration) }
-          await extend.mutateAsync({ id: enrollment.id, input, key: idempotency.get(input) })
-          setSuccess('Đã gia hạn quyền học.')
-        }
-        idempotency.clear()
-      } catch {
-        /* API error below */
-      }
+        },
+      })
     }
     const actionError = revoke.error ?? restore.error ?? extend.error
     return (

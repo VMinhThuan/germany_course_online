@@ -460,9 +460,13 @@ describe("BE-03B Admin CMS and account contract", () => {
     expect(
       (schemas.AdminMediaAsset as JsonObject).properties,
     ).not.toHaveProperty("storageKey");
-    expect(
-      (schemas.AdminMediaAsset as JsonObject).properties,
-    ).not.toHaveProperty("provider");
+    expect((schemas.AdminMediaAsset as JsonObject).properties).toHaveProperty(
+      "provider",
+      {
+        type: "string",
+        enum: ["S3_COMPATIBLE", "CLOUDINARY", "UNKNOWN"],
+      },
+    );
   });
 });
 

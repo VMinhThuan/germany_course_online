@@ -16,6 +16,7 @@ import {
 import type { CouponValidationViewModel } from '@/domains/commerce/models'
 import { AccessStatePanel, EnrollmentStatusCard } from '@/domains'
 import { DomainState } from '@/domains/shared/presentation'
+import { useDialogs } from '@/shared/ui/dialogs'
 import { Badge, Button, Card, ErrorState, LinkButton, Pagination, SectionHeader } from '@/shared/ui'
 import { formatDateTimeInTimezone, formatVnd } from '@/shared/lib/format'
 import { ProductError, ProductLoading, ProductNotFound, ProductPage } from './shared'
@@ -366,6 +367,7 @@ function PaymentInstructions({
 export function OrderPendingPage() {
   const { id = '' } = useParams()
   const { session } = useAuthSession()
+  const dialogs = useDialogs()
   const order = useProductOrder(session?.id ?? '', id)
   const confirmTransfer = useConfirmTransfer(session?.id ?? '')
   const cancelOrder = useCancelStudentOrder(session?.id ?? '')
@@ -436,13 +438,22 @@ export function OrderPendingPage() {
                   variant="outline"
                   disabled={cancelOrder.isPending}
                   loading={cancelOrder.isPending}
-                  onClick={() => {
-                    if (window.confirm('Hủy đơn trước khi báo chuyển khoản?'))
-                      void cancelOrder
-                        .mutateAsync(id)
-                        .then(() => navigate(`/orders/${id}/result`))
-                        .catch(() => undefined)
-                  }}
+                  onClick={() =>
+                    dialogs.confirm({
+                      title: 'Hủy đơn hàng này?',
+                      description: 'Bạn có thể hủy đơn trước khi báo chuyển khoản.',
+                      confirmLabel: 'Hủy đơn',
+                      destructive: true,
+                      onConfirm: async () => {
+                        try {
+                          await cancelOrder.mutateAsync(id)
+                          navigate(`/orders/${id}/result`)
+                        } catch {
+                          /* Error is shown with the order actions. */
+                        }
+                      },
+                    })
+                  }
                 >
                   Hủy đơn
                 </Button>

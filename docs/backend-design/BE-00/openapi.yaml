@@ -6141,6 +6141,76 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/UploadIntentRequest"
+  /admin/media-assets/capabilities:
+    get:
+      operationId: adminMediaCapabilities
+      summary: Read configured media-provider upload capabilities
+      tags: [Admin Catalog]
+      description: "Access: ADMIN. No provider credentials are returned."
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success: { type: boolean, const: true }
+                  data: { $ref: "#/components/schemas/MediaCapabilities" }
+        "401": { description: Authentication required, content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
+        "403": { description: Admin access required, content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
+      x-contract:
+        access: ADMIN
+        backendModule: admin/media
+        relatedCollections: [none]
+        frontendOperation: Show supported media upload types
+        query: none
+        requestBody: none
+        responseData: MediaCapabilities
+        idempotency: Safe read
+        validation: Provider credentials remain server-side
+      security:
+        - AccessToken: []
+  /admin/media-assets/{assetId}/preview-access:
+    post:
+      operationId: createAdminMediaPreviewAccess
+      summary: Create a short-lived Admin preview URL
+      tags: [Admin Catalog]
+      description: "Access: ADMIN. Response is private and must not be cached."
+      parameters:
+        - name: assetId
+          in: path
+          required: true
+          schema: { type: string, pattern: "^[a-fA-F0-9]{24}$" }
+      responses:
+        "200":
+          description: Short-lived signed media access
+          headers:
+            Cache-Control: { schema: { type: string, const: "private, no-store" } }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success: { type: boolean, const: true }
+                  data: { $ref: "#/components/schemas/MediaPreviewAccess" }
+        "401": { description: Authentication required, content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
+        "403": { description: Admin access required, content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
+        "404": { description: Media is not ready, content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
+      x-contract:
+        access: ADMIN
+        backendModule: admin/media
+        relatedCollections: [media_assets]
+        frontendOperation: Preview a ready media asset
+        query: none
+        requestBody: none
+        responseData: MediaPreviewAccess
+        idempotency: Short-lived access
+        validation: No-store cache and provider-specific expiry
+      security:
+        - AccessToken: []
   /admin/media-assets/{assetId}/complete-upload:
     post:
       operationId: completeMediaUpload
@@ -6234,7 +6304,7 @@ paths:
         frontendOperation: PDF admin CMS requirement
         query: none
         requestBody: UploadCompleteRequest
-        responseData: MediaAsset
+        responseData: AdminMediaAsset
         idempotency: Idempotent finalize
         validation: Verify uploaded bytes and type
       security:
@@ -6246,6 +6316,70 @@ paths:
             schema:
               $ref: "#/components/schemas/UploadCompleteRequest"
   /admin/media-assets/{assetId}:
+    get:
+      operationId: adminGetMediaAsset
+      summary: Read media metadata and usage references
+      tags: [Admin Catalog]
+      description: "Access: ADMIN. Provider storage identity is read-only Admin metadata."
+      parameters:
+        - name: assetId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^[a-fA-F0-9]{24}$
+      responses:
+        "200":
+          description: Media detail
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                properties:
+                  success:
+                    type: boolean
+                    const: true
+                  data:
+                    $ref: "#/components/schemas/AdminMediaDetail"
+        "401":
+          description: Standard error envelope.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: Standard error envelope.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: Standard error envelope.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+      x-contract:
+        access: ADMIN
+        backendModule: admin/media
+        relatedCollections:
+          - media_assets
+          - courses
+          - users
+          - site_settings
+          - lesson_assets
+          - exercise_assets
+        frontendOperation: Inspect media references before deletion
+        query: none
+        requestBody: none
+        responseData: AdminMediaDetail
+        idempotency: Safe read
+        validation: No provider secret or signed URL included
+      security:
+        - AccessToken: []
     delete:
       operationId: deleteMediaAsset
       summary: Delete unused asset and object
@@ -8788,6 +8922,18 @@ paths:
             enum:
               - PUBLIC
               - ENROLLED
+        - name: uploadStatus
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [PENDING, READY, DELETING, DELETED]
+        - name: provider
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [S3_COMPATIBLE, CLOUDINARY]
       responses:
         "200":
           description: Success
@@ -8866,10 +9012,10 @@ paths:
           - lesson_assets
           - exercise_assets
           - audit_logs
-        query: page,pageSize,q,mediaType,visibility
+        query: page,pageSize,q,mediaType,visibility,uploadStatus,provider
         requestBody: none
         responseData: AdminMediaPage
-        validation: Only completed, nondeleted assets are listed; storage keys and credentials stay private.
+        validation: Provider status and usage metadata are listed; secrets and signed URLs stay private.
       security:
         - AccessToken: []
   /admin/lessons/{lessonId}/assets:
@@ -10079,6 +10225,20 @@ components:
         - sectionType
         - sortOrder
         - lessons
+    LessonVideo:
+      type: object
+      properties:
+        provider:
+          type: string
+          enum:
+            - YOUTUBE
+        videoId:
+          type: string
+          pattern: ^[A-Za-z0-9_-]{11}$
+      required:
+        - provider
+        - videoId
+      additionalProperties: false
     LessonWorkspace:
       type: object
       properties:
@@ -10097,6 +10257,10 @@ components:
           type: string
         content:
           $ref: "#/components/schemas/SafeLessonContent"
+        video:
+          oneOf:
+            - $ref: "#/components/schemas/LessonVideo"
+            - type: "null"
         lessonType:
           type: string
           enum:
@@ -10133,6 +10297,7 @@ components:
         - title
         - description
         - content
+        - video
         - lessonType
         - estimatedMinutes
         - countsTowardProgress
@@ -11694,19 +11859,36 @@ components:
         assetId:
           type: string
           pattern: ^[a-fA-F0-9]{24}$
+        provider:
+          type: string
+          enum: [S3_COMPATIBLE, CLOUDINARY]
         uploadUrl:
           type: string
           format: uri
+        uploadMethod:
+          type: string
+          enum: [PUT, POST]
+        uploadHeaders:
+          type: object
+          additionalProperties:
+            type: string
+        uploadFields:
+          type: object
+          additionalProperties:
+            type: string
         expiresAt:
           type: string
           format: date-time
       additionalProperties: false
       required:
         - assetId
+        - provider
         - uploadUrl
+        - uploadMethod
+        - uploadHeaders
+        - uploadFields
         - expiresAt
-      description: Signed PUT URL is short lived. Client must send the requested Content-Type; provider
-        access keys and object keys are never returned.
+      description: Provider-specific upload instructions are short lived. The Cloudinary API Secret and storage credentials remain server-side; signed upload fields are sent to the browser.
     MediaAsset:
       type: object
       properties:
@@ -12068,6 +12250,10 @@ components:
         content:
           oneOf:
             - $ref: "#/components/schemas/AdminLessonContent"
+            - type: "null"
+        video:
+          oneOf:
+            - $ref: "#/components/schemas/LessonVideo"
             - type: "null"
         lessonType:
           type: string
@@ -13015,6 +13201,10 @@ components:
           oneOf:
             - $ref: "#/components/schemas/AdminLessonContent"
             - type: "null"
+        video:
+          oneOf:
+            - $ref: "#/components/schemas/LessonVideo"
+            - type: "null"
         lessonType:
           type: string
           enum:
@@ -13054,6 +13244,7 @@ components:
         - title
         - description
         - content
+        - video
         - lessonType
         - estimatedMinutes
         - countsTowardProgress
@@ -13075,6 +13266,10 @@ components:
         content:
           oneOf:
             - $ref: "#/components/schemas/AdminLessonContent"
+            - type: "null"
+        video:
+          oneOf:
+            - $ref: "#/components/schemas/LessonVideo"
             - type: "null"
         lessonType:
           type: string
@@ -13344,6 +13539,38 @@ components:
         createdAt:
           type: string
           format: date-time
+        provider:
+          type: string
+          enum: [S3_COMPATIBLE, CLOUDINARY, UNKNOWN]
+        publicId:
+          oneOf:
+            - type: string
+            - type: "null"
+        resourceType:
+          oneOf:
+            - type: string
+              enum: [image, video, raw]
+            - type: "null"
+        deliveryType:
+          oneOf:
+            - type: string
+              enum: [upload, private, authenticated]
+            - type: "null"
+        format:
+          oneOf:
+            - type: string
+            - type: "null"
+        uploadStatus:
+          type: string
+          enum: [PENDING, READY, DELETING, DELETED]
+        uploadExpiresAt:
+          oneOf:
+            - type: string
+              format: date-time
+            - type: "null"
+        usageCount:
+          type: integer
+          minimum: 0
       required:
         - id
         - originalName
@@ -13354,6 +13581,61 @@ components:
         - visibility
         - uploadedById
         - createdAt
+      additionalProperties: false
+    AdminMediaDetail:
+      type: object
+      properties:
+        media:
+          $ref: "#/components/schemas/AdminMediaAsset"
+        references:
+          type: array
+          items:
+            type: object
+            properties:
+              kind:
+                type: string
+                enum: [LESSON, EXERCISE, COURSE, USER_PROFILE, SITE_SETTINGS]
+              parentId:
+                type: string
+              role:
+                type: string
+              title:
+                type: [string, "null"]
+            required: [kind, parentId, role, title]
+            additionalProperties: false
+      required: [media, references]
+      additionalProperties: false
+    MediaCapabilities:
+      type: object
+      properties:
+        activeProvider:
+          type: [string, "null"]
+          enum: [S3_COMPATIBLE, CLOUDINARY, null]
+        supportedMediaTypes:
+          type: array
+          items:
+            type: string
+            enum: [IMAGE, VIDEO, AUDIO, PDF]
+      required: [activeProvider, supportedMediaTypes]
+      additionalProperties: false
+    MediaPreviewAccess:
+      type: object
+      properties:
+        assetId:
+          type: string
+          pattern: ^[a-fA-F0-9]{24}$
+        url:
+          type: string
+          format: uri
+        expiresAt:
+          type: string
+          format: date-time
+        mediaType:
+          type: string
+          enum: [IMAGE, VIDEO, AUDIO, PDF]
+        mimeType:
+          type: string
+      required: [assetId, url, expiresAt, mediaType, mimeType]
       additionalProperties: false
     AdminMediaPage:
       type: object

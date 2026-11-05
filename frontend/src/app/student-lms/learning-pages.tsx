@@ -33,6 +33,7 @@ import {
   LessonContent,
   LessonNotesEditor,
   LessonProgressList,
+  YouTubeLessonPlayer,
   QuizIntro,
   QuizResult,
   QuizRunner,
@@ -194,6 +195,10 @@ export function LearningLessonPage() {
                 <LessonContent content={{ ...lesson.data, media: [] }} headingLevel={2} />
                 {lesson.data.access.kind === 'available' && (
                   <div className="mx-auto mt-6 grid w-full max-w-3xl gap-4">
+                    <YouTubeLessonPlayer
+                      video={lesson.data.video}
+                      title={lesson.data.lesson.title}
+                    />
                     {lesson.data.media.map((media) =>
                       media.mediaType === 'VIDEO' ? (
                         <VideoPlayer key={media.id} media={media} />

@@ -22,6 +22,7 @@ import {
   UserSession,
 } from "../../db/models/index.js";
 import { withTransaction } from "../../db/connection.js";
+import type { MediaProvider } from "../../config/env.js";
 import { AppError, conflict, notFound } from "../../shared/errors.js";
 import { addUtcCalendarMonths } from "../commerce/dto.js";
 import { normalizeCouponCode } from "../commerce/pricing.js";
@@ -30,6 +31,7 @@ import {
   exerciseDto,
   id,
   iso,
+  adminMediaDto,
   lessonDto,
   mediaDto,
   quizDto,
@@ -68,9 +70,15 @@ import type {
   uploadCompleteSchema,
   uploadIntentSchema,
 } from "./schemas.js";
-import type { MediaStorageAdapter } from "../learning/media-storage.js";
+import type {
+  DeleteMediaInput,
+  MediaStorageAdapter,
+  MediaResourceType,
+} from "../learning/media-storage.js";
 
 export type Actor = { userId: string; ipAddress: string | null };
+export type AuditActor =
+  Actor | { userId: null; ipAddress: null; source: "course-import" };
 type Page<T> = {
   items: T[];
   page: number;
@@ -154,7 +162,7 @@ export class AdminService {
     return courseDto(course as unknown as Doc);
   }
 
-  async createCourse(input: CourseWrite, actor: Actor) {
+  async createCourse(input: CourseWrite, actor: AuditActor) {
     try {
       const course = await withTransaction(async (session) => {
         await this.lockCourseMedia(input, session);
@@ -265,7 +273,7 @@ export class AdminService {
     });
   }
 
-  async publishCourse(courseId: string, actor: Actor) {
+  async publishCourse(courseId: string, actor: AuditActor) {
     const oid = objectId(courseId);
     return withTransaction(async (session) => {
       const course = await Course.findOne({
@@ -316,7 +324,11 @@ export class AdminService {
     );
   }
 
-  async createSection(courseId: string, input: SectionWrite, actor: Actor) {
+  async createSection(
+    courseId: string,
+    input: SectionWrite,
+    actor: AuditActor,
+  ) {
     const parentId = objectId(courseId);
     return withTransaction(async (session) => {
       const parent = await Course.findOne({ _id: parentId, deletedAt: null })
@@ -347,7 +359,11 @@ export class AdminService {
     });
   }
 
-  async updateSection(sectionId: string, patch: SectionPatch, actor: Actor) {
+  async updateSection(
+    sectionId: string,
+    patch: SectionPatch,
+    actor: AuditActor,
+  ) {
     const oid = objectId(sectionId);
     return withTransaction(async (session) => {
       const section = await CourseSection.findOne({
@@ -430,7 +446,7 @@ export class AdminService {
     );
   }
 
-  async createLesson(sectionId: string, input: LessonWrite, actor: Actor) {
+  async createLesson(sectionId: string, input: LessonWrite, actor: AuditActor) {
     const parentId = objectId(sectionId);
     return withTransaction(async (session) => {
       const section = await CourseSection.findOne({
@@ -452,6 +468,7 @@ export class AdminService {
             sectionId: parentId,
             description: input.description ?? "",
             content: input.content ?? null,
+            video: input.video ?? null,
             estimatedMinutes: input.estimatedMinutes ?? null,
             deletedAt: null,
           },
@@ -473,7 +490,7 @@ export class AdminService {
     });
   }
 
-  async updateLesson(lessonId: string, patch: LessonPatch, actor: Actor) {
+  async updateLesson(lessonId: string, patch: LessonPatch, actor: AuditActor) {
     const oid = objectId(lessonId);
     return withTransaction(async (session) => {
       const lesson = await Lesson.findOne({
@@ -1786,23 +1803,178 @@ export class AdminService {
   }
 
   async listMedia(query: MediaQuery): Promise<Page<Doc>> {
-    const filter: Record<string, unknown> = { ...readyAssetFilter };
+    const filter: Record<string, unknown> = {};
+    if (query.uploadStatus === "DELETED") {
+      filter.uploadStatus = "DELETED";
+    } else {
+      filter.deletedAt = null;
+      filter.uploadStatus = query.uploadStatus ?? {
+        $nin: ["PENDING", "DELETING", "DELETED"],
+      };
+    }
     if (query.mediaType) filter.mediaType = query.mediaType;
     if (query.visibility) filter.visibility = query.visibility;
+    if (query.provider) filter.provider = query.provider;
     if (query.q) filter.originalName = new RegExp(escapeRegex(query.q), "i");
     const [rows, total] = await Promise.all([
       MediaAsset.find(filter)
+        .select(
+          "+provider +storageKey +resourceType +deliveryType +providerAssetId",
+        )
         .sort({ createdAt: -1, _id: -1 })
         .skip((query.page - 1) * query.pageSize)
         .limit(query.pageSize)
         .lean(),
       MediaAsset.countDocuments(filter),
     ]);
+    const usageCounts = await countMediaReferences(
+      rows.map((row) => row._id as Types.ObjectId),
+    );
     return pageResult(
-      rows.map((row) => mediaDto(row as unknown as Doc)),
+      rows.map((row) =>
+        adminMediaDto(
+          row as unknown as Doc,
+          usageCounts.get(String(row._id)) ?? 0,
+        ),
+      ),
       query,
       total,
     );
+  }
+
+  async getMediaCapabilities() {
+    const provider = this.storage.provider ?? null;
+    return {
+      activeProvider: provider,
+      supportedMediaTypes:
+        provider === "CLOUDINARY"
+          ? ["PDF", "AUDIO"]
+          : provider === "S3_COMPATIBLE"
+            ? ["IMAGE", "VIDEO", "PDF", "AUDIO"]
+            : [],
+    };
+  }
+
+  async getMediaAssetDetail(assetId: string) {
+    const asset = await MediaAsset.findById(objectId(assetId))
+      .select(
+        "+provider +storageKey +resourceType +deliveryType +providerAssetId",
+      )
+      .lean();
+    if (!asset) throw notFound("Media asset not found.");
+    const [
+      usageCounts,
+      lessonAssociations,
+      exerciseAssociations,
+      courses,
+      users,
+      settings,
+    ] = await Promise.all([
+      countMediaReferences([asset._id]),
+      LessonAsset.find({ assetId: asset._id })
+        .select("lessonId assetRole title")
+        .lean(),
+      ExerciseAsset.find({ assetId: asset._id })
+        .select("exerciseId assetRole title")
+        .lean(),
+      Course.find({
+        $or: [
+          { thumbnailAssetId: asset._id },
+          { bannerAssetId: asset._id },
+          { introVideoAssetId: asset._id },
+        ],
+      })
+        .select("title code thumbnailAssetId bannerAssetId introVideoAssetId")
+        .lean(),
+      User.find({ avatarAssetId: asset._id })
+        .select("fullName avatarAssetId")
+        .lean(),
+      SiteSettings.findOne({
+        $or: [{ logoAssetId: asset._id }, { heroAssetId: asset._id }],
+      })
+        .select("siteName logoAssetId heroAssetId")
+        .lean(),
+    ]);
+    const references = [
+      ...lessonAssociations.map((row) => ({
+        kind: "LESSON",
+        parentId: id(row.lessonId),
+        role: String(row.assetRole),
+        title: row.title ?? null,
+      })),
+      ...exerciseAssociations.map((row) => ({
+        kind: "EXERCISE",
+        parentId: id(row.exerciseId),
+        role: String(row.assetRole),
+        title: row.title ?? null,
+      })),
+      ...courses.flatMap((row) =>
+        (["thumbnailAssetId", "bannerAssetId", "introVideoAssetId"] as const)
+          .filter((field) => id(row[field]) === id(asset._id))
+          .map((field) => ({
+            kind: "COURSE",
+            parentId: id(row._id),
+            role: field,
+            title: String(row.title),
+          })),
+      ),
+      ...users.map((row) => ({
+        kind: "USER_PROFILE",
+        parentId: id(row._id),
+        role: "AVATAR",
+        title: String(row.fullName),
+      })),
+      ...(settings
+        ? (["logoAssetId", "heroAssetId"] as const)
+            .filter((field) => id(settings[field]) === id(asset._id))
+            .map((field) => ({
+              kind: "SITE_SETTINGS",
+              parentId: id(settings._id),
+              role: field,
+              title: String(settings.siteName),
+            }))
+        : []),
+    ];
+    return {
+      media: adminMediaDto(
+        asset as unknown as Doc,
+        usageCounts.get(String(asset._id)) ?? 0,
+      ),
+      references,
+    };
+  }
+
+  async createMediaPreviewAccess(assetId: string) {
+    const asset = await MediaAsset.findOne({
+      _id: objectId(assetId),
+      ...readyAssetFilter,
+    })
+      .select(
+        "+provider +storageKey +resourceType +deliveryType +providerAssetId",
+      )
+      .lean();
+    if (!asset) throw notFound("Ready media asset not found.");
+    const adapter = resolveMediaStorage(this.storage, asset.provider);
+    if (!adapter)
+      throw mediaUnavailable(
+        "The media provider for this asset is not configured.",
+      );
+    const signed = await adapter.signRead({
+      storageKey: asset.storageKey,
+      mimeType: asset.mimeType,
+      mediaType: asset.mediaType,
+      resourceType: asset.resourceType as MediaResourceType | null,
+      deliveryType: asset.deliveryType as
+        "upload" | "private" | "authenticated" | null,
+      format: asset.format ?? null,
+    });
+    return {
+      assetId: id(asset._id),
+      url: signed.url,
+      expiresAt: signed.expiresAt.toISOString(),
+      mediaType: asset.mediaType,
+      mimeType: asset.mimeType,
+    };
   }
 
   async createMediaUploadIntent(input: UploadIntentWrite, actor: Actor) {
@@ -1810,7 +1982,15 @@ export class AdminService {
       throw mediaUnavailable(
         "Media upload is unavailable because no compatible provider is configured.",
       );
-    const storageKey = `media/${randomUUID()}`;
+    const assetId = new Types.ObjectId();
+    const provider = this.storage.provider ?? "S3_COMPATIBLE";
+    const storageKey =
+      this.storage.createStorageKey?.(
+        input.mediaType,
+        randomUUID().replaceAll("-", ""),
+      ) ?? `media/${randomUUID()}`;
+    const resourceType = cloudinaryResourceType(provider, input.mediaType);
+    const deliveryType = provider === "CLOUDINARY" ? "authenticated" : null;
     let signed;
     try {
       signed = await this.storage.createUpload({
@@ -1818,12 +1998,17 @@ export class AdminService {
         mimeType: input.mimeType,
         fileSize: input.fileSize,
         expiresInSeconds: 600,
+        mediaType: input.mediaType,
+        ...(resourceType ? { resourceType } : {}),
+        ...(deliveryType ? { deliveryType } : {}),
+        ...(provider === "CLOUDINARY"
+          ? { assetFolder: storageKey.slice(0, storageKey.lastIndexOf("/")) }
+          : {}),
       });
     } catch (error) {
       if (error instanceof AppError) throw error;
       throw mediaUnavailable();
     }
-    const assetId = new Types.ObjectId();
     await withTransaction(async (session) => {
       await MediaAsset.create(
         [
@@ -1833,8 +2018,12 @@ export class AdminService {
             mediaType: input.mediaType,
             mimeType: input.mimeType,
             fileSize: input.fileSize,
-            provider: "S3_COMPATIBLE",
+            provider,
             storageKey,
+            resourceType,
+            deliveryType,
+            format: null,
+            providerAssetId: null,
             externalMediaId: null,
             durationSeconds: null,
             uploadedById: objectId(actor.userId),
@@ -1859,7 +2048,11 @@ export class AdminService {
     });
     return {
       assetId: assetId.toString(),
+      provider: signed.provider,
       uploadUrl: signed.url,
+      uploadMethod: signed.method,
+      uploadHeaders: signed.headers ?? {},
+      uploadFields: signed.fields ?? {},
       expiresAt: signed.expiresAt.toISOString(),
     };
   }
@@ -1875,18 +2068,16 @@ export class AdminService {
         "UPLOAD_MODE_UNSUPPORTED",
         "This provider uses single-part PUT uploads and does not accept multipart upload ids.",
       );
-    if (!this.storage.headObject)
-      throw mediaUnavailable(
-        "Upload verification is unavailable because no compatible provider is configured.",
-      );
     const oid = objectId(assetId);
     const asset = await MediaAsset.findById(oid)
-      .select("+provider +storageKey")
+      .select(
+        "+provider +storageKey +resourceType +deliveryType +providerAssetId",
+      )
       .lean();
     if (!asset || asset.deletedAt || asset.uploadStatus === "DELETED")
       throw notFound("Media upload not found.");
     if (asset.uploadStatus === "READY")
-      return mediaDto(asset as unknown as Doc);
+      return adminMediaDto(asset as unknown as Doc, 0);
     if (asset.uploadStatus !== "PENDING")
       throw conflict("Media upload is currently unavailable.");
     if (
@@ -1898,13 +2089,24 @@ export class AdminService {
         "UPLOAD_INTENT_EXPIRED",
         "The media upload intent expired.",
       );
-    if (asset.provider !== "S3_COMPATIBLE")
+    const adapter = resolveMediaStorage(this.storage, asset.provider);
+    if (!adapter || (!adapter.verifyUpload && !adapter.headObject))
       throw mediaUnavailable(
-        "The media provider for this asset is unsupported.",
+        "Upload verification is unavailable for the media provider on this asset.",
       );
     let metadata;
     try {
-      metadata = await this.storage.headObject(asset.storageKey);
+      metadata = adapter.verifyUpload
+        ? await adapter.verifyUpload({
+            storageKey: asset.storageKey,
+            mimeType: asset.mimeType,
+            fileSize: asset.fileSize,
+            mediaType: asset.mediaType,
+            resourceType: asset.resourceType as MediaResourceType | null,
+            deliveryType: asset.deliveryType as
+              "upload" | "private" | "authenticated" | null,
+          })
+        : await adapter.headObject!(asset.storageKey);
     } catch (error) {
       if (error instanceof AppError) throw error;
       throw mediaUnavailable("Uploaded object metadata could not be verified.");
@@ -1917,7 +2119,8 @@ export class AdminService {
       );
     if (
       metadata.contentLength !== asset.fileSize ||
-      metadata.contentType?.toLowerCase() !== asset.mimeType.toLowerCase()
+      (asset.provider !== "CLOUDINARY" &&
+        metadata.contentType?.toLowerCase() !== asset.mimeType.toLowerCase())
     )
       throw new AppError(
         422,
@@ -1926,14 +2129,32 @@ export class AdminService {
       );
     return withTransaction(async (session) => {
       const current = await MediaAsset.findById(oid)
-        .select("+provider +storageKey")
+        .select(
+          "+provider +storageKey +resourceType +deliveryType +providerAssetId",
+        )
         .session(session);
       if (!current) throw notFound("Media upload not found.");
       if (current.get("uploadStatus") === "READY")
-        return mediaDto(current.toObject() as unknown as Doc);
+        return adminMediaDto(current.toObject() as unknown as Doc, 0);
       if (current.get("uploadStatus") !== "PENDING")
         throw conflict("Media upload is currently unavailable.");
-      current.set({ uploadStatus: "READY", uploadExpiresAt: null });
+      current.set({
+        uploadStatus: "READY",
+        uploadExpiresAt: null,
+        ...(metadata.providerAssetId !== undefined
+          ? { providerAssetId: metadata.providerAssetId }
+          : {}),
+        ...(metadata.resourceType !== undefined
+          ? { resourceType: metadata.resourceType }
+          : {}),
+        ...(metadata.deliveryType !== undefined
+          ? { deliveryType: metadata.deliveryType }
+          : {}),
+        ...(metadata.format !== undefined ? { format: metadata.format } : {}),
+        ...(metadata.durationSeconds !== undefined
+          ? { durationSeconds: metadata.durationSeconds }
+          : {}),
+      });
       await current.save({ session, validateModifiedOnly: true });
       await audit(
         actor,
@@ -1943,25 +2164,24 @@ export class AdminService {
         ["uploadStatus"],
         session,
       );
-      return mediaDto(current.toObject() as unknown as Doc);
+      return adminMediaDto(current.toObject() as unknown as Doc, 0);
     });
   }
 
   async deleteMediaAsset(assetId: string, actor: Actor) {
-    if (!this.storage.deleteObject)
-      throw mediaUnavailable(
-        "Media deletion is unavailable because no compatible provider is configured.",
-      );
     const oid = objectId(assetId);
     const asset = await MediaAsset.findById(oid)
-      .select("+provider +storageKey")
+      .select(
+        "+provider +storageKey +resourceType +deliveryType +providerAssetId",
+      )
       .lean();
     if (!asset) throw notFound("Media asset not found.");
     if (asset.uploadStatus === "DELETED" || asset.deletedAt)
       return { id: oid.toString(), deleted: true };
-    if (asset.provider !== "S3_COMPATIBLE")
+    const adapter = resolveMediaStorage(this.storage, asset.provider);
+    if (!adapter || (!adapter.deleteAsset && !adapter.deleteObject))
       throw mediaUnavailable(
-        "The media provider for this asset is unsupported.",
+        "Media deletion is unavailable for the provider stored on this asset.",
       );
     await withTransaction(async (session) => {
       const current = await MediaAsset.findById(oid).session(session);
@@ -1994,7 +2214,15 @@ export class AdminService {
       await current.save({ session, validateModifiedOnly: true });
     });
     try {
-      await this.storage.deleteObject(asset.storageKey);
+      const deletion: DeleteMediaInput = {
+        storageKey: asset.storageKey,
+        mediaType: asset.mediaType,
+        resourceType: asset.resourceType as MediaResourceType | null,
+        deliveryType: asset.deliveryType as
+          "upload" | "private" | "authenticated" | null,
+      };
+      if (adapter.deleteAsset) await adapter.deleteAsset(deletion);
+      else await adapter.deleteObject!(asset.storageKey);
     } catch (error) {
       throw error instanceof AppError
         ? error
@@ -2737,7 +2965,7 @@ function roleMatchesMediaType(
 }
 
 async function audit(
-  actor: Actor,
+  actor: AuditActor,
   action: string,
   entityType: string,
   entityId: unknown,
@@ -2748,13 +2976,17 @@ async function audit(
   await AuditLog.create(
     [
       {
-        actorUserId: objectId(actor.userId),
+        actorUserId: actor.userId ? objectId(actor.userId) : null,
         action,
         entityType,
         entityId:
           entityId instanceof Types.ObjectId ? entityId : String(entityId),
         oldValue: null,
-        newValue: { changedFields, ...(state ?? {}) },
+        newValue: {
+          changedFields,
+          ...("source" in actor ? { source: actor.source } : {}),
+          ...(state ?? {}),
+        },
         ipAddress: actor.ipAddress,
       },
     ],
@@ -2970,4 +3202,75 @@ function safeEntityId(value: unknown): string {
   if (value instanceof Types.ObjectId) return value.toString();
   if (typeof value === "string") return value.slice(0, 100);
   return "redacted";
+}
+
+function resolveMediaStorage(
+  storage: MediaStorageAdapter,
+  providerValue: unknown,
+): MediaStorageAdapter | undefined {
+  if (providerValue !== "S3_COMPATIBLE" && providerValue !== "CLOUDINARY")
+    return undefined;
+  const provider = providerValue as MediaProvider;
+  const resolved = storage.resolve?.(provider);
+  if (resolved) return resolved;
+  if (!storage.resolve && (!storage.provider || storage.provider === provider))
+    return storage;
+  return undefined;
+}
+
+function cloudinaryResourceType(
+  provider: MediaProvider,
+  mediaType: string,
+): MediaResourceType | null {
+  if (provider !== "CLOUDINARY") return null;
+  if (mediaType === "PDF") return "image";
+  if (mediaType === "AUDIO") return "video";
+  return null;
+}
+
+async function countMediaReferences(
+  assetIds: Types.ObjectId[],
+): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  if (assetIds.length === 0) return counts;
+
+  type CountRow = { _id: unknown; count: number };
+  const collect = async (
+    aggregate: (pipeline: mongoose.PipelineStage[]) => Promise<unknown[]>,
+    fields: string[],
+  ): Promise<CountRow[]> => {
+    const pipeline: mongoose.PipelineStage[] = [
+      {
+        $match: {
+          $or: fields.map((field) => ({ [field]: { $in: assetIds } })),
+        },
+      },
+      { $project: { references: fields.map((field) => `$${field}`) } },
+      { $unwind: "$references" },
+      { $match: { references: { $in: assetIds } } },
+      { $group: { _id: "$references", count: { $sum: 1 } } },
+    ];
+    return (await aggregate(pipeline)) as CountRow[];
+  };
+  const groups = await Promise.all([
+    collect(
+      (pipeline) => Course.aggregate(pipeline).exec(),
+      ["thumbnailAssetId", "bannerAssetId", "introVideoAssetId"],
+    ),
+    collect((pipeline) => User.aggregate(pipeline).exec(), ["avatarAssetId"]),
+    collect(
+      (pipeline) => SiteSettings.aggregate(pipeline).exec(),
+      ["logoAssetId", "heroAssetId"],
+    ),
+    collect((pipeline) => LessonAsset.aggregate(pipeline).exec(), ["assetId"]),
+    collect(
+      (pipeline) => ExerciseAsset.aggregate(pipeline).exec(),
+      ["assetId"],
+    ),
+  ]);
+  for (const row of groups.flat()) {
+    const assetId = id(row._id);
+    if (assetId) counts.set(assetId, (counts.get(assetId) ?? 0) + row.count);
+  }
+  return counts;
 }
