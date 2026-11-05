@@ -142,7 +142,10 @@ describe('LearningLessonPage', () => {
     expect(screen.getByRole('heading', { name: 'Bài tập của bài học' })).toBeVisible()
     expect(screen.getByRole('heading', { name: 'Đáp án bài tập' })).toBeVisible()
     expect(screen.getByText('Bài này chưa có đáp án.')).toBeVisible()
-    expect(screen.getByRole('link', { name: /Bài 1: Begrüßung und Abschied/ })).toBeVisible()
+    expect(
+      screen.queryByRole('complementary', { name: 'Điều hướng bài học' }),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Các bài trong khóa học' })).toBeNull()
 
     const article = screen.getByRole('heading', { name: 'Sich vorstellen' }).closest('article')
     expect(article).toHaveClass('w-full')
@@ -234,9 +237,10 @@ describe('LearningLessonPage', () => {
     })
     renderLesson()
 
-    expect(
-      screen.getByRole('button', { name: 'Tải video: Video chữa bài · Sich vorstellen' }),
-    ).toBeVisible()
+    expect(screen.getByTitle('Video chữa bài · Sich vorstellen')).toHaveAttribute(
+      'src',
+      'https://www.youtube-nocookie.com/embed/lamg3tUwct4?rel=0',
+    )
   })
 
   it('navigates to the previous and next lesson', async () => {

@@ -40,29 +40,8 @@ import {
 } from '@/domains'
 import { AudioPlayer, PDFViewer, VideoPlayer } from '@/domains/media'
 import { DomainState } from '@/domains/shared/presentation'
-import type { LessonProgressItemViewModel } from '@/domains/progress/models'
 import { Button, Card, ErrorState, LinkButton, SectionHeader, useNotifications } from '@/shared/ui'
 import { ProductError, ProductLoading, ProductNotFound, ProductPage } from './shared'
-
-function groupLessonProgressItems(items: readonly LessonProgressItemViewModel[]) {
-  const groups = new Map<
-    string,
-    { id: string; title: string; items: LessonProgressItemViewModel[] }
-  >()
-
-  for (const item of items) {
-    const id = item.sectionId ?? item.sectionTitle ?? 'course-lessons'
-    const group = groups.get(id) ?? {
-      id,
-      title: item.sectionTitle ?? 'Các bài học',
-      items: [],
-    }
-    group.items.push(item)
-    groups.set(id, group)
-  }
-
-  return [...groups.values()]
-}
 
 export function LearningCoursePage() {
   const { courseId = '' } = useParams()
@@ -227,7 +206,7 @@ export function LearningLessonPage() {
           <p className="-mb-3 text-sm font-semibold tracking-wide text-action-primary">
             {lesson.data.sectionTitle ?? 'Chương học'} · Bài {lesson.data.lessonNumber ?? 1}
           </p>
-          <div className="grid min-w-0 gap-7 xl:grid-cols-[minmax(0,1fr)_18rem]">
+          <div className="grid min-w-0 gap-7">
             <div className="grid min-w-0 gap-6">
               <section aria-label="Bài giảng của bài học" className="grid min-w-0 gap-3">
                 <SectionHeader
@@ -402,47 +381,6 @@ export function LearningLessonPage() {
                 />
               )}
             </div>
-            <aside aria-label="Điều hướng bài học" className="grid content-start gap-4">
-              <AccessStatePanel access={lesson.data.access} />
-              <Card className="grid gap-3 p-4">
-                <h2 className="font-semibold">Trong bài này</h2>
-                <nav aria-label="Các bài trong khóa học" className="grid gap-2">
-                  {groupLessonProgressItems(lesson.data.progressItems).map((group) => (
-                    <div key={group.id} className="grid gap-1">
-                      <h3 className="px-3 pt-2 text-xs font-bold uppercase tracking-wider text-ink-muted">
-                        {group.title}
-                      </h3>
-                      {group.items.map((item) =>
-                        item.href ? (
-                          <Link
-                            key={item.lessonId}
-                            to={item.href}
-                            aria-label={`Bài ${item.lessonNumber ?? ''}: ${item.title}${item.status === 'COMPLETED' ? ' · Đã hoàn thành' : ''}`}
-                            aria-current={item.lessonId === lessonId ? 'page' : undefined}
-                            className="rounded-xl px-3 py-2 text-sm text-ink-secondary hover:bg-surface-muted"
-                          >
-                            <span className="flex items-start justify-between gap-2">
-                              <span className="min-w-0">
-                                <span className="block text-xs font-semibold text-ink-muted">
-                                  Bài {item.lessonNumber ?? ''}
-                                </span>
-                                <span className="mt-0.5 block">{item.title}</span>
-                              </span>
-                              <span aria-hidden="true" className="text-xs text-ink-muted">
-                                {item.status === 'COMPLETED' ? '✓' : ''}
-                              </span>
-                            </span>
-                          </Link>
-                        ) : null,
-                      )}
-                    </div>
-                  ))}
-                </nav>
-              </Card>
-              <LinkButton to={`/learn/courses/${lesson.data.courseId}`} variant="outline">
-                Về lộ trình
-              </LinkButton>
-            </aside>
           </div>
         </div>
       )}

@@ -1,19 +1,19 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { parseYouTubeVideoId, YouTubeLessonPlayer } from './youtube-lesson-player'
 
 describe('YouTubeLessonPlayer', () => {
-  it('renders the API video ID in a privacy-enhanced, lazy iframe after activation', () => {
+  it('shows the privacy-enhanced YouTube player and thumbnail immediately', () => {
     const video = { provider: 'YOUTUBE' as const, videoId: 'lamg3tUwct4' }
     render(<YouTubeLessonPlayer video={video} title="Begrüßung und Abschied" />)
 
-    expect(screen.queryByTitle('Begrüßung und Abschied')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Tải video: Begrüßung und Abschied' }))
-
-    expect(screen.getByTitle('Begrüßung und Abschied')).toHaveAttribute(
+    const player = screen.getByTitle('Begrüßung und Abschied')
+    expect(player).toHaveAttribute(
       'src',
       'https://www.youtube-nocookie.com/embed/lamg3tUwct4?rel=0',
     )
+    expect(player).toHaveAttribute('loading', 'lazy')
+    expect(screen.queryByRole('button', { name: /Tải video:/ })).not.toBeInTheDocument()
   })
 
   it('does not render an iframe for an invalid API video ID', () => {
@@ -31,6 +31,7 @@ describe('YouTubeLessonPlayer', () => {
       'src',
       'https://www.youtube-nocookie.com/embed/lamg3tUwct4?rel=0',
     )
+    expect(screen.getByTitle('Preview')).toHaveAttribute('loading', 'eager')
     expect(document.activeElement).not.toBe(screen.getByTitle('Preview'))
   })
 })
