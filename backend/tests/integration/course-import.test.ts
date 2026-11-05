@@ -64,6 +64,7 @@ describe("BE-08A course import workflow", () => {
         title: section.title,
       }).lean();
       expect(storedSection).not.toBeNull();
+      expect(storedSection?.sortOrder).toBe(section.sortOrder);
       const lessons = await Lesson.find({ sectionId: storedSection!._id })
         .sort({ sortOrder: 1 })
         .lean();
@@ -72,6 +73,9 @@ describe("BE-08A course import workflow", () => {
       );
       expect(lessons.map((lesson) => lesson.video?.videoId)).toEqual(
         section.lessons.map((lesson) => lesson.videoId),
+      );
+      expect(lessons.map((lesson) => lesson.sortOrder)).toEqual(
+        section.lessons.map((lesson) => lesson.sortOrder),
       );
     }
 

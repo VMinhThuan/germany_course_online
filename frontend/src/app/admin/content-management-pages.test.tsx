@@ -17,6 +17,7 @@ import { NotificationProvider } from '@/shared/ui/notifications'
 import {
   AdminExercisesPage,
   AdminLessonCreatePage,
+  AdminLessonDetailPage,
   AdminLessonsPage,
   AdminSectionsPage,
 } from './content-management-pages'
@@ -282,6 +283,29 @@ describe('course content management', () => {
     )
     expect(await screen.findByLabelText('Đường dẫn hiện tại')).toHaveTextContent(
       `/admin/courses/${course.id}/sections/${section.id}/lessons/${lesson.id}`,
+    )
+  })
+
+  it('publishes a PDF exercise created from the lesson detail page', async () => {
+    const user = userEvent.setup()
+    renderPage(
+      <AdminLessonDetailPage courseId={course.id} sectionId={section.id} lessonId={lesson.id} />,
+      `/admin/courses/${course.id}/sections/${section.id}/lessons/${lesson.id}`,
+    )
+
+    await user.type(await screen.findByLabelText('Tên bài tập'), 'Bài tập mới')
+    await user.type(screen.getByLabelText('Hướng dẫn cho học viên'), 'Hoàn thành PDF.')
+    await user.click(screen.getByRole('button', { name: 'Tạo bài tập' }))
+
+    await waitFor(() =>
+      expect(adminRepository.createExercise).toHaveBeenCalledWith(
+        lesson.id,
+        expect.objectContaining({
+          title: 'Bài tập mới',
+          status: 'PUBLISHED',
+        }),
+        expect.any(String),
+      ),
     )
   })
 

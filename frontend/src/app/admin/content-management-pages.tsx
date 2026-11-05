@@ -1645,7 +1645,7 @@ export function AdminLessonDetailPage({
       completionMode: exerciseType === 'QUIZ' ? 'QUIZ_SUBMISSION' : 'MANUAL',
       isRequired: true,
       sortOrder: exercises.data?.length ?? 0,
-      status: 'DRAFT',
+      status: exerciseType === 'QUIZ' ? 'DRAFT' : 'PUBLISHED',
     }
     setIsAddingExercise(true)
     try {
@@ -1810,6 +1810,11 @@ export function AdminLessonDetailPage({
               rows={2}
               placeholder="Nêu rõ học viên cần làm gì"
             />
+            <p className="text-xs leading-5 text-ink-secondary">
+              {exerciseType === 'FILE_BASED'
+                ? 'Bài tập PDF sẽ hiển thị ngay sau khi được tạo.'
+                : 'Bài trắc nghiệm sẽ hiển thị sau khi hoàn thiện câu hỏi.'}
+            </p>
             {exerciseType === 'FILE_BASED' && (
               <AdminExercisePdfPicker
                 value={exercisePdf}

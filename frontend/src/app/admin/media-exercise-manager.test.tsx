@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { adminRepository } from '@/data/api/admin-repository'
-import type { ApiAdminExercise, ApiAdminMediaAsset } from '@/lib/api/types'
+import type { ApiAdminExercise, ApiAdminMediaAsset, ApiAssetAssociation } from '@/lib/api/types'
 import { DialogProvider } from '@/shared/ui/dialogs'
 import { NotificationProvider } from '@/shared/ui/notifications'
 import { AdminExercisePdfManager } from './media-exercise-manager'
@@ -15,6 +15,7 @@ vi.mock('@/data/api/admin-repository', () => ({
     listExerciseAssets: vi.fn(),
     linkExerciseAsset: vi.fn(),
     unlinkExerciseAsset: vi.fn(),
+    createMediaPreviewAccess: vi.fn(),
     createUploadIntent: vi.fn(),
     uploadFile: vi.fn(),
     completeUpload: vi.fn(),
@@ -53,6 +54,16 @@ const pdf: ApiAdminMediaAsset = {
   usageCount: 0,
 }
 
+const attachedPdf: ApiAssetAssociation = {
+  id: 'association-1',
+  exerciseId: exercise.id,
+  assetId: pdf.id,
+  assetRole: 'QUESTION_PDF',
+  title: pdf.originalName,
+  sortOrder: 0,
+  media: pdf,
+}
+
 function renderManager(exercises: readonly ApiAdminExercise[] = [exercise]) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -83,6 +94,7 @@ describe('AdminExercisePdfManager', () => {
       hasMore: false,
     })
     vi.mocked(adminRepository.listExerciseAssets).mockResolvedValue({ items: [] })
+    vi.mocked(adminRepository.unlinkExerciseAsset).mockResolvedValue(undefined)
     vi.mocked(adminRepository.linkExerciseAsset).mockResolvedValue({
       id: 'association-1',
       exerciseId: exercise.id,
@@ -105,13 +117,22 @@ describe('AdminExercisePdfManager', () => {
       progress(100)
     })
     vi.mocked(adminRepository.completeUpload).mockResolvedValue({ ...pdf, id: 'upload-1' })
+    vi.mocked(adminRepository.createMediaPreviewAccess).mockResolvedValue({
+      assetId: pdf.id,
+      url: 'https://media.example.test/preview.pdf',
+      expiresAt: '2026-11-05T01:00:00.000Z',
+      mediaType: 'PDF',
+      mimeType: 'application/pdf',
+    })
   })
 
   it('explains where to add a PDF when no file exercise exists yet', async () => {
+    const user = userEvent.setup()
     renderManager([])
 
     expect(await screen.findByText('Chưa có bài tập PDF')).toBeVisible()
-    expect(screen.getByText(/Tạo bài tập PDF trước/)).toBeVisible()
+    expect(screen.getByText(/Bạn vẫn có thể tải PDF vào thư viện/)).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Tải PDF lên thư viện' }))
     expect(screen.getByLabelText('Tệp PDF')).toBeVisible()
     expect(screen.getByRole('button', { name: 'Tải PDF lên thư viện tệp' })).toBeVisible()
     expect(screen.queryByRole('button', { name: 'Tạo bài tập FILE_BASED' })).not.toBeInTheDocument()
@@ -122,7 +143,7 @@ describe('AdminExercisePdfManager', () => {
     renderManager([])
     const file = new File(['%PDF'], 'neu.pdf', { type: 'application/pdf' })
 
-    expect(await screen.findByText('arbeitsblatt.pdf')).toBeVisible()
+    await user.click(await screen.findByRole('button', { name: 'Tải PDF lên thư viện' }))
     await user.upload(screen.getByLabelText('Tệp PDF'), file)
     await user.click(screen.getByRole('button', { name: 'Tải PDF lên thư viện tệp' }))
 
@@ -135,8 +156,9 @@ describe('AdminExercisePdfManager', () => {
     const user = userEvent.setup()
     renderManager()
 
-    await user.click(await screen.findByRole('button', { name: /arbeitsblatt\.pdf/i }))
-    await user.click(screen.getByRole('button', { name: 'Gắn PDF' }))
+    await user.click(await screen.findByRole('button', { name: 'Thay đổi tệp' }))
+    await user.click(screen.getByRole('button', { name: 'Chọn tệp có sẵn' }))
+    await user.click(await screen.findByRole('button', { name: 'Gắn' }))
 
     await waitFor(() =>
       expect(adminRepository.linkExerciseAsset).toHaveBeenCalledWith('exercise-1', 'media-1', {
@@ -152,7 +174,7 @@ describe('AdminExercisePdfManager', () => {
     renderManager()
     const file = new File(['%PDF'], 'neu.pdf', { type: 'application/pdf' })
 
-    expect(await screen.findByText('arbeitsblatt.pdf')).toBeVisible()
+    await user.click(await screen.findByRole('button', { name: 'Thay đổi tệp' }))
     await user.upload(screen.getByLabelText('Tệp PDF'), file)
     await user.click(screen.getByRole('button', { name: 'Tải lên và gắn PDF' }))
 
@@ -175,5 +197,62 @@ describe('AdminExercisePdfManager', () => {
       title: 'neu.pdf',
       sortOrder: 0,
     })
+  })
+
+  it('shows the attached file, previews it, and marks it in the available file list', async () => {
+    const user = userEvent.setup()
+    const secondPdf = { ...pdf, id: 'media-2', originalName: 'anderes.pdf' }
+    vi.mocked(adminRepository.listExerciseAssets).mockResolvedValue({ items: [attachedPdf] })
+    vi.mocked(adminRepository.listMedia).mockResolvedValue({
+      items: [pdf, secondPdf],
+      page: 1,
+      pageSize: 20,
+      total: 2,
+      hasMore: false,
+    })
+    renderManager()
+
+    expect(await screen.findByText('arbeitsblatt.pdf')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Xem trước' }))
+    expect(await screen.findByRole('dialog', { name: 'Xem trước PDF' })).toBeVisible()
+    expect(adminRepository.createMediaPreviewAccess).toHaveBeenCalledWith(pdf.id)
+
+    await user.click(screen.getByRole('button', { name: 'Đóng hộp thoại' }))
+    await user.click(screen.getByRole('button', { name: 'Thay đổi tệp' }))
+    await user.click(screen.getByRole('button', { name: 'Chọn tệp có sẵn' }))
+    expect(await screen.findByText('Đang gắn')).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Gắn' })).toBeVisible()
+  })
+
+  it('replaces the currently attached PDF when another library file is chosen', async () => {
+    const user = userEvent.setup()
+    const secondPdf = { ...pdf, id: 'media-2', originalName: 'anderes.pdf' }
+    vi.mocked(adminRepository.listExerciseAssets).mockResolvedValue({ items: [attachedPdf] })
+    vi.mocked(adminRepository.listMedia).mockResolvedValue({
+      items: [pdf, secondPdf],
+      page: 1,
+      pageSize: 20,
+      total: 2,
+      hasMore: false,
+    })
+    renderManager()
+
+    await user.click(await screen.findByRole('button', { name: 'Thay đổi tệp' }))
+    await user.click(screen.getByRole('button', { name: 'Chọn tệp có sẵn' }))
+    await screen.findByText('anderes.pdf')
+    await user.click(screen.getByRole('button', { name: 'Gắn' }))
+
+    await waitFor(() =>
+      expect(adminRepository.linkExerciseAsset).toHaveBeenCalledWith('exercise-1', 'media-2', {
+        assetRole: 'QUESTION_PDF',
+        title: 'anderes.pdf',
+        sortOrder: 0,
+      }),
+    )
+    expect(adminRepository.unlinkExerciseAsset).toHaveBeenCalledWith(
+      'exercise-1',
+      'media-1',
+      'QUESTION_PDF',
+    )
   })
 })

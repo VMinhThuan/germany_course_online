@@ -27,39 +27,39 @@ export const courseImportManifest = {
   sections: [
     {
       title: "Lektion 1",
-      sortOrder: 1,
+      sortOrder: 0,
       lessons: [
         {
           title: "Begrüßung und Abschied",
           videoId: "lamg3tUwct4",
-          sortOrder: 1,
+          sortOrder: 0,
         },
-        { title: "Sich vorstellen", videoId: "VqW9bOvJuJg", sortOrder: 2 },
+        { title: "Sich vorstellen", videoId: "VqW9bOvJuJg", sortOrder: 1 },
         {
           title: "Nach dem Befinden fragen (Du)",
           videoId: "GqdHcdnYwK0",
-          sortOrder: 3,
+          sortOrder: 2,
         },
         {
           title: "Nach dem Befinden fragen (Sie)",
           videoId: "yhH5qNyBaDI",
-          sortOrder: 4,
+          sortOrder: 3,
         },
-        { title: "Das Alphabet", videoId: "8btp8npfmC8", sortOrder: 5 },
-        { title: "Die Zahlen", videoId: "UpU-yfPXlIw", sortOrder: 6 },
+        { title: "Das Alphabet", videoId: "8btp8npfmC8", sortOrder: 4 },
+        { title: "Die Zahlen", videoId: "UpU-yfPXlIw", sortOrder: 5 },
         {
           title: "Telefonnummer und E-Mail",
           videoId: "31kcrDC_c6Q",
-          sortOrder: 7,
+          sortOrder: 6,
         },
       ],
     },
     {
       title: "Lektion 2",
-      sortOrder: 2,
+      sortOrder: 1,
       lessons: [
-        { title: "Die Länder", videoId: "q7FJCKxKLX0", sortOrder: 1 },
-        { title: "Der Wohnort", videoId: "O5Hz1ukprws", sortOrder: 2 },
+        { title: "Die Länder", videoId: "q7FJCKxKLX0", sortOrder: 0 },
+        { title: "Der Wohnort", videoId: "O5Hz1ukprws", sortOrder: 1 },
       ],
     },
   ] satisfies readonly CourseImportSection[],
