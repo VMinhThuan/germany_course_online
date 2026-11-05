@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useRef, type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react'
 import { ArrowLeft, BookOpenText, LogOut, Settings2 } from 'lucide-react'
 import { Link, NavLink, useLocation } from 'react-router'
 import { useQueryClient, useMutation } from '@tanstack/react-query'
@@ -9,8 +17,16 @@ import { ApiError } from '@/lib/api/client'
 
 const navigation = [
   { to: '/admin', label: 'Tổng quan' },
-  { to: '/admin/courses', label: 'Khóa học' },
-  { to: '/admin/media', label: 'Thư viện media' },
+  {
+    label: 'Quản lý khóa học',
+    children: [
+      { to: '/admin/courses', label: 'Khóa học' },
+      { to: '/admin/sections', label: 'Chương' },
+      { to: '/admin/lessons', label: 'Bài học' },
+      { to: '/admin/exercises', label: 'Bài tập' },
+    ],
+  },
+  { to: '/admin/media', label: 'Thư viện tệp' },
   { to: '/admin/students', label: 'Học viên' },
   { to: '/admin/enrollments', label: 'Quyền học' },
   { to: '/admin/orders', label: 'Đơn hàng' },
@@ -63,6 +79,52 @@ export function AdminLayout({
             className="flex gap-2 overflow-x-auto rounded-2xl border border-border-subtle bg-white p-2 lg:grid lg:content-start lg:gap-1 lg:overflow-visible"
           >
             {navigation.map((item) => {
+              if ('children' in item) {
+                return (
+                  <div
+                    key={item.label}
+                    className="min-w-[13rem] rounded-xl bg-surface-muted p-2 lg:min-w-0"
+                  >
+                    <p className="px-2 pb-1 pt-0.5 text-[0.65rem] font-bold uppercase tracking-[0.12em] text-ink-muted">
+                      {item.label}
+                    </p>
+                    <div className="grid grid-cols-2 gap-1 lg:grid-cols-1">
+                      {item.children.map((child) => {
+                        const nestedSectionEditor =
+                          /^\/admin\/courses\/[^/]+\/sections\/[^/]+$/.test(location.pathname)
+                        const nestedLessonEditor =
+                          /^\/admin\/courses\/[^/]+\/sections\/[^/]+\/lessons\/[^/]+$/.test(
+                            location.pathname,
+                          )
+                        const nestedExerciseEditor =
+                          /^\/admin\/courses\/[^/]+\/sections\/[^/]+\/lessons\/[^/]+\/exercises\/[^/]+$/.test(
+                            location.pathname,
+                          )
+                        const active =
+                          location.pathname === child.to ||
+                          (location.pathname.startsWith(`${child.to}/`) &&
+                            !(
+                              child.to === '/admin/courses' &&
+                              (nestedSectionEditor || nestedLessonEditor || nestedExerciseEditor)
+                            )) ||
+                          (child.to === '/admin/sections' && nestedSectionEditor) ||
+                          (child.to === '/admin/lessons' && nestedLessonEditor) ||
+                          (child.to === '/admin/exercises' && nestedExerciseEditor)
+                        return (
+                          <NavLink
+                            key={child.to}
+                            to={child.to}
+                            aria-current={active ? 'page' : undefined}
+                            className={`min-h-10 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${active ? 'bg-white text-action-primary shadow-sm' : 'text-ink-secondary hover:bg-white/80 hover:text-ink-primary'}`}
+                          >
+                            {child.label}
+                          </NavLink>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              }
               const active =
                 location.pathname === item.to ||
                 (item.to !== '/admin' && location.pathname.startsWith(`${item.to}/`))
@@ -80,9 +142,9 @@ export function AdminLayout({
           </nav>
           <div className="mt-4 hidden rounded-2xl border border-border-subtle bg-white p-4 text-sm text-ink-secondary lg:block">
             <Settings2 aria-hidden="true" className="mb-2 size-5 text-action-primary" />
-            <p className="font-semibold text-ink-primary">Quản trị qua API</p>
+            <p className="font-semibold text-ink-primary">Quản lý nội dung học</p>
             <p className="mt-1 leading-6">
-              Mọi thao tác ghi đều được máy chủ phân quyền và ghi nhật ký.
+              Chọn khóa học, chương, bài học hoặc bài tập để bắt đầu chỉnh sửa.
             </p>
           </div>
         </aside>
@@ -219,6 +281,131 @@ export function AdminSelect({
   )
 }
 
+function normalizeAdminSearch(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[đĐ]/g, 'd')
+    .toLocaleLowerCase('vi')
+    .trim()
+}
+
+export function AdminSearchSelect({
+  label,
+  value,
+  onChange,
+  options,
+  placeholder = 'Gõ để tìm tên…',
+  disabled = false,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  options: readonly { value: string; label: string; description?: string }[]
+  placeholder?: string
+  disabled?: boolean
+}) {
+  const id = useId()
+  const listId = `${id}-options`
+  const selected = options.find((option) => option.value === value)
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const filtered = options
+    .filter((option) =>
+      normalizeAdminSearch(`${option.label} ${option.description ?? ''}`).includes(
+        normalizeAdminSearch(search),
+      ),
+    )
+    .slice(0, 80)
+
+  function choose(option: (typeof options)[number]) {
+    onChange(option.value)
+    setSearch('')
+    setOpen(false)
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === 'Escape') {
+      setOpen(false)
+      setSearch('')
+    } else if (event.key === 'Enter' && open && filtered[0]) {
+      event.preventDefault()
+      choose(filtered[0])
+    } else if (event.key === 'ArrowDown') {
+      setOpen(true)
+    }
+  }
+
+  return (
+    <div className="relative grid min-w-0 gap-1.5 text-sm font-semibold text-ink-primary">
+      <label htmlFor={id}>{label}</label>
+      <input
+        id={id}
+        role="combobox"
+        aria-autocomplete="list"
+        aria-expanded={open}
+        aria-controls={listId}
+        autoComplete="off"
+        className="min-h-11 w-full rounded-xl border border-border-subtle bg-white px-3 font-normal outline-none focus-visible:ring-2 focus-visible:ring-action-primary disabled:bg-surface-muted"
+        value={open ? search : (selected?.label ?? '')}
+        placeholder={options.length ? placeholder : 'Chưa có mục nào để chọn'}
+        disabled={disabled || options.length === 0}
+        onFocus={() => {
+          setSearch(selected?.label ?? '')
+          setOpen(true)
+        }}
+        onBlur={() => setOpen(false)}
+        onKeyDown={handleKeyDown}
+        onChange={(event) => {
+          setSearch(event.target.value)
+          setOpen(true)
+          if (value) onChange('')
+        }}
+      />
+      {open && (
+        <div
+          id={listId}
+          role="listbox"
+          aria-label={label}
+          className="absolute inset-x-0 top-full z-20 mt-1 max-h-64 overflow-y-auto rounded-xl border border-border-subtle bg-white p-1 shadow-raised"
+        >
+          {filtered.length ? (
+            filtered.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                role="option"
+                aria-selected={option.value === value}
+                className="grid min-h-10 w-full gap-0.5 rounded-lg px-3 py-2 text-left font-normal hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => choose(option)}
+              >
+                <span className="truncate font-semibold">{option.label}</span>
+                {option.description && (
+                  <span className="truncate text-xs text-ink-secondary">{option.description}</span>
+                )}
+              </button>
+            ))
+          ) : (
+            <p className="px-3 py-2 text-sm font-normal text-ink-secondary">
+              Không tìm thấy kết quả phù hợp.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function useDebouncedValue<T>(value: T, delay = 250) {
+  const [debouncedValue, setDebouncedValue] = useState(value)
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedValue(value), delay)
+    return () => window.clearTimeout(timeout)
+  }, [delay, value])
+  return debouncedValue
+}
+
 export function AdminTextArea({
   label,
   value,
@@ -290,7 +477,7 @@ export function AdminLoadError({ error, retry }: { error: unknown; retry: () => 
   return (
     <ErrorState
       title="Không tải được dữ liệu"
-      description={error instanceof Error ? error.message : 'Kiểm tra kết nối API rồi thử lại.'}
+      description={error instanceof Error ? error.message : 'Kiểm tra kết nối rồi thử lại.'}
       onRetry={retry}
     />
   )

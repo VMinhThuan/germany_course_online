@@ -615,52 +615,95 @@ test('Admin creates and publishes a valid CMS tree; learner completion keeps its
   browser,
   request,
 }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
   const adminToken = await login(page, 'admin.be04@example.test')
   await page.goto('/admin/courses')
   await page.getByLabel('Mã khóa học').fill('BE05-CMS-A1')
-  await page.getByLabel('Slug').fill('be05-cms-a1')
   await page.getByLabel('Tên khóa học').fill('Khóa CMS tổng hợp BE-05')
   await page.getByLabel('Cấp độ').fill('A1')
-  await page.getByLabel('Học phí (VND nguyên)').fill('1200000')
+  await page.getByLabel('Học phí (đồng)').fill('1200000')
   await page.getByLabel('Thời hạn truy cập (tháng)').fill('12')
   await page.getByLabel('Mô tả ngắn').fill('Course created by the actual Admin CMS form.')
   await page
     .getByLabel('Mô tả', { exact: true })
     .fill('Nội dung tổng hợp dùng cho kiểm thử E2E BE-05.')
-  await page.getByRole('button', { name: 'Tạo bản nháp' }).click()
+  await page.getByRole('button', { name: 'Tạo khóa học' }).click()
   await expect(page).toHaveURL(/\/admin\/courses\/[0-9a-f]{24}$/)
   const courseId = new URL(page.url()).pathname.split('/').at(-1)!
-  const draftPublic = await request.get(`${apiBase}/courses/be05-cms-a1`)
+  const courseSlug = 'khoa-cms-tong-hop-be-05'
+  const draftPublic = await request.get(`${apiBase}/courses/${courseSlug}`)
   expect(draftPublic.status()).toBe(404)
 
   await page.getByLabel('Tên khóa học').fill('Khóa CMS BE-05 đã chỉnh sửa')
-  await page.getByRole('button', { name: 'Lưu khóa học' }).click()
+  await page.getByRole('button', { name: 'Lưu thay đổi' }).click()
   await expect(page.getByText('Đã lưu thông tin khóa học.')).toBeVisible()
+
+  await page.goto('/admin/sections')
+  const sectionCourse = page.getByRole('combobox', { name: 'Khóa học' })
+  await sectionCourse.fill('Khóa CMS BE-05 đã chỉnh sửa')
+  await page.getByRole('option', { name: /Khóa CMS BE-05 đã chỉnh sửa/ }).click()
   await page.getByLabel('Tên chương').fill('Chương BE-05')
-  await page.getByRole('button', { name: 'Thêm chương' }).click()
+  await page.getByRole('button', { name: 'Tạo chương' }).click()
   const sectionLink = page.getByRole('link', { name: /Chương BE-05/ })
   await expect(sectionLink).toBeVisible()
   await sectionLink.click()
   const sectionId = new URL(page.url()).pathname.split('/').at(-1)!
   await page.getByLabel('Trạng thái').selectOption('PUBLISHED')
-  await page.getByRole('button', { name: 'Lưu chương' }).click()
+  await page.getByRole('button', { name: 'Lưu thay đổi' }).click()
   await expect(page.getByText('Đã lưu chương.', { exact: true }).first()).toBeVisible()
+
+  await page.goto('/admin/lessons')
+  const lessonCourse = page.getByRole('combobox', { name: '1. Khóa học' })
+  await lessonCourse.fill('Khóa CMS BE-05 đã chỉnh sửa')
+  await page.getByRole('option', { name: /Khóa CMS BE-05 đã chỉnh sửa/ }).click()
+  const lessonSection = page.getByRole('combobox', { name: '2. Chương' })
+  await lessonSection.fill('Chương BE-05')
+  await page.getByRole('option', { name: /Chương BE-05/ }).click()
   await page.getByLabel('Tên bài học').fill('Bài học đầu tiên BE-05')
-  await page.getByRole('button', { name: 'Thêm bài học' }).click()
-  const lessonLink = page.getByRole('link', { name: 'Bài học đầu tiên BE-05' })
-  await expect(lessonLink).toBeVisible()
-  await lessonLink.click()
+  await page.getByRole('button', { name: 'Tạo bài học' }).click()
+  await expect(page).toHaveURL(
+    new RegExp(`/admin/courses/${courseId}/sections/${sectionId}/lessons/[0-9a-f]{24}$`),
+  )
   const lessonId = new URL(page.url()).pathname.split('/').at(-1)!
-  await page
-    .getByLabel('Nội dung bài học (văn bản thuần)')
-    .fill('Hallo zusammen.\n\nWie geht es dir?')
+  await page.getByLabel('Nội dung ghi chú cho học viên').fill('Hallo zusammen.\n\nWie geht es dir?')
   await page.getByLabel('Trạng thái').selectOption('PUBLISHED')
-  await page.getByRole('button', { name: 'Lưu bài học' }).click()
-  await expect(page.getByText('Đã lưu bài học.', { exact: true }).first()).toBeVisible()
+  const invalidLessonFields = await page
+    .locator('form')
+    .first()
+    .evaluate((form) =>
+      Array.from(
+        form.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(
+          'input, select, textarea',
+        ),
+      )
+        .filter((field) => !field.checkValidity())
+        .map((field) => ({ name: field.getAttribute('aria-label'), value: field.value })),
+    )
+  expect(invalidLessonFields).toEqual([])
+  await page.getByRole('button', { name: 'Lưu thay đổi' }).click()
+  await expect(page.getByText('Đã lưu bài học.', { exact: true })).toBeVisible()
+  const savedLessonsResponse = await apiGet(
+    request,
+    `/admin/sections/${sectionId}/lessons?page=1&pageSize=100`,
+    adminToken,
+  )
+  const savedLessons = (await savedLessonsResponse.json()).data.items as Array<{
+    id: string
+    status: string
+    content: { paragraphs: string[] }
+  }>
+  const savedLesson = savedLessons.find((item) => item.id === lessonId)
+  expect(
+    savedLesson,
+    `saved lesson ids: ${savedLessons.map((item) => item.id).join(', ')}`,
+  ).toMatchObject({
+    status: 'PUBLISHED',
+    content: { paragraphs: ['Hallo zusammen.', 'Wie geht es dir?'] },
+  })
 
   await page.getByLabel('Tên bài tập').fill('Tệp bài tập BE-05')
-  await page.getByLabel('Hướng dẫn bài tập').fill('Hoàn thành tệp tổng hợp theo hướng dẫn.')
-  await page.getByRole('button', { name: 'Thêm bài' }).click()
+  await page.getByLabel('Hướng dẫn cho học viên').fill('Hoàn thành tệp tổng hợp theo hướng dẫn.')
+  await page.getByRole('button', { name: 'Tạo bài tập' }).click()
   const fileExerciseLink = page.getByRole('link', { name: 'Chỉnh sửa' }).first()
   await expect(fileExerciseLink).toBeVisible()
   const fileExerciseHref = await fileExerciseLink.getAttribute('href')
@@ -671,53 +714,37 @@ test('Admin creates and publishes a valid CMS tree; learner completion keeps its
   await page.getByLabel('Trạng thái').selectOption('PUBLISHED')
   await page.getByRole('button', { name: 'Lưu bài tập' }).click()
   await expect(page.getByText('Đã lưu bài tập.')).toBeVisible()
-  await page.goto(`/admin/courses/${courseId}/sections/${sectionId}/lessons/${lessonId}`)
 
-  await page.locator('form').last().getByRole('combobox').selectOption('QUIZ')
+  await page.goto(`/admin/courses/${courseId}/sections/${sectionId}/lessons/${lessonId}`)
+  await page.getByLabel('Loại bài tập').selectOption('QUIZ')
   await page.getByLabel('Tên bài tập').fill('Quiz bắt buộc BE-05')
-  await page.getByLabel('Hướng dẫn bài tập').fill('Chọn đáp án phù hợp với ngữ cảnh.')
-  await page.getByRole('button', { name: 'Thêm bài' }).click()
+  await page.getByLabel('Hướng dẫn cho học viên').fill('Chọn đáp án phù hợp với ngữ cảnh.')
+  await page.getByRole('button', { name: 'Tạo bài tập và mở câu hỏi' }).click()
   await expect(page).toHaveURL(
     new RegExp(
       `/admin/courses/${courseId}/sections/${sectionId}/lessons/${lessonId}/exercises/[0-9a-f]{24}$`,
     ),
   )
   const quizExerciseId = new URL(page.url()).pathname.split('/').at(-1)!
-  await page.getByLabel('Tên Quiz').fill('Quiz giao tiếp BE-05')
-  await page.getByLabel('Ngưỡng đạt (%) · để trống nếu không có').fill('80')
-  const questionEditor = page.getByLabel('Câu hỏi và lựa chọn (JSON theo schema Quiz)')
-  await questionEditor.fill('[]')
-  await page.getByRole('button', { name: 'Lưu Quiz' }).click()
-  await expect(page.getByRole('alert').getByText(/Cần ít nhất một câu hỏi/)).toBeVisible()
-  await questionEditor.fill(
-    JSON.stringify(
-      [
-        {
-          questionText: 'Cách nói tạm biệt là gì?',
-          questionType: 'SINGLE_CHOICE',
-          explanation: 'Auf Wiedersehen là lời tạm biệt.',
-          points: '1',
-          sortOrder: 1,
-          options: [
-            { optionText: 'Guten Tag', isCorrect: false, sortOrder: 1 },
-            { optionText: 'Auf Wiedersehen', isCorrect: true, sortOrder: 2 },
-          ],
-        },
-      ],
-      null,
-      2,
-    ),
-  )
-  await page.getByRole('button', { name: 'Lưu Quiz' }).click()
-  await expect(page.getByText('Đã lưu cấu hình Quiz.')).toBeVisible()
+  await page.getByLabel('Tên bài trắc nghiệm').fill('Quiz giao tiếp BE-05')
+  await page.getByLabel('Điểm đạt (%) · để trống nếu không áp dụng').fill('80')
+  await page.getByLabel('Nội dung câu hỏi').fill('Cách nói tạm biệt là gì?')
+  await page.getByRole('textbox', { name: 'Lựa chọn 1' }).fill('Guten Tag')
+  await page.getByRole('textbox', { name: 'Lựa chọn 2' }).fill('Auf Wiedersehen')
+  await page.getByRole('radio').nth(1).check()
+  await page
+    .getByLabel('Giải thích đáp án (không bắt buộc)')
+    .fill('Auf Wiedersehen là lời tạm biệt.')
+  await page.getByRole('button', { name: 'Lưu bài trắc nghiệm' }).click()
+  await expect(page.getByText('Đã lưu bài trắc nghiệm.')).toBeVisible()
   await page.getByLabel('Hướng dẫn').fill('Chọn đáp án phù hợp với ngữ cảnh.')
   await page.getByLabel('Trạng thái').selectOption('PUBLISHED')
   await page.getByRole('button', { name: 'Lưu bài tập' }).click()
   await expect(page.getByText('Đã lưu bài tập.')).toBeVisible()
   await page.goto(`/admin/courses/${courseId}`)
-  await page.getByRole('button', { name: 'Xuất bản khóa học' }).click()
-  await expect(page.getByText('Khóa học đã được xuất bản.')).toBeVisible()
-  const publishedPublic = await request.get(`${apiBase}/courses/be05-cms-a1`)
+  await page.getByRole('button', { name: 'Hiển thị khóa học' }).click()
+  await expect(page.getByText('Đã hiển thị khóa học.')).toBeVisible()
+  const publishedPublic = await request.get(`${apiBase}/courses/${courseSlug}`)
   expect(publishedPublic.status()).toBe(200)
   expect((await publishedPublic.json()).data.title).toBe('Khóa CMS BE-05 đã chỉnh sửa')
 
@@ -760,31 +787,23 @@ test('Admin creates and publishes a valid CMS tree; learner completion keeps its
   const completeLessonButton = learner.getByRole('button', { name: 'Hoàn thành bài học' })
   await expect(completeLessonButton).toBeEnabled()
   await completeLessonButton.click()
-  await expect(learner.getByRole('button', { name: 'Đã hoàn thành' })).toBeVisible()
+  await expect(learner.getByRole('button', { name: 'Đã hoàn thành', exact: true })).toBeVisible()
 
   await page.goto(quizRoute)
-  const quizJson = page.getByLabel('Câu hỏi và lựa chọn (JSON theo schema Quiz)')
-  await expect(quizJson).toHaveValue(/Cách nói tạm biệt là gì\?/)
-  const editedQuestions = JSON.parse(await quizJson.inputValue()) as Array<{
-    options: Array<{ isCorrect: boolean }>
-  }>
-  editedQuestions[0]!.options[0]!.isCorrect = true
-  editedQuestions[0]!.options[1]!.isCorrect = false
-  await quizJson.fill(JSON.stringify(editedQuestions, null, 2))
-  await page.getByRole('button', { name: 'Lưu Quiz' }).click()
-  await expect(page.getByText('Đã lưu cấu hình Quiz.')).toBeVisible()
+  await expect(page.getByLabel('Nội dung câu hỏi')).toHaveValue('Cách nói tạm biệt là gì?')
+  await page.getByRole('radio').first().check()
+  await page.getByRole('button', { name: 'Lưu bài trắc nghiệm' }).click()
+  await expect(page.getByText('Đã lưu bài trắc nghiệm.')).toBeVisible()
   await learner.goto(`/learn/quizzes/${attemptId}/result`)
   await expect(learner.getByText('0 / 1 câu đúng')).toBeVisible()
   await expect(learner.getByText('Đáp án được hệ thống trả về: Auf Wiedersehen')).toBeVisible()
   await expect(learner.getByText('Bạn đã chọn: Guten Tag')).toBeVisible()
 
   await page.goto(`/admin/courses/${courseId}`)
-  page.once('dialog', async (dialog) => {
-    await dialog.accept()
-  })
-  await page.getByRole('button', { name: 'Xóa mềm' }).click()
+  await page.getByRole('button', { name: 'Xóa khóa học' }).click()
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Xóa khóa học' }).click()
   await expect(page).toHaveURL('/admin/courses')
-  const deletedPublicCourse = await request.get(`${apiBase}/courses/be05-cms-a1`)
+  const deletedPublicCourse = await request.get(`${apiBase}/courses/${courseSlug}`)
   expect(deletedPublicCourse.status()).toBe(404)
   const retainedEnrollment = await apiGet(
     request,

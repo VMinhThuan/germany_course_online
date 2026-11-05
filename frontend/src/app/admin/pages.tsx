@@ -12,13 +12,15 @@ import { adminRepository } from '@/data/api/admin-repository'
 import { formatVnd } from '@/shared/lib/format'
 import { Card, EmptyState } from '@/shared/ui'
 import { AdminCard, AdminLayout, AdminLoadError, AdminLoading } from './shared'
+import { AdminCoursesPage, AdminExerciseEditorPage } from './catalog-pages'
 import {
   AdminCourseEditorPage,
-  AdminCoursesPage,
-  AdminExerciseEditorPage,
-  AdminLessonEditorPage,
+  AdminExercisesPage,
+  AdminLessonDetailPage,
+  AdminLessonsPage,
   AdminSectionEditorPage,
-} from './catalog-pages'
+  AdminSectionsPage,
+} from './content-management-pages'
 import { AdminEnrollmentsPage, AdminStudentsPage } from './directory-pages'
 import { AdminCouponsPage, AdminOrdersPage, AdminRenewalPlansPage } from './commerce-pages'
 import { AdminAuditLogsPage, AdminMediaPage, AdminSettingsPage } from './media-settings-pages'
@@ -55,7 +57,7 @@ export function AdminDashboardPage() {
   return (
     <AdminLayout
       title="Tổng quan"
-      description="Chỉ hiển thị số liệu tổng hợp do API quản trị trả về."
+      description="Xem nhanh tình hình khóa học, học viên và đơn hàng."
     >
       {summary.isPending ? (
         <AdminLoading />
@@ -116,10 +118,7 @@ export function AdminDashboardPage() {
                 <EmptyState title="Chưa có đơn hàng" />
               )}
             </AdminCard>
-            <AdminCard
-              title="Lối tắt"
-              description="Các thay đổi ghi nhận qua endpoint có phân quyền và audit."
-            >
+            <AdminCard title="Lối tắt" description="Mở nhanh những việc quản lý thường dùng.">
               <div className="grid gap-2">
                 <Link
                   to="/admin/courses"
@@ -152,8 +151,11 @@ export function AdminDashboardPage() {
 }
 
 function titleFor(path: string) {
-  if (path.startsWith('/admin/courses')) return 'Quản lý khóa học và CMS'
-  if (path.startsWith('/admin/media')) return 'Thư viện media'
+  if (path.startsWith('/admin/courses')) return 'Khóa học'
+  if (path.startsWith('/admin/sections')) return 'Chương'
+  if (path.startsWith('/admin/lessons')) return 'Bài học'
+  if (path.startsWith('/admin/exercises')) return 'Bài tập'
+  if (path.startsWith('/admin/media')) return 'Thư viện tệp'
   if (path.startsWith('/admin/students')) return 'Quản lý học viên'
   if (path.startsWith('/admin/enrollments')) return 'Quản lý quyền học'
   if (path.startsWith('/admin/orders')) return 'Kiểm duyệt đơn hàng'
@@ -178,7 +180,7 @@ export function AdminWorkspacePage() {
       content = <AdminSectionEditorPage courseId={parts[2]!} sectionId={parts[4]!} />
     else if (parts.length === 7 && parts[3] === 'sections' && parts[5] === 'lessons')
       content = (
-        <AdminLessonEditorPage courseId={parts[2]!} sectionId={parts[4]!} lessonId={parts[6]!} />
+        <AdminLessonDetailPage courseId={parts[2]!} sectionId={parts[4]!} lessonId={parts[6]!} />
       )
     else if (
       parts.length === 9 &&
@@ -194,7 +196,10 @@ export function AdminWorkspacePage() {
           exerciseId={parts[8]!}
         />
       )
-  } else if (segment === 'media' && parts.length === 2) content = <AdminMediaPage />
+  } else if (segment === 'sections' && parts.length === 2) content = <AdminSectionsPage />
+  else if (segment === 'lessons' && parts.length === 2) content = <AdminLessonsPage />
+  else if (segment === 'exercises' && parts.length === 2) content = <AdminExercisesPage />
+  else if (segment === 'media' && parts.length === 2) content = <AdminMediaPage />
   else if (segment === 'students')
     content = <AdminStudentsPage {...(parts[2] ? { userId: parts[2] } : {})} />
   else if (segment === 'enrollments')
@@ -209,7 +214,9 @@ export function AdminWorkspacePage() {
   return (
     <AdminLayout
       title={title}
-      description="Thao tác được gửi tới backend Express; lỗi xác thực và ràng buộc được hiển thị từ API."
+      {...(['courses', 'sections', 'lessons', 'exercises'].includes(segment ?? '')
+        ? { description: 'Quản lý nội dung theo thứ tự khóa học → chương → bài học → bài tập.' }
+        : {})}
     >
       {content ?? (
         <AdminCard title="Không tìm thấy trang quản trị">

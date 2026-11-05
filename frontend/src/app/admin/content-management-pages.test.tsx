@@ -1,0 +1,254 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { adminRepository } from '@/data/api/admin-repository'
+import type {
+  ApiAdminCourse,
+  ApiAdminExercise,
+  ApiAdminLesson,
+  ApiAdminMediaAsset,
+  ApiAdminSection,
+} from '@/lib/api/types'
+import { DialogProvider } from '@/shared/ui/dialogs'
+import { NotificationProvider } from '@/shared/ui/notifications'
+import { AdminExercisesPage } from './content-management-pages'
+
+vi.mock('@/data/api/admin-repository', () => ({
+  adminRepository: {
+    listCourses: vi.fn(),
+    listSections: vi.fn(),
+    listLessons: vi.fn(),
+    listExercises: vi.fn(),
+    createExercise: vi.fn(),
+    updateExercise: vi.fn(),
+    deleteExercise: vi.fn(),
+    getMediaCapabilities: vi.fn(),
+    listMedia: vi.fn(),
+    createUploadIntent: vi.fn(),
+    uploadFile: vi.fn(),
+    completeUpload: vi.fn(),
+    deleteMedia: vi.fn(),
+    linkExerciseAsset: vi.fn(),
+  },
+}))
+
+const course: ApiAdminCourse = {
+  id: 'course-1',
+  code: 'A1-1',
+  slug: 'german-a1-1',
+  title: 'Tiếng Đức A1.1',
+  description: 'Mô tả khóa học',
+  shortDescription: 'Khóa học A1.1',
+  objectives: [],
+  requirements: [],
+  level: 'A1',
+  thumbnailAssetId: null,
+  bannerAssetId: null,
+  introVideoAssetId: null,
+  price: '1000000',
+  accessDurationMonths: 12,
+  sortOrder: 0,
+  status: 'PUBLISHED',
+  createdAt: '2026-11-05T00:00:00.000Z',
+  updatedAt: '2026-11-05T00:00:00.000Z',
+  deletedAt: null,
+}
+
+const section: ApiAdminSection = {
+  id: 'section-1',
+  courseId: course.id,
+  title: 'Lektion 1',
+  description: null,
+  sectionType: 'CHAPTER',
+  sortOrder: 0,
+  status: 'PUBLISHED',
+  createdAt: '2026-11-05T00:00:00.000Z',
+  updatedAt: '2026-11-05T00:00:00.000Z',
+  deletedAt: null,
+}
+
+const lesson: ApiAdminLesson = {
+  id: 'lesson-1',
+  sectionId: section.id,
+  title: 'Begrüßung und Abschied',
+  description: null,
+  content: null,
+  video: null,
+  solutionVideo: null,
+  lessonType: 'LECTURE',
+  estimatedMinutes: null,
+  countsTowardProgress: true,
+  sortOrder: 0,
+  status: 'PUBLISHED',
+  createdAt: '2026-11-05T00:00:00.000Z',
+  updatedAt: '2026-11-05T00:00:00.000Z',
+  deletedAt: null,
+}
+
+const exercise: ApiAdminExercise = {
+  id: 'exercise-1',
+  lessonId: lesson.id,
+  title: 'Arbeitsblatt',
+  description: null,
+  instructions: 'Làm bài trong PDF.',
+  exerciseType: 'FILE_BASED',
+  completionMode: 'MANUAL',
+  isRequired: true,
+  sortOrder: 0,
+  status: 'DRAFT',
+  createdAt: '2026-11-05T00:00:00.000Z',
+  updatedAt: '2026-11-05T00:00:00.000Z',
+  deletedAt: null,
+}
+
+const pdf: ApiAdminMediaAsset = {
+  id: 'media-1',
+  originalName: 'arbeitsblatt.pdf',
+  mediaType: 'PDF',
+  mimeType: 'application/pdf',
+  fileSize: 2048,
+  durationSeconds: null,
+  visibility: 'ENROLLED',
+  uploadedById: null,
+  createdAt: '2026-11-05T00:00:00.000Z',
+  provider: 'CLOUDINARY',
+  uploadStatus: 'READY',
+  usageCount: 0,
+}
+
+function page<T>(items: T[]) {
+  return { items, page: 1, pageSize: 100, total: items.length, hasMore: false }
+}
+
+function renderPage() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  })
+  return render(
+    <NotificationProvider>
+      <DialogProvider>
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter initialEntries={['/admin/exercises']}>
+            <AdminExercisesPage />
+          </MemoryRouter>
+        </QueryClientProvider>
+      </DialogProvider>
+    </NotificationProvider>,
+  )
+}
+
+async function chooseLocation(user: ReturnType<typeof userEvent.setup>) {
+  const courseSelect = await screen.findByRole('combobox', { name: '1. Khóa học' })
+  await user.click(courseSelect)
+  await user.click(await screen.findByRole('option', { name: /Tiếng Đức A1\.1/ }))
+
+  const sectionSelect = await screen.findByRole('combobox', { name: '2. Chương' })
+  await user.click(sectionSelect)
+  await user.click(await screen.findByRole('option', { name: /Lektion 1/ }))
+
+  const lessonSelect = await screen.findByRole('combobox', { name: '3. Bài học' })
+  await user.click(lessonSelect)
+  await user.click(await screen.findByRole('option', { name: /Begrüßung und Abschied/ }))
+}
+
+describe('AdminExercisesPage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(adminRepository.listCourses).mockResolvedValue(page([course]))
+    vi.mocked(adminRepository.listSections).mockResolvedValue(page([section]))
+    vi.mocked(adminRepository.listLessons).mockResolvedValue(page([lesson]))
+    vi.mocked(adminRepository.listExercises).mockResolvedValue(page([]))
+    vi.mocked(adminRepository.createExercise).mockResolvedValue(exercise)
+    vi.mocked(adminRepository.getMediaCapabilities).mockResolvedValue({
+      activeProvider: 'CLOUDINARY',
+      supportedMediaTypes: ['PDF'],
+    })
+    vi.mocked(adminRepository.listMedia).mockResolvedValue(page([pdf]))
+    vi.mocked(adminRepository.createUploadIntent).mockResolvedValue({
+      assetId: 'upload-1',
+      provider: 'CLOUDINARY',
+      uploadUrl: 'https://api.cloudinary.com/v1_1/test/raw/upload',
+      uploadMethod: 'POST',
+      uploadHeaders: {},
+      uploadFields: { api_key: 'test-key', signature: 'test-signature' },
+      expiresAt: '2026-11-05T01:00:00.000Z',
+    })
+    vi.mocked(adminRepository.uploadFile).mockImplementation(async (_intent, _file, progress) => {
+      progress(100)
+    })
+    vi.mocked(adminRepository.completeUpload).mockResolvedValue(pdf)
+    vi.mocked(adminRepository.linkExerciseAsset).mockResolvedValue({
+      id: 'association-1',
+      exerciseId: exercise.id,
+      assetId: pdf.id,
+      assetRole: 'QUESTION_PDF',
+      title: pdf.originalName,
+      sortOrder: 0,
+      media: pdf,
+    })
+  })
+
+  it('chooses course, chapter and lesson in order before creating an exercise', async () => {
+    const user = userEvent.setup()
+    renderPage()
+
+    expect(screen.queryByRole('heading', { name: 'Tạo bài tập mới' })).not.toBeInTheDocument()
+    await chooseLocation(user)
+    expect(await screen.findByRole('heading', { name: 'Tạo bài tập mới' })).toBeVisible()
+    expect(screen.getByText(/Tiếng Đức A1\.1 · Lektion 1/)).toBeVisible()
+  })
+
+  it('uploads and attaches the selected PDF when the exercise is created', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await chooseLocation(user)
+
+    await user.type(screen.getByLabelText('Tên bài tập'), 'Arbeitsblatt')
+    await user.type(screen.getByLabelText('Hướng dẫn cho học viên'), 'Mở PDF và làm bài.')
+    const file = new File(['%PDF-1.4'], 'neu.pdf', { type: 'application/pdf' })
+    await user.upload(screen.getByLabelText('Tệp PDF (tối đa 40 MB)'), file)
+    await user.click(screen.getByRole('button', { name: 'Tạo bài tập' }))
+
+    await waitFor(() =>
+      expect(adminRepository.createUploadIntent).toHaveBeenCalledWith(
+        {
+          originalName: 'neu.pdf',
+          mediaType: 'PDF',
+          mimeType: 'application/pdf',
+          fileSize: file.size,
+          visibility: 'ENROLLED',
+        },
+        expect.any(AbortSignal),
+      ),
+    )
+    expect(adminRepository.completeUpload).toHaveBeenCalledWith('upload-1')
+    expect(adminRepository.linkExerciseAsset).toHaveBeenCalledWith('exercise-1', 'upload-1', {
+      assetRole: 'QUESTION_PDF',
+      title: 'neu.pdf',
+      sortOrder: 0,
+    })
+  })
+
+  it('attaches a PDF already in the library without uploading it again', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await chooseLocation(user)
+
+    await user.type(screen.getByLabelText('Tên bài tập'), 'Arbeitsblatt')
+    await user.type(screen.getByLabelText('Hướng dẫn cho học viên'), 'Mở PDF và làm bài.')
+    await user.click(screen.getByRole('button', { name: 'Chọn PDF có sẵn' }))
+    await user.click(await screen.findByRole('button', { name: /arbeitsblatt\.pdf/ }))
+    await user.click(screen.getByRole('button', { name: 'Tạo bài tập' }))
+
+    await waitFor(() =>
+      expect(adminRepository.linkExerciseAsset).toHaveBeenCalledWith('exercise-1', 'media-1', {
+        assetRole: 'QUESTION_PDF',
+        title: 'arbeitsblatt.pdf',
+        sortOrder: 0,
+      }),
+    )
+    expect(adminRepository.createUploadIntent).not.toHaveBeenCalled()
+  })
+})

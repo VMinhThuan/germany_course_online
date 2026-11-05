@@ -107,13 +107,13 @@ describe('AdminExercisePdfManager', () => {
     vi.mocked(adminRepository.completeUpload).mockResolvedValue({ ...pdf, id: 'upload-1' })
   })
 
-  it('explains how to create a file exercise before attaching its PDF', async () => {
+  it('explains where to add a PDF when no file exercise exists yet', async () => {
     renderManager([])
 
-    expect(await screen.findByText('Chưa có bài tập dạng PDF')).toBeVisible()
-    expect(screen.getByText(/Tạo bài tập ở biểu mẫu phía trên/)).toBeVisible()
+    expect(await screen.findByText('Chưa có bài tập PDF')).toBeVisible()
+    expect(screen.getByText(/Tạo bài tập PDF trước/)).toBeVisible()
     expect(screen.getByLabelText('Tệp PDF')).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Tải PDF lên thư viện media' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Tải PDF lên thư viện tệp' })).toBeVisible()
     expect(screen.queryByRole('button', { name: 'Tạo bài tập FILE_BASED' })).not.toBeInTheDocument()
   })
 
@@ -122,11 +122,11 @@ describe('AdminExercisePdfManager', () => {
     renderManager([])
     const file = new File(['%PDF'], 'neu.pdf', { type: 'application/pdf' })
 
-    await screen.findByText(/Provider: CLOUDINARY/)
+    expect(await screen.findByText('arbeitsblatt.pdf')).toBeVisible()
     await user.upload(screen.getByLabelText('Tệp PDF'), file)
-    await user.click(screen.getByRole('button', { name: 'Tải PDF lên thư viện media' }))
+    await user.click(screen.getByRole('button', { name: 'Tải PDF lên thư viện tệp' }))
 
-    expect(await screen.findByText('Đã tải PDF lên thư viện media.')).toBeVisible()
+    expect(await screen.findByText('Đã tải PDF lên thư viện tệp.')).toBeVisible()
     expect(adminRepository.completeUpload).toHaveBeenCalledWith('upload-1')
     expect(adminRepository.linkExerciseAsset).not.toHaveBeenCalled()
   })
@@ -152,7 +152,7 @@ describe('AdminExercisePdfManager', () => {
     renderManager()
     const file = new File(['%PDF'], 'neu.pdf', { type: 'application/pdf' })
 
-    await screen.findByText(/Provider: CLOUDINARY/)
+    expect(await screen.findByText('arbeitsblatt.pdf')).toBeVisible()
     await user.upload(screen.getByLabelText('Tệp PDF'), file)
     await user.click(screen.getByRole('button', { name: 'Tải lên và gắn PDF' }))
 
