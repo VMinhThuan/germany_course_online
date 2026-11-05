@@ -40,8 +40,29 @@ import {
 } from '@/domains'
 import { AudioPlayer, PDFViewer, VideoPlayer } from '@/domains/media'
 import { DomainState } from '@/domains/shared/presentation'
-import { Button, Card, ErrorState, LinkButton, SectionHeader } from '@/shared/ui'
+import type { LessonProgressItemViewModel } from '@/domains/progress/models'
+import { Button, Card, ErrorState, LinkButton, SectionHeader, useNotifications } from '@/shared/ui'
 import { ProductError, ProductLoading, ProductNotFound, ProductPage } from './shared'
+
+function groupLessonProgressItems(items: readonly LessonProgressItemViewModel[]) {
+  const groups = new Map<
+    string,
+    { id: string; title: string; items: LessonProgressItemViewModel[] }
+  >()
+
+  for (const item of items) {
+    const id = item.sectionId ?? item.sectionTitle ?? 'course-lessons'
+    const group = groups.get(id) ?? {
+      id,
+      title: item.sectionTitle ?? 'Các bài học',
+      items: [],
+    }
+    group.items.push(item)
+    groups.set(id, group)
+  }
+
+  return [...groups.values()]
+}
 
 export function LearningCoursePage() {
   const { courseId = '' } = useParams()
@@ -169,6 +190,19 @@ export function LearningLessonPage() {
   const completeLesson = useCompleteLesson(session?.id ?? '')
   const [noteValue, setNoteValue] = useState<string>()
   const navigate = useNavigate()
+  const notifications = useNotifications()
+
+  async function markLessonComplete() {
+    try {
+      await completeLesson.mutateAsync(lessonId)
+      notifications.success('Bài học đã hoàn thành')
+    } catch {
+      notifications.error(
+        'Chưa hoàn thành được bài học',
+        'Hãy hoàn tất bài tập bắt buộc rồi thử lại.',
+      )
+    }
+  }
 
   return (
     <ProductPage
@@ -189,12 +223,19 @@ export function LearningLessonPage() {
             </LinkButton>
             <LessonCompletionIndicator completed={lesson.data.isCompleted} />
           </div>
+          <p className="-mb-3 text-sm font-semibold tracking-wide text-action-primary">
+            {lesson.data.sectionTitle ?? 'Chương học'} · Bài {lesson.data.lessonNumber ?? 1}
+          </p>
           <div className="grid min-w-0 gap-7 xl:grid-cols-[minmax(0,1fr)_18rem]">
             <div className="grid min-w-0 gap-6">
-              <div className="min-w-0">
-                <LessonContent content={{ ...lesson.data, media: [] }} headingLevel={2} />
+              <section aria-label="Bài giảng của bài học" className="grid min-w-0 gap-3">
+                <SectionHeader
+                  title="Bài giảng của bài học"
+                  description="Nội dung và video hướng dẫn của bài học này."
+                />
+                <LessonContent content={{ ...lesson.data, media: [] }} headingLevel={3} fullWidth />
                 {lesson.data.access.kind === 'available' && (
-                  <div className="mx-auto mt-6 grid w-full max-w-3xl gap-4">
+                  <div className="grid w-full gap-4">
                     <YouTubeLessonPlayer
                       video={lesson.data.video}
                       title={lesson.data.lesson.title}
@@ -210,8 +251,8 @@ export function LearningLessonPage() {
                     )}
                   </div>
                 )}
-              </div>
-              <section aria-labelledby="lesson-exercises-title" className="grid gap-3">
+              </section>
+              <section aria-label="Bài tập của bài học" className="grid gap-3">
                 <SectionHeader
                   title="Bài tập của bài học"
                   description="Bài bắt buộc cần hoàn thành để mở trạng thái hoàn tất bài học."
@@ -254,6 +295,31 @@ export function LearningLessonPage() {
                   <Card className="p-4 text-sm text-ink-secondary">Bài này chưa có bài tập.</Card>
                 )}
               </section>
+              <section aria-label="Đáp án bài tập" className="grid gap-3">
+                <SectionHeader
+                  title="Đáp án bài tập"
+                  description="Video chữa bài giúp bạn đối chiếu cách làm."
+                />
+                {lesson.data.solutionVideos?.length ? (
+                  <div className="grid min-w-0 gap-5">
+                    {lesson.data.solutionVideos.map((solution) => (
+                      <div
+                        key={`${solution.exerciseId}-${solution.media.id}`}
+                        className="grid gap-2"
+                      >
+                        <p className="font-semibold">{solution.exerciseTitle}</p>
+                        <VideoPlayer media={solution.media} />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <Card className="p-4 text-sm text-ink-secondary">
+                    {lesson.data.hasRestrictedSolutionVideos
+                      ? 'Hoàn thành bài tập để mở video đáp án.'
+                      : 'Bài này chưa có đáp án.'}
+                  </Card>
+                )}
+              </section>
               <section
                 id="notes"
                 className="scroll-mt-24 grid gap-3"
@@ -291,7 +357,7 @@ export function LearningLessonPage() {
                 <Button
                   disabled={!lesson.data.canCompleteLesson || completeLesson.isPending}
                   loading={completeLesson.isPending}
-                  onClick={() => void completeLesson.mutateAsync(lessonId)}
+                  onClick={() => void markLessonComplete()}
                   startIcon={lesson.data.isCompleted ? <Check aria-hidden="true" /> : undefined}
                 >
                   {lesson.data.isCompleted ? 'Đã hoàn thành' : 'Hoàn thành bài học'}
@@ -311,7 +377,7 @@ export function LearningLessonPage() {
                 <ErrorState
                   title="Chưa hoàn thành được bài học"
                   description="Hãy hoàn tất bài tập bắt buộc rồi thử lại."
-                  onRetry={() => void completeLesson.mutate(lessonId)}
+                  onRetry={() => void markLessonComplete()}
                 />
               )}
             </div>
@@ -320,21 +386,36 @@ export function LearningLessonPage() {
               <Card className="grid gap-3 p-4">
                 <h2 className="font-semibold">Trong bài này</h2>
                 <nav aria-label="Các bài trong khóa học" className="grid gap-2">
-                  {lesson.data.progressItems.map((item) =>
-                    item.href ? (
-                      <Link
-                        key={item.lessonId}
-                        to={item.href}
-                        aria-current={item.lessonId === lessonId ? 'page' : undefined}
-                        className="rounded-xl px-3 py-2 text-sm text-ink-secondary hover:bg-surface-muted"
-                      >
-                        {item.title}
-                        <span className="ml-2 text-xs text-ink-muted">
-                          {item.status === 'COMPLETED' ? '✓' : ''}
-                        </span>
-                      </Link>
-                    ) : null,
-                  )}
+                  {groupLessonProgressItems(lesson.data.progressItems).map((group) => (
+                    <div key={group.id} className="grid gap-1">
+                      <h3 className="px-3 pt-2 text-xs font-bold uppercase tracking-wider text-ink-muted">
+                        {group.title}
+                      </h3>
+                      {group.items.map((item) =>
+                        item.href ? (
+                          <Link
+                            key={item.lessonId}
+                            to={item.href}
+                            aria-label={`Bài ${item.lessonNumber ?? ''}: ${item.title}${item.status === 'COMPLETED' ? ' · Đã hoàn thành' : ''}`}
+                            aria-current={item.lessonId === lessonId ? 'page' : undefined}
+                            className="rounded-xl px-3 py-2 text-sm text-ink-secondary hover:bg-surface-muted"
+                          >
+                            <span className="flex items-start justify-between gap-2">
+                              <span className="min-w-0">
+                                <span className="block text-xs font-semibold text-ink-muted">
+                                  Bài {item.lessonNumber ?? ''}
+                                </span>
+                                <span className="mt-0.5 block">{item.title}</span>
+                              </span>
+                              <span aria-hidden="true" className="text-xs text-ink-muted">
+                                {item.status === 'COMPLETED' ? '✓' : ''}
+                              </span>
+                            </span>
+                          </Link>
+                        ) : null,
+                      )}
+                    </div>
+                  ))}
                 </nav>
               </Card>
               <LinkButton to={`/learn/courses/${lesson.data.courseId}`} variant="outline">

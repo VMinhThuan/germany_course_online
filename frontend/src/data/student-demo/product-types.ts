@@ -12,6 +12,7 @@ import type {
 import type { ExerciseViewModel } from '@/domains/exercises/models'
 import type { EnrollmentSummaryViewModel } from '@/domains/enrollment/models'
 import type { LessonContentViewModel, CourseTreeViewModel } from '@/domains/learning/models'
+import type { MediaViewModel } from '@/domains/media/models'
 import type {
   CourseProgressViewModel,
   LessonProgressItemViewModel,
@@ -49,12 +50,22 @@ export interface StudentLessonWorkspaceViewModel extends LessonContentViewModel 
   courseId: string
   courseTitle: string
   sectionId: string
+  sectionTitle?: string
+  lessonNumber?: number
   exercises: readonly StudentExerciseSummaryViewModel[]
   progressItems: readonly LessonProgressItemViewModel[]
+  solutionVideos?: readonly StudentSolutionVideoViewModel[]
+  hasRestrictedSolutionVideos?: boolean
   canCompleteLesson: boolean
   isCompleted: boolean
   previousLessonId?: string
   nextLessonId?: string
+}
+
+export interface StudentSolutionVideoViewModel {
+  exerciseId: string
+  exerciseTitle: string
+  media: MediaViewModel
 }
 
 export interface StudentCheckoutContextViewModel {

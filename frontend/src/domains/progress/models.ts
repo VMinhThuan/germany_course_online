@@ -14,6 +14,9 @@ export interface LessonProgressItemViewModel {
   title: string
   status: ProgressStatus
   href?: string
+  sectionId?: string
+  sectionTitle?: string
+  lessonNumber?: number
 }
 
 export type NoteSaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error'

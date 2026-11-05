@@ -265,11 +265,16 @@ export function LessonContent({
   content,
   children,
   headingLevel = 1,
-}: PropsWithChildren<{ content: LessonContentViewModel; headingLevel?: HeadingLevel }>) {
+  fullWidth = false,
+}: PropsWithChildren<{
+  content: LessonContentViewModel
+  headingLevel?: HeadingLevel
+  fullWidth?: boolean
+}>) {
   if (content.access.kind === 'restricted' || content.access.kind === 'expired-display')
     return <LockedContentPanel access={content.access} />
   return (
-    <article className="mx-auto w-full max-w-3xl space-y-7">
+    <article className={fullWidth ? 'w-full space-y-7' : 'mx-auto w-full max-w-3xl space-y-7'}>
       <header className="space-y-3">
         <p className="text-sm font-semibold text-action-primary">
           {content.lesson.lessonType === 'LECTURE' ? 'Bài giảng' : 'Thực hành'}

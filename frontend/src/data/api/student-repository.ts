@@ -346,16 +346,41 @@ const learning: StudentLearningRepository = {
     const workspace = await apiRequest<ApiLessonWorkspace>(
       `/learn/lessons/${encodeURIComponent(lessonId)}`,
     )
-    const [course, media] = await Promise.all([
+    const [course, media, solutionVideos] = await Promise.all([
       apiRequest<ApiStudentCourseOverview>(`/me/courses/${encodeURIComponent(workspace.courseId)}`),
       Promise.all(
         (workspace.media.length ? workspace.media : workspace.assets).map((asset) =>
           getSignedMedia(asset, { lessonId: workspace.id }),
         ),
       ),
+      Promise.all(
+        workspace.exercises.flatMap((exercise) =>
+          exercise.capabilities.canViewSolutions
+            ? exercise.assets
+                .filter((asset) => asset.role === 'SOLUTION_VIDEO')
+                .map(async (asset) => ({
+                  exerciseId: exercise.id,
+                  exerciseTitle: exercise.title,
+                  media: {
+                    ...(await getSignedMedia(asset, { exerciseId: exercise.id })),
+                    title: asset.title || `Video chữa bài · ${exercise.title}`,
+                  },
+                }))
+            : [],
+        ),
+      ),
     ])
-    const courseLessons = course.sections.flatMap((section) => section.lessons)
+    const courseLessons = course.sections.flatMap((section) =>
+      section.lessons.map((item, index) => ({
+        ...item,
+        sectionId: section.id,
+        sectionTitle: section.title,
+        lessonNumber: index + 1,
+      })),
+    )
     const lessonProgress = courseLessons.find((item) => item.id === workspace.id)?.progress
+    const section = course.sections.find((item) => item.id === workspace.sectionId)
+    const currentLessonIndex = courseLessons.findIndex((item) => item.id === workspace.id)
     const progressStatus = lessonProgress?.status ?? 'NOT_STARTED'
     const lesson: LessonSummaryModel = {
       id: workspace.id,
@@ -373,21 +398,38 @@ const learning: StudentLearningRepository = {
       courseId: workspace.courseId,
       courseTitle: course.course.title,
       sectionId: workspace.sectionId,
+      ...(section ? { sectionTitle: section.title } : {}),
+      ...(currentLessonIndex >= 0
+        ? { lessonNumber: courseLessons[currentLessonIndex]!.lessonNumber }
+        : {}),
       paragraphs: extractParagraphs(workspace.content),
       video: workspace.video,
       media,
       access: toAccess(course.access),
       exercises: workspace.exercises.map(toExerciseSummary),
-      progressItems: course.sections.flatMap((section) =>
-        section.lessons.map((item) => ({
-          lessonId: item.id,
-          title: item.title,
-          status: item.progress.status,
-          href: `/learn/lessons/${item.id}`,
-        })),
+      solutionVideos,
+      hasRestrictedSolutionVideos: workspace.exercises.some(
+        (exercise) =>
+          !exercise.capabilities.canViewSolutions &&
+          exercise.assets.some((asset) => asset.role === 'SOLUTION_VIDEO'),
       ),
+      progressItems: courseLessons.map((item) => ({
+        lessonId: item.id,
+        title: item.title,
+        status: item.progress.status,
+        href: `/learn/lessons/${item.id}`,
+        sectionId: item.sectionId,
+        sectionTitle: item.sectionTitle,
+        lessonNumber: item.lessonNumber,
+      })),
       canCompleteLesson: workspace.canCompleteLesson,
       isCompleted: progressStatus === 'COMPLETED',
+      ...(currentLessonIndex > 0
+        ? { previousLessonId: courseLessons[currentLessonIndex - 1]!.id }
+        : {}),
+      ...(currentLessonIndex >= 0 && currentLessonIndex < courseLessons.length - 1
+        ? { nextLessonId: courseLessons[currentLessonIndex + 1]!.id }
+        : {}),
     }
   },
   async getExercise(_sessionId, exerciseId) {
