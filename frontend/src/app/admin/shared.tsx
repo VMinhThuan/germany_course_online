@@ -2,12 +2,21 @@ import {
   useCallback,
   useEffect,
   useId,
+  useMemo,
   useRef,
   useState,
   type KeyboardEvent,
   type ReactNode,
 } from 'react'
-import { ArrowLeft, BookOpenText, LogOut, Settings2 } from 'lucide-react'
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowUp,
+  ArrowUpDown,
+  BookOpenText,
+  LogOut,
+  Settings2,
+} from 'lucide-react'
 import { Link, NavLink, useLocation } from 'react-router'
 import { useQueryClient, useMutation } from '@tanstack/react-query'
 import { useAuthSession } from '@/app/auth/auth-session'
@@ -278,6 +287,111 @@ export function AdminSelect({
         ))}
       </select>
     </label>
+  )
+}
+
+export type AdminTableColumn<T> = {
+  key: string
+  label: string
+  render: (row: T) => ReactNode
+  sortValue?: (row: T) => string | number | null
+  className?: string
+}
+
+export function AdminSortableTable<T>({
+  rows,
+  columns,
+  rowKey,
+  emptyContent,
+}: {
+  rows: readonly T[]
+  columns: readonly AdminTableColumn<T>[]
+  rowKey: (row: T) => string
+  emptyContent: ReactNode
+}) {
+  const initialSortKey = columns.find((column) => column.sortValue)?.key ?? ''
+  const [sortKey, setSortKey] = useState(initialSortKey)
+  const [direction, setDirection] = useState<'asc' | 'desc'>('asc')
+  const sortedRows = useMemo(() => {
+    const column = columns.find((item) => item.key === sortKey && item.sortValue)
+    if (!column?.sortValue) return [...rows]
+    const collator = new Intl.Collator('vi', { numeric: true, sensitivity: 'base' })
+    return [...rows].sort((left, right) => {
+      const leftValue = column.sortValue!(left)
+      const rightValue = column.sortValue!(right)
+      const comparison =
+        typeof leftValue === 'number' && typeof rightValue === 'number'
+          ? leftValue - rightValue
+          : collator.compare(String(leftValue ?? ''), String(rightValue ?? ''))
+      return direction === 'asc' ? comparison : -comparison
+    })
+  }, [columns, direction, rows, sortKey])
+
+  function setSort(column: AdminTableColumn<T>) {
+    if (!column.sortValue) return
+    if (column.key === sortKey) setDirection((current) => (current === 'asc' ? 'desc' : 'asc'))
+    else {
+      setSortKey(column.key)
+      setDirection('asc')
+    }
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-xl border border-border-subtle bg-white">
+      <table className="w-full min-w-[44rem] border-collapse text-left text-sm">
+        <thead className="bg-surface-muted text-xs uppercase tracking-wide text-ink-secondary">
+          <tr>
+            {columns.map((column) => {
+              const active = sortKey === column.key
+              const SortIcon = column.sortValue
+                ? !active
+                  ? ArrowUpDown
+                  : direction === 'asc'
+                    ? ArrowUp
+                    : ArrowDown
+                : null
+              return (
+                <th
+                  key={column.key}
+                  scope="col"
+                  aria-sort={active ? (direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+                  className={`border-b border-border-subtle px-4 py-3 font-semibold ${column.className ?? ''}`}
+                >
+                  <button
+                    type="button"
+                    disabled={!column.sortValue}
+                    onClick={() => setSort(column)}
+                    className="inline-flex min-h-8 items-center gap-2 rounded-md text-left hover:text-ink-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary disabled:cursor-default"
+                  >
+                    {column.label}
+                    {SortIcon && <SortIcon aria-hidden="true" className="size-3.5 shrink-0" />}
+                  </button>
+                </th>
+              )
+            })}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border-subtle">
+          {sortedRows.length ? (
+            sortedRows.map((row) => (
+              <tr key={rowKey(row)} className="align-middle hover:bg-surface-muted/60">
+                {columns.map((column) => (
+                  <td key={column.key} className={`px-4 py-3 ${column.className ?? ''}`}>
+                    {column.render(row)}
+                  </td>
+                ))}
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td colSpan={columns.length} className="px-4 py-8 text-center">
+                {emptyContent}
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
   )
 }
 

@@ -16,6 +16,7 @@ import { AdminCoursesPage, AdminExerciseEditorPage } from './catalog-pages'
 import {
   AdminCourseEditorPage,
   AdminExercisesPage,
+  AdminLessonCreatePage,
   AdminLessonDetailPage,
   AdminLessonsPage,
   AdminSectionEditorPage,
@@ -197,6 +198,8 @@ export function AdminWorkspacePage() {
         />
       )
   } else if (segment === 'sections' && parts.length === 2) content = <AdminSectionsPage />
+  else if (segment === 'lessons' && parts.length === 3 && parts[2] === 'new')
+    content = <AdminLessonCreatePage />
   else if (segment === 'lessons' && parts.length === 2) content = <AdminLessonsPage />
   else if (segment === 'exercises' && parts.length === 2) content = <AdminExercisesPage />
   else if (segment === 'media' && parts.length === 2) content = <AdminMediaPage />

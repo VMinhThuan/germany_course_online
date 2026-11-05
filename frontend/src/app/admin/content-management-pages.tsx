@@ -19,6 +19,7 @@ import type {
   ApiAdminSection,
   ApiPage,
 } from '@/lib/api/types'
+import { BaseDialog } from '@/shared/ui/dialogs'
 import { Button, EmptyState } from '@/shared/ui'
 import { useDialogs } from '@/shared/ui/dialogs'
 import { useNotifications } from '@/shared/ui/notifications'
@@ -30,8 +31,10 @@ import {
   AdminLoadError,
   AdminLoading,
   AdminSearchSelect,
+  AdminSortableTable,
   AdminSelect,
   AdminTextArea,
+  type AdminTableColumn,
   useAdminMutation,
   useStableIdempotencyKey,
 } from './shared'
@@ -67,6 +70,24 @@ async function loadAllPages<T>(loadPage: (page: number) => Promise<ApiPage<T>>) 
   return first.items.concat(...rest.map((page) => page.items))
 }
 
+async function mapConcurrent<T, TResult>(
+  items: readonly T[],
+  limit: number,
+  mapItem: (item: T) => Promise<TResult>,
+) {
+  const results = new Array<TResult>(items.length)
+  let nextIndex = 0
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, async () => {
+      while (nextIndex < items.length) {
+        const index = nextIndex++
+        results[index] = await mapItem(items[index]!)
+      }
+    }),
+  )
+  return results
+}
+
 function useCourseOptions() {
   return useQuery({
     queryKey: ['admin', 'content-course-options'],
@@ -91,6 +112,79 @@ function useLessonOptions(sectionId: string) {
     queryFn: () =>
       loadAllPages((page) => adminRepository.listLessons(sectionId, { page, pageSize: 100 })),
     enabled: Boolean(sectionId),
+    retry: false,
+  })
+}
+
+type SectionManagementRow = { section: ApiAdminSection; course: ApiAdminCourse }
+type LessonManagementRow = {
+  lesson: ApiAdminLesson
+  section: ApiAdminSection
+  course: ApiAdminCourse
+}
+type ExerciseManagementRow = {
+  exercise: ApiAdminExercise
+  lesson: ApiAdminLesson
+  section: ApiAdminSection
+  course: ApiAdminCourse
+}
+
+function useAllSections(courses: ApiAdminCourse[] | undefined) {
+  const courseIds = courses?.map((course) => course.id) ?? []
+  return useQuery({
+    queryKey: ['admin', 'content-all-sections', courseIds],
+    queryFn: async () => {
+      const sectionsByCourse = await mapConcurrent(courses ?? [], 6, async (course) => ({
+        course,
+        sections: await loadAllPages((page) =>
+          adminRepository.listSections(course.id, { page, pageSize: 100 }),
+        ),
+      }))
+      return sectionsByCourse.flatMap(({ course, sections }) =>
+        sections.map((section) => ({ section, course })),
+      )
+    },
+    enabled: Boolean(courses),
+    retry: false,
+  })
+}
+
+function useAllLessons(sections: SectionManagementRow[] | undefined) {
+  const sectionIds = sections?.map(({ section }) => section.id) ?? []
+  return useQuery({
+    queryKey: ['admin', 'content-all-lessons', sectionIds],
+    queryFn: async () => {
+      const lessonsBySection = await mapConcurrent(sections ?? [], 6, async (parent) => ({
+        parent,
+        lessons: await loadAllPages((page) =>
+          adminRepository.listLessons(parent.section.id, { page, pageSize: 100 }),
+        ),
+      }))
+      return lessonsBySection.flatMap(({ parent, lessons }) =>
+        lessons.map((lesson) => ({ lesson, ...parent })),
+      )
+    },
+    enabled: Boolean(sections),
+    retry: false,
+  })
+}
+
+function useAllExercises(lessons: LessonManagementRow[] | undefined) {
+  const lessonIds = lessons?.map(({ lesson }) => lesson.id) ?? []
+  return useQuery({
+    queryKey: ['admin', 'content-all-exercises', lessonIds],
+    queryFn: async () => {
+      const exercisesByLesson = await mapConcurrent(lessons ?? [], 6, async (parent) => ({
+        parent,
+        exercises: await loadAllPages((page) =>
+          adminRepository.listExercises(parent.lesson.id, { page, pageSize: 100 }),
+        ),
+      }))
+      return exercisesByLesson.flatMap(({ parent, exercises }) =>
+        exercises.map((exercise) => ({ exercise, ...parent })),
+      )
+    },
+    enabled: Boolean(lessons),
     retry: false,
   })
 }
@@ -180,55 +274,6 @@ function VisibilityButton({
   )
 }
 
-function ContentRow({
-  title,
-  description,
-  status,
-  editHref,
-  editLabel,
-  onToggle,
-  onDelete,
-  busy,
-}: {
-  title: string
-  description: string
-  status: ApiAdminSection['status'] | ApiAdminLesson['status'] | ApiAdminExercise['status']
-  editHref: string
-  editLabel: string
-  onToggle: () => void
-  onDelete: () => void
-  busy: boolean
-}) {
-  return (
-    <div className="grid gap-3 rounded-2xl border border-border-subtle bg-white p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-      <Link
-        to={editHref}
-        className="min-w-0 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-action-primary"
-      >
-        <strong className="block truncate text-ink-primary">{title}</strong>
-        <span className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink-secondary">
-          <ContentStatus status={status} />
-          {description && <span>{description}</span>}
-          <span className="font-semibold text-action-primary">{editLabel}</span>
-        </span>
-      </Link>
-      <div className="flex flex-wrap gap-2 sm:justify-end">
-        <VisibilityButton status={status} onClick={onToggle} loading={busy} />
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          loading={busy}
-          onClick={onDelete}
-          startIcon={<Trash2 aria-hidden="true" className="size-4" />}
-        >
-          Xóa
-        </Button>
-      </div>
-    </div>
-  )
-}
-
 export function AdminSectionsPage() {
   const dialogs = useDialogs()
   const notifications = useNotifications()
@@ -238,21 +283,21 @@ export function AdminSectionsPage() {
   const [search, setSearch] = useState('')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const sections = useSectionOptions(courseId)
+  const [createOpen, setCreateOpen] = useState(false)
+  const sections = useAllSections(courses.data)
   const create = useAdminMutation(
-    ({ input, key }: { input: Record<string, unknown>; key: string }) =>
-      adminRepository.createSection(courseId, input, key),
+    ({ parentId, input, key }: { parentId: string; input: Record<string, unknown>; key: string }) =>
+      adminRepository.createSection(parentId, input, key),
   )
   const update = useAdminMutation(
     ({ id, status }: { id: string; status: ApiAdminSection['status'] }) =>
       adminRepository.updateSection(id, { status }),
   )
   const remove = useAdminMutation((id: string) => adminRepository.deleteSection(id))
-  const selectedCourse = courses.data?.find((course) => course.id === courseId)
   const filtered = (sections.data ?? []).filter((section) =>
-    normalizeSearch(`${section.title} ${section.description ?? ''}`).includes(
-      normalizeSearch(search),
-    ),
+    normalizeSearch(
+      `${section.section.title} ${section.section.description ?? ''} ${section.course.title} ${section.course.code}`,
+    ).includes(normalizeSearch(search)),
   )
 
   async function submit(event: FormEvent) {
@@ -262,14 +307,15 @@ export function AdminSectionsPage() {
       title: title.trim(),
       description: description.trim() || null,
       sectionType: 'CHAPTER',
-      sortOrder: sections.data?.length ?? 0,
+      sortOrder: sections.data?.filter((row) => row.section.courseId === courseId).length ?? 0,
       status: 'DRAFT',
     }
     try {
-      await create.mutateAsync({ input, key: idempotency.get(input) })
+      await create.mutateAsync({ parentId: courseId, input, key: idempotency.get(input) })
       idempotency.clear()
       setTitle('')
       setDescription('')
+      setCreateOpen(false)
       notifications.success('Đã tạo chương mới.')
     } catch {
       /* Error is shown below the form. */
@@ -303,100 +349,171 @@ export function AdminSectionsPage() {
     })
   }
 
-  return (
-    <div className="grid gap-5">
-      <AdminCard
-        title="Chọn khóa học trước"
-        description="Chọn khóa học để xem, tạo và sắp xếp các chương bên trong. Có thể gõ tên khóa học để tìm nhanh."
-      >
-        {courses.isPending ? (
-          <AdminLoading label="Đang tải khóa học" />
-        ) : courses.isError ? (
-          <AdminLoadError error={courses.error} retry={() => void courses.refetch()} />
-        ) : (
-          <AdminSearchSelect
-            label="Khóa học"
-            value={courseId}
-            onChange={(value) => {
-              setCourseId(value)
-              setSearch('')
-            }}
-            options={(courses.data ?? []).map((course) => ({
-              value: course.id,
-              label: course.title,
-              description: `${course.code} · ${course.level}`,
-            }))}
+  const columns: AdminTableColumn<SectionManagementRow>[] = [
+    {
+      key: 'title',
+      label: 'Tên chương',
+      sortValue: (row) => row.section.title,
+      render: (row) => (
+        <Link
+          to={sectionPath(row.course.id, row.section.id)}
+          className="font-semibold text-action-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-action-primary"
+        >
+          {row.section.title}
+        </Link>
+      ),
+    },
+    {
+      key: 'course',
+      label: 'Khóa học',
+      sortValue: (row) => row.course.title,
+      render: (row) => (
+        <span>
+          <span className="block font-medium text-ink-primary">{row.course.title}</span>
+          <span className="text-xs text-ink-secondary">{row.course.code}</span>
+        </span>
+      ),
+    },
+    {
+      key: 'order',
+      label: 'Thứ tự',
+      sortValue: (row) => row.section.sortOrder,
+      render: (row) => `Chương ${row.section.sortOrder + 1}`,
+    },
+    {
+      key: 'status',
+      label: 'Trạng thái',
+      sortValue: (row) => statusLabel(row.section.status),
+      render: (row) => <ContentStatus status={row.section.status} />,
+    },
+    {
+      key: 'actions',
+      label: 'Thao tác',
+      className: 'text-right',
+      render: (row) => (
+        <div className="flex justify-end gap-2">
+          <VisibilityButton
+            status={row.section.status}
+            onClick={() => toggle(row.section)}
+            loading={update.isPending}
           />
-        )}
-      </AdminCard>
-
-      {courseId && (
-        <>
-          <AdminCard
-            title={selectedCourse ? `Chương · ${selectedCourse.title}` : 'Danh sách chương'}
-            description="Tìm chương theo tên, sửa nội dung hoặc ẩn chương khỏi trang học viên."
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            loading={remove.isPending}
+            onClick={() => confirmDelete(row.section)}
+            startIcon={<Trash2 aria-hidden="true" className="size-4" />}
           >
+            Xóa
+          </Button>
+        </div>
+      ),
+    },
+  ]
+
+  return (
+    <div className="grid gap-4">
+      <AdminCard
+        title="Danh sách chương"
+        description="Các chương thuộc mọi khóa học. Dùng ô tìm kiếm hoặc nhấn tiêu đề cột để sắp xếp."
+      >
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="w-full max-w-lg">
             <SearchInput
-              label="Tìm chương"
+              label="Tìm chương hoặc khóa học"
               value={search}
               onChange={setSearch}
-              placeholder="Nhập tên chương"
+              placeholder="Nhập tên chương, tên hoặc mã khóa học"
             />
-            {sections.isPending ? (
-              <AdminLoading label="Đang tải chương" />
-            ) : sections.isError ? (
-              <AdminLoadError error={sections.error} retry={() => void sections.refetch()} />
-            ) : filtered.length ? (
-              <div className="grid gap-2">
-                {filtered.map((section) => (
-                  <ContentRow
-                    key={section.id}
-                    title={section.title}
-                    description={`Chương ${section.sortOrder + 1}`}
-                    status={section.status}
-                    editHref={sectionPath(courseId, section.id)}
-                    editLabel="Sửa chương"
-                    onToggle={() => toggle(section)}
-                    onDelete={() => confirmDelete(section)}
-                    busy={update.isPending || remove.isPending}
-                  />
-                ))}
-              </div>
-            ) : (
+          </div>
+          <Button
+            type="button"
+            disabled={!courses.data?.length}
+            onClick={() => {
+              setCourseId(courses.data?.[0]?.id ?? '')
+              setCreateOpen(true)
+            }}
+            startIcon={<Plus aria-hidden="true" className="size-4" />}
+          >
+            Tạo chương
+          </Button>
+        </div>
+        {courses.isPending || sections.isPending ? (
+          <AdminLoading label="Đang tải chương" />
+        ) : courses.isError ? (
+          <AdminLoadError error={courses.error} retry={() => void courses.refetch()} />
+        ) : sections.isError ? (
+          <AdminLoadError error={sections.error} retry={() => void sections.refetch()} />
+        ) : (
+          <AdminSortableTable
+            rows={filtered}
+            columns={columns}
+            rowKey={(row) => row.section.id}
+            emptyContent={
               <EmptyState
-                title={search ? 'Không tìm thấy chương' : 'Khóa học chưa có chương'}
+                title={search ? 'Không tìm thấy chương' : 'Chưa có chương'}
                 description={
-                  search ? 'Thử một tên khác.' : 'Tạo chương đầu tiên ở biểu mẫu bên dưới.'
+                  search ? 'Thử từ khóa khác.' : 'Tạo chương đầu tiên bằng nút phía trên.'
                 }
               />
-            )}
-            <AdminFeedback error={update.error ?? remove.error} />
-          </AdminCard>
+            }
+          />
+        )}
+        <AdminFeedback error={update.error ?? remove.error} />
+      </AdminCard>
 
-          <AdminCard title="Tạo chương mới">
-            <p className="text-sm leading-6 text-ink-secondary">
-              Chương sẽ được lưu ở trạng thái bản nháp. Bạn có thể chỉnh sửa hoặc hiển thị sau.
+      <BaseDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        title="Tạo chương mới"
+        description="Chọn khóa học chứa chương này rồi nhập tên. Chương mới sẽ được lưu ở trạng thái bản nháp."
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
+              Hủy
+            </Button>
+            <Button type="submit" form="admin-create-section" loading={create.isPending}>
+              Tạo chương
+            </Button>
+          </>
+        }
+      >
+        <form
+          id="admin-create-section"
+          className="grid gap-3"
+          onSubmit={(event) => void submit(event)}
+        >
+          {courses.isPending ? (
+            <AdminLoading label="Đang tải khóa học" />
+          ) : courses.isError ? (
+            <AdminLoadError error={courses.error} retry={() => void courses.refetch()} />
+          ) : courses.data?.length ? (
+            <AdminSearchSelect
+              label="Khóa học"
+              value={courseId}
+              onChange={setCourseId}
+              options={(courses.data ?? []).map((course) => ({
+                value: course.id,
+                label: course.title,
+                description: `${course.code} · ${course.level}`,
+              }))}
+            />
+          ) : (
+            <p className="rounded-xl bg-surface-muted p-3 text-sm leading-6 text-ink-secondary">
+              Tạo một khóa học trước khi thêm chương.
             </p>
-            <form className="grid gap-3" onSubmit={(event) => void submit(event)}>
-              <AdminField label="Tên chương" value={title} onChange={setTitle} required />
-              <AdminTextArea
-                label="Mô tả ngắn"
-                value={description}
-                onChange={setDescription}
-                rows={2}
-              />
-              <AdminFeedback error={create.error} />
-              <Button
-                type="submit"
-                loading={create.isPending}
-                startIcon={<Plus aria-hidden="true" className="size-4" />}
-              >
-                Tạo chương
-              </Button>
-            </form>
-          </AdminCard>
-        </>
-      )}
+          )}
+          <AdminField label="Tên chương" value={title} onChange={setTitle} required />
+          <AdminTextArea
+            label="Mô tả ngắn"
+            value={description}
+            onChange={setDescription}
+            rows={2}
+          />
+          <AdminFeedback error={create.error} />
+        </form>
+      </BaseDialog>
     </div>
   )
 }
@@ -405,60 +522,20 @@ export function AdminLessonsPage() {
   const dialogs = useDialogs()
   const notifications = useNotifications()
   const navigate = useNavigate()
-  const idempotency = useStableIdempotencyKey()
   const courses = useCourseOptions()
-  const [courseId, setCourseId] = useState('')
-  const [sectionId, setSectionId] = useState('')
   const [search, setSearch] = useState('')
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const sections = useSectionOptions(courseId)
-  const lessons = useLessonOptions(sectionId)
-  const create = useAdminMutation(
-    ({ parentId, input, key }: { parentId: string; input: Record<string, unknown>; key: string }) =>
-      adminRepository.createLesson(parentId, input, key),
-  )
+  const sections = useAllSections(courses.data)
+  const lessons = useAllLessons(sections.data)
   const update = useAdminMutation(
     ({ id, status }: { id: string; status: ApiAdminLesson['status'] }) =>
       adminRepository.updateLesson(id, { status }),
   )
   const remove = useAdminMutation((id: string) => adminRepository.deleteLesson(id))
-  const selectedCourse = courses.data?.find((course) => course.id === courseId)
-  const selectedSection = sections.data?.find((section) => section.id === sectionId)
-  const filtered = (lessons.data ?? []).filter((lesson) =>
-    normalizeSearch(`${lesson.title} ${lesson.description ?? ''}`).includes(
-      normalizeSearch(search),
-    ),
+  const filtered = (lessons.data ?? []).filter((row) =>
+    normalizeSearch(
+      `${row.lesson.title} ${row.lesson.description ?? ''} ${row.section.title} ${row.course.title} ${row.course.code}`,
+    ).includes(normalizeSearch(search)),
   )
-
-  async function submit(event: FormEvent) {
-    event.preventDefault()
-    if (!sectionId) return
-    const input = {
-      title: title.trim(),
-      description: description.trim() || null,
-      content: { version: 1, paragraphs: [] },
-      video: null,
-      solutionVideo: null,
-      lessonType: 'LECTURE',
-      estimatedMinutes: null,
-      countsTowardProgress: true,
-      sortOrder: lessons.data?.length ?? 0,
-      status: 'DRAFT',
-    }
-    try {
-      const lesson = await create.mutateAsync({
-        parentId: sectionId,
-        input,
-        key: idempotency.get(input),
-      })
-      idempotency.clear()
-      notifications.success('Đã tạo bài học. Thêm video và bài tập trong trang chỉnh sửa.')
-      navigate(lessonPath(courseId, sectionId, lesson.id))
-    } catch {
-      /* Error is shown below the form. */
-    }
-  }
 
   function toggle(lesson: ApiAdminLesson) {
     const nextStatus = lesson.status === 'PUBLISHED' ? 'HIDDEN' : 'PUBLISHED'
@@ -487,121 +564,124 @@ export function AdminLessonsPage() {
     })
   }
 
-  return (
-    <div className="grid gap-5">
-      <AdminCard
-        title="Chọn vị trí bài học"
-        description="Chọn khóa học trước, sau đó chọn chương. Danh sách bài học sẽ hiện ra để bạn tìm và chỉnh sửa."
-      >
-        {courses.isPending ? (
-          <AdminLoading label="Đang tải khóa học" />
-        ) : courses.isError ? (
-          <AdminLoadError error={courses.error} retry={() => void courses.refetch()} />
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
-            <AdminSearchSelect
-              label="1. Khóa học"
-              value={courseId}
-              onChange={(value) => {
-                setCourseId(value)
-                setSectionId('')
-                setSearch('')
-              }}
-              options={(courses.data ?? []).map((course) => ({
-                value: course.id,
-                label: course.title,
-                description: `${course.code} · ${course.level}`,
-              }))}
-            />
-            <AdminSearchSelect
-              label="2. Chương"
-              value={sectionId}
-              onChange={(value) => {
-                setSectionId(value)
-                setSearch('')
-              }}
-              disabled={!courseId || sections.isPending}
-              options={(sections.data ?? []).map((section) => ({
-                value: section.id,
-                label: section.title,
-                description: `Chương ${section.sortOrder + 1}`,
-              }))}
-            />
-          </div>
-        )}
-        {sections.isError && (
-          <AdminLoadError error={sections.error} retry={() => void sections.refetch()} />
-        )}
-      </AdminCard>
-
-      {sectionId && (
-        <>
-          <AdminCard
-            title={`Bài học · ${selectedSection?.title ?? ''}`}
-            description={`Khóa học: ${selectedCourse?.title ?? '—'}. Chọn “Sửa bài học” để thêm video, bài tập và nội dung.`}
+  const columns: AdminTableColumn<LessonManagementRow>[] = [
+    {
+      key: 'title',
+      label: 'Tên bài học',
+      sortValue: (row) => row.lesson.title,
+      render: (row) => (
+        <Link
+          to={lessonPath(row.course.id, row.section.id, row.lesson.id)}
+          className="font-semibold text-action-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-action-primary"
+        >
+          {row.lesson.title}
+        </Link>
+      ),
+    },
+    {
+      key: 'course',
+      label: 'Khóa học',
+      sortValue: (row) => row.course.title,
+      render: (row) => row.course.title,
+    },
+    {
+      key: 'section',
+      label: 'Chương',
+      sortValue: (row) => row.section.title,
+      render: (row) => row.section.title,
+    },
+    {
+      key: 'order',
+      label: 'Vị trí',
+      sortValue: (row) => row.lesson.sortOrder,
+      render: (row) => `Bài ${row.lesson.sortOrder + 1}`,
+    },
+    {
+      key: 'type',
+      label: 'Loại',
+      sortValue: (row) => (row.lesson.lessonType === 'LECTURE' ? 'Bài giảng' : 'Luyện tập'),
+      render: (row) => (row.lesson.lessonType === 'LECTURE' ? 'Bài giảng' : 'Luyện tập'),
+    },
+    {
+      key: 'status',
+      label: 'Trạng thái',
+      sortValue: (row) => statusLabel(row.lesson.status),
+      render: (row) => <ContentStatus status={row.lesson.status} />,
+    },
+    {
+      key: 'actions',
+      label: 'Thao tác',
+      className: 'text-right',
+      render: (row) => (
+        <div className="flex justify-end gap-2">
+          <VisibilityButton
+            status={row.lesson.status}
+            onClick={() => toggle(row.lesson)}
+            loading={update.isPending}
+          />
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            loading={remove.isPending}
+            onClick={() => confirmDelete(row.lesson)}
+            startIcon={<Trash2 aria-hidden="true" className="size-4" />}
           >
+            Xóa
+          </Button>
+        </div>
+      ),
+    },
+  ]
+
+  return (
+    <div className="grid gap-4">
+      <AdminCard
+        title="Danh sách bài học"
+        description="Tất cả bài học trong hệ thống. Bạn có thể tìm, sắp xếp và mở bài học để chỉnh sửa."
+      >
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="w-full max-w-lg">
             <SearchInput
               label="Tìm bài học"
               value={search}
               onChange={setSearch}
-              placeholder="Nhập tên bài học"
+              placeholder="Nhập tên bài, chương hoặc khóa học"
             />
-            {lessons.isPending ? (
-              <AdminLoading label="Đang tải bài học" />
-            ) : lessons.isError ? (
-              <AdminLoadError error={lessons.error} retry={() => void lessons.refetch()} />
-            ) : filtered.length ? (
-              <div className="grid gap-2">
-                {filtered.map((lesson) => (
-                  <ContentRow
-                    key={lesson.id}
-                    title={lesson.title}
-                    description={`Bài ${lesson.sortOrder + 1} · ${lesson.estimatedMinutes ? `${lesson.estimatedMinutes} phút` : 'chưa đặt thời lượng'}`}
-                    status={lesson.status}
-                    editHref={lessonPath(courseId, sectionId, lesson.id)}
-                    editLabel="Sửa bài học"
-                    onToggle={() => toggle(lesson)}
-                    onDelete={() => confirmDelete(lesson)}
-                    busy={update.isPending || remove.isPending}
-                  />
-                ))}
-              </div>
-            ) : (
+          </div>
+          <Button
+            type="button"
+            onClick={() => navigate('/admin/lessons/new')}
+            startIcon={<Plus aria-hidden="true" className="size-4" />}
+          >
+            Tạo bài học
+          </Button>
+        </div>
+        {courses.isPending || sections.isPending || lessons.isPending ? (
+          <AdminLoading label="Đang tải bài học" />
+        ) : courses.isError ? (
+          <AdminLoadError error={courses.error} retry={() => void courses.refetch()} />
+        ) : sections.isError ? (
+          <AdminLoadError error={sections.error} retry={() => void sections.refetch()} />
+        ) : lessons.isError ? (
+          <AdminLoadError error={lessons.error} retry={() => void lessons.refetch()} />
+        ) : (
+          <AdminSortableTable
+            rows={filtered}
+            columns={columns}
+            rowKey={(row) => row.lesson.id}
+            emptyContent={
               <EmptyState
-                title={search ? 'Không tìm thấy bài học' : 'Chương chưa có bài học'}
+                title={search ? 'Không tìm thấy bài học' : 'Chưa có bài học'}
                 description={
-                  search ? 'Thử một tên khác.' : 'Tạo bài học đầu tiên ở biểu mẫu bên dưới.'
+                  search ? 'Thử từ khóa khác.' : 'Tạo bài học đầu tiên bằng nút phía trên.'
                 }
               />
-            )}
-            <AdminFeedback error={update.error ?? remove.error} />
-          </AdminCard>
-
-          <AdminCard title="Tạo bài học mới">
-            <p className="text-sm leading-6 text-ink-secondary">
-              Sau khi tạo, bạn sẽ thêm video bài giảng, bài tập và video chữa bài ở một màn hình duy
-              nhất.
-            </p>
-            <form className="grid gap-3" onSubmit={(event) => void submit(event)}>
-              <AdminField label="Tên bài học" value={title} onChange={setTitle} required />
-              <AdminTextArea
-                label="Mô tả nội dung"
-                value={description}
-                onChange={setDescription}
-                rows={2}
-              />
-              <AdminFeedback error={create.error} />
-              <Button
-                type="submit"
-                loading={create.isPending}
-                startIcon={<Plus aria-hidden="true" className="size-4" />}
-              >
-                Tạo bài học
-              </Button>
-            </form>
-          </AdminCard>
-        </>
-      )}
+            }
+          />
+        )}
+        <AdminFeedback error={update.error ?? remove.error} />
+      </AdminCard>
     </div>
   )
 }
@@ -621,15 +701,13 @@ export function AdminExercisesPage() {
   const [pdf, setPdf] = useState<ExercisePdfSelection | null>(null)
   const [pdfProgress, setPdfProgress] = useState<number | null>(null)
   const [isSavingExercise, setIsSavingExercise] = useState(false)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [validation, setValidation] = useState('')
   const sections = useSectionOptions(courseId)
   const lessons = useLessonOptions(sectionId)
-  const exercises = useQuery({
-    queryKey: ['admin', 'content-exercise-options', lessonId],
-    queryFn: () =>
-      loadAllPages((page) => adminRepository.listExercises(lessonId, { page, pageSize: 100 })),
-    enabled: Boolean(lessonId),
-    retry: false,
-  })
+  const allSections = useAllSections(courses.data)
+  const allLessons = useAllLessons(allSections.data)
+  const exercises = useAllExercises(allLessons.data)
   const create = useAdminMutation(
     ({ parentId, input, key }: { parentId: string; input: Record<string, unknown>; key: string }) =>
       adminRepository.createExercise(parentId, input, key),
@@ -639,17 +717,18 @@ export function AdminExercisesPage() {
       adminRepository.updateExercise(id, { status }),
   )
   const remove = useAdminMutation((id: string) => adminRepository.deleteExercise(id))
-  const selectedCourse = courses.data?.find((course) => course.id === courseId)
-  const selectedSection = sections.data?.find((section) => section.id === sectionId)
-  const selectedLesson = lessons.data?.find((lesson) => lesson.id === lessonId)
-  const filtered = (exercises.data ?? []).filter((exercise) =>
-    normalizeSearch(`${exercise.title} ${exercise.instructions}`).includes(normalizeSearch(search)),
+  const filtered = (exercises.data ?? []).filter((row) =>
+    normalizeSearch(
+      `${row.exercise.title} ${row.exercise.instructions} ${row.lesson.title} ${row.section.title} ${row.course.title} ${row.course.code}`,
+    ).includes(normalizeSearch(search)),
   )
-  const navigate = useNavigate()
-
   async function submit(event: FormEvent) {
     event.preventDefault()
-    if (!lessonId) return
+    setValidation('')
+    if (!courseId || !sectionId || !lessonId) {
+      setValidation('Chọn khóa học, chương và bài học chứa bài tập này.')
+      return
+    }
     const input = {
       title: title.trim(),
       description: null,
@@ -686,8 +765,12 @@ export function AdminExercisesPage() {
       setTitle('')
       setInstructions('')
       setPdf(null)
-      if (exercise.exerciseType === 'QUIZ')
-        navigate(exercisePath(courseId, sectionId, lessonId, exercise.id))
+      setCourseId('')
+      setSectionId('')
+      setLessonId('')
+      setCreateOpen(false)
+      setExerciseType('FILE_BASED')
+      setValidation('')
     } catch {
       /* Error is shown below the form. */
     } finally {
@@ -722,18 +805,161 @@ export function AdminExercisesPage() {
     })
   }
 
+  const columns: AdminTableColumn<ExerciseManagementRow>[] = [
+    {
+      key: 'title',
+      label: 'Tên bài tập',
+      sortValue: (row) => row.exercise.title,
+      render: (row) => (
+        <Link
+          to={exercisePath(row.course.id, row.section.id, row.lesson.id, row.exercise.id)}
+          className="font-semibold text-action-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-action-primary"
+        >
+          {row.exercise.title}
+        </Link>
+      ),
+    },
+    {
+      key: 'course',
+      label: 'Khóa học',
+      sortValue: (row) => row.course.title,
+      render: (row) => row.course.title,
+    },
+    {
+      key: 'section',
+      label: 'Chương',
+      sortValue: (row) => row.section.title,
+      render: (row) => row.section.title,
+    },
+    {
+      key: 'lesson',
+      label: 'Bài học',
+      sortValue: (row) => row.lesson.title,
+      render: (row) => row.lesson.title,
+    },
+    {
+      key: 'type',
+      label: 'Loại',
+      sortValue: (row) =>
+        row.exercise.exerciseType === 'FILE_BASED' ? 'Bài tập PDF' : 'Trắc nghiệm',
+      render: (row) => (row.exercise.exerciseType === 'FILE_BASED' ? 'Bài tập PDF' : 'Trắc nghiệm'),
+    },
+    {
+      key: 'status',
+      label: 'Trạng thái',
+      sortValue: (row) => statusLabel(row.exercise.status),
+      render: (row) => <ContentStatus status={row.exercise.status} />,
+    },
+    {
+      key: 'actions',
+      label: 'Thao tác',
+      className: 'text-right',
+      render: (row) => (
+        <div className="flex justify-end gap-2">
+          <VisibilityButton
+            status={row.exercise.status}
+            onClick={() => toggle(row.exercise)}
+            loading={update.isPending}
+          />
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            loading={remove.isPending}
+            onClick={() => confirmDelete(row.exercise)}
+            startIcon={<Trash2 aria-hidden="true" className="size-4" />}
+          >
+            Xóa
+          </Button>
+        </div>
+      ),
+    },
+  ]
+
   return (
-    <div className="grid gap-5">
+    <div className="grid gap-4">
       <AdminCard
-        title="Chọn vị trí bài tập"
-        description="Chọn khóa học, chương rồi bài học. Sau đó bạn có thể tìm, tạo và chỉnh sửa bài tập."
+        title="Danh sách bài tập"
+        description="Tất cả bài tập trong hệ thống. Tên khóa học, chương và bài học giúp bạn nhận ra vị trí của từng bài."
       >
-        {courses.isPending ? (
-          <AdminLoading label="Đang tải khóa học" />
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="w-full max-w-lg">
+            <SearchInput
+              label="Tìm bài tập"
+              value={search}
+              onChange={setSearch}
+              placeholder="Nhập tên bài tập, bài học hoặc khóa học"
+            />
+          </div>
+          <Button
+            type="button"
+            onClick={() => setCreateOpen(true)}
+            startIcon={<Plus aria-hidden="true" className="size-4" />}
+          >
+            Tạo bài tập
+          </Button>
+        </div>
+        {courses.isPending ||
+        allSections.isPending ||
+        allLessons.isPending ||
+        exercises.isPending ? (
+          <AdminLoading label="Đang tải bài tập" />
         ) : courses.isError ? (
           <AdminLoadError error={courses.error} retry={() => void courses.refetch()} />
+        ) : allSections.isError ? (
+          <AdminLoadError error={allSections.error} retry={() => void allSections.refetch()} />
+        ) : allLessons.isError ? (
+          <AdminLoadError error={allLessons.error} retry={() => void allLessons.refetch()} />
+        ) : exercises.isError ? (
+          <AdminLoadError error={exercises.error} retry={() => void exercises.refetch()} />
         ) : (
-          <div className="grid gap-3 sm:grid-cols-3">
+          <AdminSortableTable
+            rows={filtered}
+            columns={columns}
+            rowKey={(row) => row.exercise.id}
+            emptyContent={
+              <EmptyState
+                title={search ? 'Không tìm thấy bài tập' : 'Chưa có bài tập'}
+                description={
+                  search ? 'Thử từ khóa khác.' : 'Tạo bài tập đầu tiên bằng nút phía trên.'
+                }
+              />
+            }
+          />
+        )}
+        <AdminFeedback error={update.error ?? remove.error} />
+      </AdminCard>
+
+      <BaseDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        title="Tạo bài tập mới"
+        description="Chọn khóa học, chương và bài học để đặt bài tập đúng chỗ. Với bài tập PDF, có thể tải tệp hoặc chọn tệp đã có."
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
+              Hủy
+            </Button>
+            <Button
+              type="submit"
+              form="admin-create-exercise"
+              loading={isSavingExercise || create.isPending || pdfProgress !== null}
+            >
+              Tạo bài tập
+            </Button>
+          </>
+        }
+      >
+        <form
+          id="admin-create-exercise"
+          className="grid gap-3"
+          onSubmit={(event) => void submit(event)}
+        >
+          {courses.isPending ? (
+            <AdminLoading label="Đang tải khóa học" />
+          ) : courses.isError ? (
+            <AdminLoadError error={courses.error} retry={() => void courses.refetch()} />
+          ) : courses.data?.length ? (
             <AdminSearchSelect
               label="1. Khóa học"
               value={courseId}
@@ -741,7 +967,7 @@ export function AdminExercisesPage() {
                 setCourseId(value)
                 setSectionId('')
                 setLessonId('')
-                setSearch('')
+                setValidation('')
               }}
               options={(courses.data ?? []).map((course) => ({
                 value: course.id,
@@ -749,144 +975,99 @@ export function AdminExercisesPage() {
                 description: `${course.code} · ${course.level}`,
               }))}
             />
-            <AdminSearchSelect
-              label="2. Chương"
-              value={sectionId}
+          ) : (
+            <p className="rounded-xl bg-surface-muted p-3 text-sm leading-6 text-ink-secondary">
+              Cần có khóa học, chương và bài học trước khi thêm bài tập.
+            </p>
+          )}
+          <AdminSearchSelect
+            label="2. Chương"
+            value={sectionId}
+            onChange={(value) => {
+              setSectionId(value)
+              setLessonId('')
+              setValidation('')
+            }}
+            disabled={!courseId || sections.isPending}
+            options={(sections.data ?? []).map((section) => ({
+              value: section.id,
+              label: section.title,
+              description: `Chương ${section.sortOrder + 1}`,
+            }))}
+          />
+          <AdminSearchSelect
+            label="3. Bài học"
+            value={lessonId}
+            onChange={(value) => {
+              setLessonId(value)
+              setValidation('')
+            }}
+            disabled={!sectionId || lessons.isPending}
+            options={(lessons.data ?? []).map((lesson) => ({
+              value: lesson.id,
+              label: lesson.title,
+              description: `Bài ${lesson.sortOrder + 1}`,
+            }))}
+          />
+          {sections.isError && (
+            <AdminLoadError error={sections.error} retry={() => void sections.refetch()} />
+          )}
+          {courseId && !sections.isPending && !sections.isError && !sections.data?.length && (
+            <p className="text-sm leading-6 text-ink-secondary">Khóa học này chưa có chương.</p>
+          )}
+          {lessons.isError && (
+            <AdminLoadError error={lessons.error} retry={() => void lessons.refetch()} />
+          )}
+          {sectionId && !lessons.isPending && !lessons.isError && !lessons.data?.length && (
+            <p className="text-sm leading-6 text-ink-secondary">Chương này chưa có bài học.</p>
+          )}
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_14rem]">
+            <AdminField label="Tên bài tập" value={title} onChange={setTitle} required />
+            <AdminSelect
+              label="Loại bài tập"
+              value={exerciseType}
               onChange={(value) => {
-                setSectionId(value)
-                setLessonId('')
-                setSearch('')
+                setExerciseType(value as typeof exerciseType)
+                if (value === 'QUIZ') setPdf(null)
               }}
-              disabled={!courseId || sections.isPending}
-              options={(sections.data ?? []).map((section) => ({
-                value: section.id,
-                label: section.title,
-                description: `Chương ${section.sortOrder + 1}`,
-              }))}
-            />
-            <AdminSearchSelect
-              label="3. Bài học"
-              value={lessonId}
-              onChange={(value) => {
-                setLessonId(value)
-                setSearch('')
-              }}
-              disabled={!sectionId || lessons.isPending}
-              options={(lessons.data ?? []).map((lesson) => ({
-                value: lesson.id,
-                label: lesson.title,
-                description: `Bài ${lesson.sortOrder + 1}`,
-              }))}
+              options={[
+                { value: 'FILE_BASED', label: 'Bài tập PDF' },
+                { value: 'QUIZ', label: 'Trắc nghiệm' },
+              ]}
             />
           </div>
-        )}
-        {sections.isError && (
-          <AdminLoadError error={sections.error} retry={() => void sections.refetch()} />
-        )}
-        {lessons.isError && (
-          <AdminLoadError error={lessons.error} retry={() => void lessons.refetch()} />
-        )}
-      </AdminCard>
-
-      {lessonId && (
-        <>
-          <AdminCard
-            title={`Bài tập · ${selectedLesson?.title ?? ''}`}
-            description={`${selectedCourse?.title ?? ''} · ${selectedSection?.title ?? ''}. Tìm bài tập theo tên hoặc hướng dẫn.`}
-          >
-            <SearchInput
-              label="Tìm bài tập"
-              value={search}
-              onChange={setSearch}
-              placeholder="Nhập tên bài tập"
+          <AdminTextArea
+            label="Hướng dẫn cho học viên"
+            value={instructions}
+            onChange={setInstructions}
+            rows={3}
+            required
+            placeholder="Ví dụ: Mở tệp, hoàn thành bài rồi đánh dấu đã làm."
+          />
+          {exerciseType === 'FILE_BASED' && (
+            <AdminExercisePdfPicker
+              value={pdf}
+              onChange={setPdf}
+              disabled={isSavingExercise || pdfProgress !== null}
             />
-            {exercises.isPending ? (
-              <AdminLoading label="Đang tải bài tập" />
-            ) : exercises.isError ? (
-              <AdminLoadError error={exercises.error} retry={() => void exercises.refetch()} />
-            ) : filtered.length ? (
-              <div className="grid gap-2">
-                {filtered.map((exercise) => (
-                  <ContentRow
-                    key={exercise.id}
-                    title={exercise.title}
-                    description={
-                      exercise.exerciseType === 'FILE_BASED' ? 'Bài tập PDF' : 'Trắc nghiệm'
-                    }
-                    status={exercise.status}
-                    editHref={exercisePath(courseId, sectionId, lessonId, exercise.id)}
-                    editLabel="Sửa bài tập"
-                    onToggle={() => toggle(exercise)}
-                    onDelete={() => confirmDelete(exercise)}
-                    busy={update.isPending || remove.isPending}
-                  />
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                title={search ? 'Không tìm thấy bài tập' : 'Bài học chưa có bài tập'}
-                description={
-                  search ? 'Thử một tên khác.' : 'Tạo bài tập đầu tiên ở biểu mẫu bên dưới.'
-                }
-              />
-            )}
-            <AdminFeedback error={update.error ?? remove.error} />
-          </AdminCard>
-
-          <AdminCard title="Tạo bài tập mới">
-            <p className="text-sm leading-6 text-ink-secondary">
-              Bài tập PDF có thể tải tệp từ máy hoặc chọn PDF đã có. Tệp sẽ được tải và gắn tự động
-              khi tạo bài.
+          )}
+          {pdfProgress !== null && (
+            <div className="rounded-xl bg-surface-muted p-3 text-sm" role="status">
+              <p>Đang tải PDF lên {pdfProgress}%</p>
+              <progress className="mt-2 block w-full" value={pdfProgress} max={100} />
+            </div>
+          )}
+          {validation && (
+            <p
+              role="alert"
+              className="rounded-xl bg-danger-surface p-3 text-sm text-danger-foreground"
+            >
+              {validation}
             </p>
-            <form className="grid gap-3" onSubmit={(event) => void submit(event)}>
-              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_14rem]">
-                <AdminField label="Tên bài tập" value={title} onChange={setTitle} required />
-                <AdminSelect
-                  label="Loại bài tập"
-                  value={exerciseType}
-                  onChange={(value) => {
-                    setExerciseType(value as typeof exerciseType)
-                    if (value === 'QUIZ') setPdf(null)
-                  }}
-                  options={[
-                    { value: 'FILE_BASED', label: 'Bài tập PDF' },
-                    { value: 'QUIZ', label: 'Trắc nghiệm' },
-                  ]}
-                />
-              </div>
-              <AdminTextArea
-                label="Hướng dẫn cho học viên"
-                value={instructions}
-                onChange={setInstructions}
-                rows={3}
-                required
-                placeholder="Ví dụ: Mở tệp, hoàn thành bài rồi đánh dấu đã làm."
-              />
-              {exerciseType === 'FILE_BASED' && (
-                <AdminExercisePdfPicker
-                  value={pdf}
-                  onChange={setPdf}
-                  disabled={isSavingExercise || pdfProgress !== null}
-                />
-              )}
-              {pdfProgress !== null && (
-                <div className="rounded-xl bg-surface-muted p-3 text-sm" role="status">
-                  <p>Đang tải PDF lên {pdfProgress}%</p>
-                  <progress className="mt-2 block w-full" value={pdfProgress} max={100} />
-                </div>
-              )}
-              <AdminFeedback error={create.error} />
-              <Button
-                type="submit"
-                loading={isSavingExercise || create.isPending || pdfProgress !== null}
-                startIcon={<Plus aria-hidden="true" className="size-4" />}
-              >
-                {exerciseType === 'QUIZ' ? 'Tạo bài tập và mở câu hỏi' : 'Tạo bài tập'}
-              </Button>
-            </form>
-          </AdminCard>
-        </>
-      )}
+          )}
+          <AdminFeedback error={create.error} />
+        </form>
+      </BaseDialog>
     </div>
   )
 }
@@ -937,6 +1118,375 @@ function LessonYouTubeField({
           title={title}
         />
       )}
+    </div>
+  )
+}
+
+export function AdminLessonCreatePage() {
+  const courses = useCourseOptions()
+  const [courseId, setCourseId] = useState('')
+  const [sectionId, setSectionId] = useState('')
+  const sections = useSectionOptions(courseId)
+  const lessons = useLessonOptions(sectionId)
+  const create = useAdminMutation(
+    ({ parentId, input, key }: { parentId: string; input: Record<string, unknown>; key: string }) =>
+      adminRepository.createLesson(parentId, input, key),
+  )
+  const createExercise = useAdminMutation(
+    ({ parentId, input, key }: { parentId: string; input: Record<string, unknown>; key: string }) =>
+      adminRepository.createExercise(parentId, input, key),
+  )
+  const idempotency = useStableIdempotencyKey()
+  const notifications = useNotifications()
+  const navigate = useNavigate()
+  const course = courses.data?.find((item) => item.id === courseId)
+  const section = sections.data?.find((item) => item.id === sectionId)
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [paragraphs, setParagraphs] = useState('')
+  const [lectureVideoUrl, setLectureVideoUrl] = useState('')
+  const [solutionVideoUrl, setSolutionVideoUrl] = useState('')
+  const [lessonType, setLessonType] = useState<'LECTURE' | 'PRACTICE'>('LECTURE')
+  const [estimatedMinutes, setEstimatedMinutes] = useState('')
+  const [sortOrder, setSortOrder] = useState(0)
+  const [countsTowardProgress, setCountsTowardProgress] = useState(true)
+  const [status, setStatus] = useState<'DRAFT' | 'PUBLISHED' | 'HIDDEN'>('DRAFT')
+  const [newExercise, setNewExercise] = useState('')
+  const [newExerciseInstructions, setNewExerciseInstructions] = useState('')
+  const [exerciseType, setExerciseType] = useState<'FILE_BASED' | 'QUIZ'>('FILE_BASED')
+  const [exercisePdf, setExercisePdf] = useState<ExercisePdfSelection | null>(null)
+  const [exercisePdfProgress, setExercisePdfProgress] = useState<number | null>(null)
+  const [validation, setValidation] = useState('')
+
+  useEffect(() => {
+    // Keep the new lesson's default position after existing lessons in the selected chapter.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSortOrder(lessons.data?.length ?? 0)
+  }, [lessons.data?.length])
+
+  async function submit(event: FormEvent) {
+    event.preventDefault()
+    setValidation('')
+    if (!courseId || !sectionId) {
+      setValidation('Chọn khóa học và chương trước khi lưu bài học.')
+      return
+    }
+    const lectureVideoId = parseYouTubeVideoId(lectureVideoUrl)
+    const solutionVideoId = parseYouTubeVideoId(solutionVideoUrl)
+    if (
+      (lectureVideoUrl.trim() && !lectureVideoId) ||
+      (solutionVideoUrl.trim() && !solutionVideoId)
+    ) {
+      setValidation('Hãy kiểm tra lại liên kết YouTube trước khi lưu.')
+      return
+    }
+    if (Boolean(newExercise.trim()) !== Boolean(newExerciseInstructions.trim())) {
+      setValidation(
+        'Để thêm bài tập cùng lúc, hãy nhập cả tên và hướng dẫn. Bạn cũng có thể thêm bài tập sau khi tạo bài học.',
+      )
+      return
+    }
+    const input = {
+      title: title.trim(),
+      description: description.trim() || null,
+      content: {
+        version: 1,
+        paragraphs: paragraphs
+          .split(/\n\s*\n/)
+          .map((part) => part.trim())
+          .filter(Boolean),
+      },
+      video: lectureVideoId ? { provider: 'YOUTUBE', videoId: lectureVideoId } : null,
+      solutionVideo: solutionVideoId ? { provider: 'YOUTUBE', videoId: solutionVideoId } : null,
+      lessonType,
+      estimatedMinutes: estimatedMinutes ? Number(estimatedMinutes) : null,
+      countsTowardProgress,
+      status,
+      sortOrder,
+    }
+    try {
+      const lesson = await create.mutateAsync({
+        parentId: sectionId,
+        input,
+        key: idempotency.get(input),
+      })
+      idempotency.clear()
+      notifications.success('Đã tạo bài học.')
+      if (newExercise.trim() && newExerciseInstructions.trim()) {
+        const exerciseInput = {
+          title: newExercise.trim(),
+          description: null,
+          instructions: newExerciseInstructions.trim(),
+          exerciseType,
+          completionMode: exerciseType === 'QUIZ' ? 'QUIZ_SUBMISSION' : 'MANUAL',
+          isRequired: true,
+          sortOrder: 0,
+          status: 'DRAFT',
+        }
+        try {
+          const exercise = await createExercise.mutateAsync({
+            parentId: lesson.id,
+            input: exerciseInput,
+            key: idempotency.get(exerciseInput),
+          })
+          idempotency.clear()
+          if (exercise.exerciseType === 'FILE_BASED' && exercisePdf) {
+            try {
+              await uploadAndAttachExercisePdf(exercise.id, exercisePdf, setExercisePdfProgress)
+              notifications.success('Đã tạo bài tập và gắn PDF.')
+            } catch (error) {
+              notifications.error(
+                'Bài học đã tạo nhưng PDF chưa gắn được',
+                error instanceof Error
+                  ? `${error.message} Bạn có thể mở bài học để thử lại.`
+                  : 'Mở bài học để thử tải hoặc chọn PDF lại.',
+              )
+            }
+          } else {
+            notifications.success('Đã tạo bài tập.')
+          }
+          if (exercise.exerciseType === 'QUIZ') {
+            navigate(exercisePath(courseId, sectionId, lesson.id, exercise.id))
+            return
+          }
+        } catch {
+          notifications.error(
+            'Bài học đã tạo nhưng bài tập chưa được thêm',
+            'Mở bài học vừa tạo để thêm bài tập sau.',
+          )
+        }
+      }
+      navigate(lessonPath(courseId, sectionId, lesson.id))
+    } catch {
+      /* Error is displayed in the form. */
+    }
+  }
+
+  return (
+    <div className="grid gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface-muted px-4 py-3 text-sm">
+        <p className="min-w-0 truncate text-ink-secondary">
+          {course?.title ?? 'Chưa chọn khóa học'}
+          {section && (
+            <>
+              <ChevronRight aria-hidden="true" className="mx-1 inline size-4" />
+              {section.title}
+            </>
+          )}
+        </p>
+        <Link
+          to="/admin/lessons"
+          className="inline-flex items-center gap-1 font-semibold text-action-primary"
+        >
+          <ArrowLeft aria-hidden="true" className="size-4" />
+          Danh sách bài học
+        </Link>
+      </div>
+
+      {courses.isError ? (
+        <AdminLoadError error={courses.error} retry={() => void courses.refetch()} />
+      ) : (
+        <AdminCard
+          title="Chọn khóa học và chương"
+          description="Chọn khóa học trước. Danh sách chương sẽ tự đổi theo khóa học bạn chọn."
+        >
+          <div className="grid gap-3 sm:grid-cols-2">
+            <AdminSearchSelect
+              label="Khóa học"
+              value={courseId}
+              onChange={(value) => {
+                setCourseId(value)
+                setSectionId('')
+              }}
+              disabled={courses.isPending}
+              options={(courses.data ?? []).map((item) => ({
+                value: item.id,
+                label: item.title,
+                description: `${item.code} · ${item.level}`,
+              }))}
+            />
+            <AdminSearchSelect
+              label="Chương"
+              value={sectionId}
+              onChange={setSectionId}
+              disabled={!courseId || sections.isPending}
+              options={(sections.data ?? []).map((item) => ({
+                value: item.id,
+                label: item.title,
+                description: `Chương ${item.sortOrder + 1}`,
+              }))}
+            />
+          </div>
+          {sections.isError && (
+            <AdminLoadError error={sections.error} retry={() => void sections.refetch()} />
+          )}
+          {courseId && !sections.isPending && !sections.isError && !sections.data?.length && (
+            <p className="text-sm leading-6 text-ink-secondary">
+              Khóa học này chưa có chương. Hãy thêm chương trước khi tạo bài học.
+            </p>
+          )}
+        </AdminCard>
+      )}
+
+      <form className="grid gap-4" onSubmit={(event) => void submit(event)}>
+        <AdminCard
+          title="Thông tin bài học"
+          description="Đặt tên rõ ràng và ghi ngắn gọn học viên sẽ học được gì trong bài này."
+        >
+          <AdminField label="Tên bài học" value={title} onChange={setTitle} required />
+          <AdminTextArea
+            label="Mô tả nội dung bài học"
+            value={description}
+            onChange={setDescription}
+            rows={3}
+            placeholder="Tóm tắt nội dung và mục tiêu của bài học"
+          />
+        </AdminCard>
+
+        <AdminCard
+          title="Video bài giảng"
+          description="Dán liên kết YouTube. Bạn sẽ thấy bản xem trước ngay khi nhập liên kết."
+        >
+          <LessonYouTubeField
+            label="Liên kết video bài giảng"
+            value={lectureVideoUrl}
+            onChange={setLectureVideoUrl}
+            title={`Bài giảng · ${title || 'Bài học mới'}`}
+          />
+        </AdminCard>
+
+        <AdminCard
+          title="Bài tập của bài học"
+          description="Có thể nhập một bài tập để tạo cùng lúc, hoặc thêm bài tập khác sau khi lưu."
+        >
+          <div className="grid gap-3">
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_14rem]">
+              <AdminField
+                label="Tên bài tập (không bắt buộc)"
+                value={newExercise}
+                onChange={setNewExercise}
+                placeholder="Ví dụ: Bài tập giới thiệu bản thân"
+              />
+              <AdminSelect
+                label="Loại bài tập"
+                value={exerciseType}
+                onChange={(value) => {
+                  setExerciseType(value as typeof exerciseType)
+                  if (value === 'QUIZ') setExercisePdf(null)
+                }}
+                options={[
+                  { value: 'FILE_BASED', label: 'Bài tập PDF' },
+                  { value: 'QUIZ', label: 'Trắc nghiệm' },
+                ]}
+              />
+            </div>
+            <AdminTextArea
+              label="Hướng dẫn cho học viên"
+              value={newExerciseInstructions}
+              onChange={setNewExerciseInstructions}
+              rows={2}
+              placeholder="Nêu rõ học viên cần làm gì"
+            />
+            {exerciseType === 'FILE_BASED' && (
+              <AdminExercisePdfPicker
+                value={exercisePdf}
+                onChange={setExercisePdf}
+                disabled={
+                  create.isPending || createExercise.isPending || exercisePdfProgress !== null
+                }
+              />
+            )}
+            {exercisePdfProgress !== null && (
+              <div className="rounded-xl bg-surface-muted p-3 text-sm" role="status">
+                <p>Đang tải PDF lên {exercisePdfProgress}%</p>
+                <progress className="mt-2 block w-full" value={exercisePdfProgress} max={100} />
+              </div>
+            )}
+          </div>
+        </AdminCard>
+
+        <AdminCard
+          title="Video chữa bài"
+          description="Thêm video để học viên đối chiếu cách làm. Có thể để trống nếu chưa có video."
+        >
+          <LessonYouTubeField
+            label="Liên kết video chữa bài"
+            value={solutionVideoUrl}
+            onChange={setSolutionVideoUrl}
+            title={`Video chữa bài · ${title || 'Bài học mới'}`}
+          />
+        </AdminCard>
+
+        <AdminCard title="Thông tin bổ sung">
+          <AdminTextArea
+            label="Nội dung ghi chú cho học viên"
+            value={paragraphs}
+            onChange={setParagraphs}
+            rows={5}
+            placeholder="Mỗi đoạn cách nhau một dòng trống"
+          />
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <AdminSelect
+              label="Loại bài học"
+              value={lessonType}
+              onChange={(value) => setLessonType(value as typeof lessonType)}
+              options={[
+                { value: 'LECTURE', label: 'Bài giảng' },
+                { value: 'PRACTICE', label: 'Luyện tập' },
+              ]}
+            />
+            <AdminField
+              label="Thời lượng (phút)"
+              value={estimatedMinutes}
+              onChange={setEstimatedMinutes}
+              type="number"
+              min={0}
+              max={1440}
+            />
+            <AdminField
+              label="Vị trí trong chương"
+              value={String(sortOrder)}
+              onChange={(value) => setSortOrder(Number(value))}
+              type="number"
+              min={0}
+            />
+            <AdminSelect
+              label="Trạng thái"
+              value={status}
+              onChange={(value) => setStatus(value as typeof status)}
+              options={[
+                { value: 'DRAFT', label: 'Bản nháp' },
+                { value: 'PUBLISHED', label: 'Đang hiển thị' },
+                { value: 'HIDDEN', label: 'Đã ẩn' },
+              ]}
+            />
+          </div>
+          <label className="flex min-h-10 items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={countsTowardProgress}
+              onChange={(event) => setCountsTowardProgress(event.target.checked)}
+            />
+            Tính bài học này vào tiến độ khóa học
+          </label>
+          {validation && (
+            <p
+              role="alert"
+              className="rounded-xl bg-danger-surface p-3 text-sm text-danger-foreground"
+            >
+              {validation}
+            </p>
+          )}
+          <AdminFeedback error={create.error} />
+          <Button
+            type="submit"
+            loading={create.isPending || createExercise.isPending || exercisePdfProgress !== null}
+            startIcon={<Plus aria-hidden="true" className="size-4" />}
+          >
+            Tạo bài học
+          </Button>
+        </AdminCard>
+      </form>
     </div>
   )
 }

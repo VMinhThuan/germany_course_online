@@ -1,16 +1,17 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronRight, Eye, EyeOff, Plus, Search, Trash2 } from 'lucide-react'
+import { Eye, EyeOff, Plus, Search, Trash2 } from 'lucide-react'
 import { adminRepository } from '@/data/api/admin-repository'
 import type { ApiAdminCourse, ApiAdminQuiz } from '@/lib/api/types'
 import { ApiError } from '@/lib/api/client'
 import { formatVnd } from '@/shared/lib/format'
-import { useDialogs } from '@/shared/ui/dialogs'
+import { BaseDialog, useDialogs } from '@/shared/ui/dialogs'
 import { useNotifications } from '@/shared/ui/notifications'
-import { Button, EmptyState, Pagination } from '@/shared/ui'
+import { Button, EmptyState } from '@/shared/ui'
 import {
   AdminCard,
+  AdminSortableTable,
   AdminField,
   AdminFeedback,
   AdminLoadError,
@@ -18,6 +19,7 @@ import {
   AdminSelect,
   useDebouncedValue,
   AdminTextArea,
+  type AdminTableColumn,
   useAdminMutation,
   useStableIdempotencyKey,
 } from './shared'
@@ -46,20 +48,34 @@ function sectionPath(courseId: string, sectionId: string) {
 function lessonPath(courseId: string, sectionId: string, lessonId: string) {
   return `${sectionPath(courseId, sectionId)}/lessons/${encodeURIComponent(lessonId)}`
 }
+
+async function loadAllCoursePages(query: string) {
+  const filters = query ? { q: query } : {}
+  const first = await adminRepository.listCourses({ page: 1, pageSize: 100, ...filters })
+  const pageCount = Math.ceil(first.total / first.pageSize)
+  if (pageCount <= 1) return first.items
+  const rest = await Promise.all(
+    Array.from({ length: pageCount - 1 }, (_, index) =>
+      adminRepository.listCourses({ page: index + 2, pageSize: first.pageSize, ...filters }),
+    ),
+  )
+  return first.items.concat(...rest.map((page) => page.items))
+}
+
+function courseStatusLabel(status: ApiAdminCourse['status']) {
+  if (status === 'PUBLISHED') return 'Đang hiển thị'
+  if (status === 'ARCHIVED') return 'Đã ẩn'
+  return 'Bản nháp'
+}
+
 export function AdminCoursesPage() {
   const notifications = useNotifications()
   const dialogs = useDialogs()
-  const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const searchQuery = useDebouncedValue(search.trim())
   const courses = useQuery({
-    queryKey: ['admin', 'courses', page, searchQuery],
-    queryFn: () =>
-      adminRepository.listCourses({
-        page,
-        pageSize: 20,
-        ...(searchQuery ? { q: searchQuery } : {}),
-      }),
+    queryKey: ['admin', 'courses', searchQuery],
+    queryFn: () => loadAllCoursePages(searchQuery),
     retry: false,
   })
   const toggleStatus = useAdminMutation(
@@ -84,8 +100,7 @@ export function AdminCoursesPage() {
   const [requirements, setRequirements] = useState('')
   const [price, setPrice] = useState('')
   const [duration, setDuration] = useState('12')
-  const [success, setSuccess] = useState('')
-  const navigate = useNavigate()
+  const [createOpen, setCreateOpen] = useState(false)
 
   function updateTitle(value: string) {
     setTitle(value)
@@ -130,7 +145,6 @@ export function AdminCoursesPage() {
   }
   async function submit(event: FormEvent) {
     event.preventDefault()
-    setSuccess('')
     const input = {
       code: code.trim(),
       slug: slug.trim(),
@@ -142,128 +156,182 @@ export function AdminCoursesPage() {
       requirements: splitLines(requirements),
       price: price.trim(),
       accessDurationMonths: Number(duration),
-      sortOrder: courses.data?.total ?? 0,
+      sortOrder: courses.data?.length ?? 0,
     }
     try {
-      const course = await create.mutateAsync({ input, key: idempotency.get(input) })
+      await create.mutateAsync({ input, key: idempotency.get(input) })
       idempotency.clear()
-      setSuccess('Đã tạo khóa học nháp.')
+      setCreateOpen(false)
+      setCode('')
+      setSlug('')
+      setTitle('')
+      setLevel('A1')
+      setShortDescription('')
+      setDescription('')
+      setObjectives('')
+      setRequirements('')
+      setPrice('')
+      setDuration('12')
       notifications.success('Đã tạo khóa học nháp.')
-      navigate(coursePath(course.id))
     } catch {
       /* The API error is displayed below. */
     }
   }
 
+  const columns: AdminTableColumn<ApiAdminCourse>[] = [
+    {
+      key: 'course',
+      label: 'Khóa học',
+      sortValue: (course) => course.title,
+      render: (course) => (
+        <Link
+          to={coursePath(course.id)}
+          className="rounded-lg outline-none hover:text-action-primary focus-visible:ring-2 focus-visible:ring-action-primary"
+        >
+          <span className="block font-semibold">{course.title}</span>
+          <span className="block text-xs text-ink-secondary">{course.code}</span>
+        </Link>
+      ),
+    },
+    {
+      key: 'level',
+      label: 'Cấp độ',
+      sortValue: (course) => course.level,
+      render: (course) => course.level,
+    },
+    {
+      key: 'price',
+      label: 'Học phí',
+      sortValue: (course) => Number(course.price),
+      render: (course) => formatVnd(course.price),
+    },
+    {
+      key: 'duration',
+      label: 'Thời hạn',
+      sortValue: (course) => course.accessDurationMonths,
+      render: (course) => `${course.accessDurationMonths} tháng`,
+    },
+    {
+      key: 'status',
+      label: 'Trạng thái',
+      sortValue: (course) => courseStatusLabel(course.status),
+      render: (course) => (
+        <span className={`font-semibold ${statusTone(course.status)}`}>
+          {courseStatusLabel(course.status)}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      label: 'Thao tác',
+      className: 'text-right',
+      render: (course) => (
+        <div className="flex justify-end gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            loading={toggleStatus.isPending}
+            onClick={() => void changeVisibility(course)}
+            startIcon={
+              course.status === 'PUBLISHED' ? (
+                <EyeOff aria-hidden="true" className="size-4" />
+              ) : (
+                <Eye aria-hidden="true" className="size-4" />
+              )
+            }
+          >
+            {course.status === 'PUBLISHED'
+              ? 'Ẩn'
+              : course.status === 'ARCHIVED'
+                ? 'Hiện'
+                : 'Xuất bản'}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            loading={remove.isPending}
+            onClick={() => confirmDelete(course)}
+            startIcon={<Trash2 aria-hidden="true" className="size-4" />}
+          >
+            Xóa
+          </Button>
+        </div>
+      ),
+    },
+  ]
+
   return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,0.8fr)]">
+    <div className="grid gap-4">
       <AdminCard
-        title="Khóa học trong hệ thống"
-        description="Tìm khóa học theo tên hoặc mã. Chọn một khóa để sửa thông tin."
+        title="Danh sách khóa học"
+        description="Tìm khóa học hoặc nhấn tiêu đề cột để sắp xếp. Chọn tên khóa học để chỉnh sửa."
       >
-        <label className="relative grid gap-1.5 text-sm font-semibold text-ink-primary">
-          <span>Tìm khóa học</span>
-          <Search aria-hidden="true" className="absolute bottom-3 left-3 size-4 text-ink-muted" />
-          <input
-            className="min-h-11 w-full rounded-xl border border-border-subtle bg-white pl-10 pr-3 font-normal outline-none focus-visible:ring-2 focus-visible:ring-action-primary"
-            value={search}
-            onChange={(event) => {
-              setSearch(event.target.value)
-              setPage(1)
-            }}
-            placeholder="Nhập tên hoặc mã khóa học"
-          />
-        </label>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <label className="relative grid w-full max-w-lg gap-1.5 text-sm font-semibold text-ink-primary">
+            <span>Tìm khóa học</span>
+            <Search aria-hidden="true" className="absolute bottom-3 left-3 size-4 text-ink-muted" />
+            <input
+              className="min-h-11 w-full rounded-xl border border-border-subtle bg-white pl-10 pr-3 font-normal outline-none focus-visible:ring-2 focus-visible:ring-action-primary"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Nhập tên hoặc mã khóa học"
+            />
+          </label>
+          <Button
+            type="button"
+            onClick={() => setCreateOpen(true)}
+            startIcon={<Plus aria-hidden="true" className="size-4" />}
+          >
+            Tạo khóa học
+          </Button>
+        </div>
         {courses.isPending ? (
           <AdminLoading />
         ) : courses.isError ? (
           <AdminLoadError error={courses.error} retry={() => void courses.refetch()} />
-        ) : courses.data?.items.length ? (
-          <div className="grid gap-2">
-            {courses.data.items.map((course) => (
-              <div
-                key={course.id}
-                className="grid gap-3 rounded-xl border border-border-subtle bg-white p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
-              >
-                <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-                  <Link
-                    to={coursePath(course.id)}
-                    className="min-w-0 rounded-lg outline-none hover:text-action-primary focus-visible:ring-2 focus-visible:ring-action-primary"
-                  >
-                    <span className="block truncate font-semibold">{course.title}</span>
-                    <span className="mt-1 block text-xs text-ink-secondary">
-                      {course.code} · {course.accessDurationMonths} tháng
-                    </span>
-                  </Link>
-                  <span className="flex items-center gap-3 text-sm">
-                    <span className="text-right font-semibold">{formatVnd(course.price)}</span>
-                    <span className={`font-semibold ${statusTone(course.status)}`}>
-                      {course.status === 'PUBLISHED'
-                        ? 'Đang hiển thị'
-                        : course.status === 'ARCHIVED'
-                          ? 'Đã ẩn'
-                          : 'Bản nháp'}
-                    </span>
-                    <ChevronRight aria-hidden="true" className="size-4" />
-                  </span>
-                </div>
-                <span className="flex flex-wrap gap-2 sm:col-span-2 sm:justify-end">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    loading={toggleStatus.isPending}
-                    onClick={() => void changeVisibility(course)}
-                    startIcon={
-                      course.status === 'PUBLISHED' ? (
-                        <EyeOff aria-hidden="true" className="size-4" />
-                      ) : (
-                        <Eye aria-hidden="true" className="size-4" />
-                      )
-                    }
-                  >
-                    {course.status === 'PUBLISHED'
-                      ? 'Ẩn'
-                      : course.status === 'ARCHIVED'
-                        ? 'Hiện'
-                        : 'Xuất bản'}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    loading={remove.isPending}
-                    onClick={() => confirmDelete(course)}
-                    startIcon={<Trash2 aria-hidden="true" className="size-4" />}
-                  >
-                    Xóa
-                  </Button>
-                </span>
-              </div>
-            ))}
-          </div>
         ) : (
-          <EmptyState
-            title={searchQuery ? 'Không tìm thấy khóa học' : 'Chưa có khóa học'}
-            description={
-              searchQuery
-                ? 'Thử một tên hoặc mã khác.'
-                : 'Dùng biểu mẫu bên cạnh để tạo khóa học đầu tiên.'
+          <AdminSortableTable
+            rows={courses.data ?? []}
+            columns={columns}
+            rowKey={(course) => course.id}
+            emptyContent={
+              <EmptyState
+                title={searchQuery ? 'Không tìm thấy khóa học' : 'Chưa có khóa học'}
+                description={
+                  searchQuery
+                    ? 'Thử một tên hoặc mã khác.'
+                    : 'Tạo khóa học đầu tiên bằng nút phía trên.'
+                }
+              />
             }
           />
         )}
         <AdminFeedback error={toggleStatus.error ?? remove.error} />
-        {courses.data && <p className="text-xs text-ink-muted">Tổng số: {courses.data.total}</p>}
-        {courses.data && courses.data.total > courses.data.pageSize && (
-          <Pagination
-            page={courses.data.page}
-            pages={Math.ceil(courses.data.total / courses.data.pageSize)}
-            onPageChange={setPage}
-          />
-        )}
       </AdminCard>
-      <AdminCard title="Tạo khóa học">
-        <form className="grid gap-3" onSubmit={(event) => void submit(event)}>
+
+      <BaseDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        title="Tạo khóa học mới"
+        description="Nhập thông tin cơ bản. Ảnh bìa sẽ được bổ sung sau khi chốt cách lưu ảnh."
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
+              Hủy
+            </Button>
+            <Button type="submit" form="admin-create-course" loading={create.isPending}>
+              Tạo khóa học
+            </Button>
+          </>
+        }
+      >
+        <form
+          id="admin-create-course"
+          className="grid gap-3"
+          onSubmit={(event) => void submit(event)}
+        >
           <AdminField
             label="Mã khóa học"
             value={code}
@@ -320,16 +388,9 @@ export function AdminCoursesPage() {
           <p className="rounded-xl bg-surface-muted p-3 text-xs leading-5 text-ink-secondary">
             Khóa học mới ở trạng thái bản nháp. Ảnh bìa sẽ được thêm sau khi hoàn tất cách lưu ảnh.
           </p>
-          <AdminFeedback error={create.error} success={success} />
-          <Button
-            type="submit"
-            loading={create.isPending}
-            startIcon={<Plus aria-hidden="true" className="size-4" />}
-          >
-            Tạo khóa học
-          </Button>
+          <AdminFeedback error={create.error} />
         </form>
-      </AdminCard>
+      </BaseDialog>
     </div>
   )
 }
