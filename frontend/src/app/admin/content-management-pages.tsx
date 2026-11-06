@@ -2112,15 +2112,17 @@ export function AdminCourseEditorPage({ courseId }: { courseId: string }) {
             label="Mô tả ngắn"
             value={form.shortDescription ?? ''}
             onChange={(value) => setForm((old) => ({ ...old, shortDescription: value }))}
+            placeholder="Ví dụ: Bắt đầu từ lời chào, rồi tự tin giới thiệu bản thân bằng tiếng Đức."
           />
           <AdminTextArea
             label="Mô tả khóa học"
             value={form.description ?? ''}
             onChange={(value) => setForm((old) => ({ ...old, description: value }))}
             rows={4}
+            placeholder="Ví dụ: Làm quen với lời chào, giới thiệu bản thân, bảng chữ cái, số đếm và thông tin cá nhân thường dùng."
           />
           <AdminTextArea
-            label="Học viên sẽ đạt được gì? (mỗi ý một dòng)"
+            label="Sau khóa học, học viên có thể (mỗi ý một dòng)"
             value={(form.objectives ?? []).join('\n')}
             onChange={(value) =>
               setForm((old) => ({
@@ -2132,9 +2134,12 @@ export function AdminCourseEditorPage({ courseId }: { courseId: string }) {
               }))
             }
             rows={3}
+            placeholder={
+              'Tự chào hỏi và giới thiệu tên bằng tiếng Đức.\nĐánh vần tên, nói số điện thoại và email.\nHỏi đáp ngắn về nơi ở và thông tin cá nhân.'
+            }
           />
           <AdminTextArea
-            label="Điều kiện đầu vào (mỗi ý một dòng)"
+            label="Học viên cần chuẩn bị gì? (mỗi ý một dòng)"
             value={(form.requirements ?? []).join('\n')}
             onChange={(value) =>
               setForm((old) => ({
@@ -2146,6 +2151,9 @@ export function AdminCourseEditorPage({ courseId }: { courseId: string }) {
               }))
             }
             rows={3}
+            placeholder={
+              'Không cần biết tiếng Đức trước khi bắt đầu.\nChuẩn bị điện thoại hoặc máy tính có kết nối internet.'
+            }
           />
           <CourseBannerField
             assetId={form.bannerAssetId}

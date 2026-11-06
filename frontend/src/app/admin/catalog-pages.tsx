@@ -379,25 +379,33 @@ export function AdminCoursesPage() {
             value={shortDescription}
             onChange={setShortDescription}
             required
+            placeholder="Ví dụ: Bắt đầu từ lời chào, rồi tự tin giới thiệu bản thân bằng tiếng Đức."
           />
           <AdminTextArea
-            label="Mô tả"
+            label="Mô tả khóa học"
             value={description}
             onChange={setDescription}
             rows={4}
             required
+            placeholder="Ví dụ: Làm quen với lời chào, giới thiệu bản thân, bảng chữ cái, số đếm và thông tin cá nhân thường dùng."
           />
           <AdminTextArea
-            label="Nội dung học viên sẽ nắm được (mỗi ý một dòng)"
+            label="Sau khóa học, học viên có thể (mỗi ý một dòng)"
             value={objectives}
             onChange={setObjectives}
             rows={3}
+            placeholder={
+              'Tự chào hỏi và giới thiệu tên bằng tiếng Đức.\nĐánh vần tên, nói số điện thoại và email.\nHỏi đáp ngắn về nơi ở và thông tin cá nhân.'
+            }
           />
           <AdminTextArea
-            label="Điều kiện đầu vào (mỗi ý một dòng)"
+            label="Học viên cần chuẩn bị gì? (mỗi ý một dòng)"
             value={requirements}
             onChange={setRequirements}
             rows={3}
+            placeholder={
+              'Không cần biết tiếng Đức trước khi bắt đầu.\nChuẩn bị điện thoại hoặc máy tính có kết nối internet.'
+            }
           />
           <CourseBannerField
             assetId={null}

@@ -195,7 +195,9 @@ export function CourseCard({
               course.title
             )}
           </CardTitle>
-          <CourseLevelBadge level={course.level} />
+          {!course.title.toLowerCase().includes(course.level.toLowerCase()) && (
+            <CourseLevelBadge level={course.level} />
+          )}
         </div>
         <p className="text-sm leading-6 text-ink-secondary">{course.shortDescription}</p>
         {access?.kind === 'customer-preview' && (

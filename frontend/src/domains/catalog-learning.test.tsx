@@ -11,7 +11,7 @@ import { CourseTree, LessonRow, LockedContentPanel } from '@/domains/learning'
 import { A11_COURSE, MOCK_PREVIEW_MANIFEST } from '@/data/mock'
 
 describe('catalog components', () => {
-  it('renders course artwork without covering it and keeps the level beside the title', () => {
+  it('avoids repeating the level when it is already part of the course title', () => {
     const { container } = render(<CourseCard course={A11_COURSE} onOpen={() => undefined} />)
     const courseImage = container.querySelector<HTMLImageElement>(
       `img[src="${A11_COURSE.thumbnailUrl}"]`,
@@ -19,10 +19,21 @@ describe('catalog components', () => {
 
     expect(courseImage).toHaveClass('block', 'h-auto', 'w-full')
     expect(courseImage?.parentElement).not.toHaveClass('relative')
-    expect(screen.getByText(A11_COURSE.level, { exact: true })).toBeVisible()
+    expect(screen.queryByText(A11_COURSE.level, { exact: true })).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: A11_COURSE.title })).toBeVisible()
     expect(screen.getByText(/1\.290\.000/)).toBeVisible()
     expect(screen.getByRole('button', { name: /Xem khóa học/ })).toBeVisible()
+  })
+
+  it('shows the level when the course title does not include it', () => {
+    render(
+      <CourseCard
+        course={{ ...A11_COURSE, title: 'Tiếng Đức cho người mới' }}
+        onOpen={() => undefined}
+      />,
+    )
+
+    expect(screen.getByText(A11_COURSE.level, { exact: true })).toBeVisible()
   })
 
   it('shows catalog loading, empty, and error states', () => {

@@ -37,7 +37,7 @@ describe('CoursePricingSection', () => {
     expect(banner).toHaveClass('block', 'h-auto', 'w-full')
     expect(banner?.parentElement).not.toHaveClass('homepage-course-banner')
     expect(screen.getByRole('heading', { level: 3, name: PUBLIC_DEMO_COURSE.title })).toBeVisible()
-    expect(screen.getByText(PUBLIC_DEMO_COURSE.level, { exact: true })).toBeVisible()
+    expect(screen.queryByText(PUBLIC_DEMO_COURSE.level, { exact: true })).not.toBeInTheDocument()
     expect(
       screen.getByRole('link', {
         name: `Xem khóa học ${PUBLIC_DEMO_COURSE.title}`,
@@ -54,6 +54,13 @@ describe('CoursePricingSection', () => {
       container.querySelector('img[src="/assets/homepage/paniverse-hero.webp"]'),
     ).not.toBeNull()
     expect(screen.getByRole('heading', { level: 3, name: course.title })).toBeVisible()
+    expect(screen.getByText(course.level, { exact: true })).toBeVisible()
+  })
+
+  it('shows one level label when the title does not already include it', () => {
+    const course = { ...PUBLIC_DEMO_COURSE, title: 'Tiếng Đức cho người mới' }
+    renderPricing({ courses: [course] })
+
     expect(screen.getByText(course.level, { exact: true })).toBeVisible()
   })
 

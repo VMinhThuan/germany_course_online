@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { ArrowLeft, ArrowRight, BookOpenText, LockKeyhole } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { useAuthSession } from '@/app/auth/auth-session'
 import { CoursePricingSection } from '@/features/homepage/sections/CoursePricingSection'
@@ -16,17 +16,10 @@ import {
   usePublicCourseCatalogPage,
   usePublicSiteSettings,
 } from '@/data/public-demo'
-import {
-  CourseDetailHero,
-  CourseObjectives,
-  CourseOutline,
-  CourseOverview,
-  CoursePricingSummary,
-  CourseGrid,
-} from '@/domains/catalog'
+import { CourseOutline, CourseGrid } from '@/domains/catalog'
 import { DomainState } from '@/domains/shared/presentation'
 import { PublicShell } from '@/shared/layouts/shells'
-import { Button, Card, Container, LinkButton, Pagination } from '@/shared/ui'
+import { Button, Card, Container, Pagination } from '@/shared/ui'
 import { formatVnd } from '@/shared/lib/format'
 import { setBrandPageTitle } from '@/config/brand'
 import '@/features/homepage/homepage.css'
@@ -193,6 +186,17 @@ export function ApiCourseDetailPage() {
     )
 
   const course = courseQuery.data
+  const courseInformationCount = [
+    course.description.trim().length > 0,
+    course.objectives.length > 0,
+    course.requirements.length > 0,
+  ].filter(Boolean).length
+  const courseInformationGridClass =
+    courseInformationCount === 1
+      ? 'grid gap-4'
+      : courseInformationCount === 2
+        ? 'grid gap-4 sm:grid-cols-2'
+        : 'grid gap-4 sm:grid-cols-2 lg:grid-cols-3'
   const checkout = `/checkout/${encodeURIComponent(course.id)}`
   const openCheckout = () =>
     navigate(session ? checkout : `/login?returnTo=${encodeURIComponent(checkout)}`)
@@ -203,86 +207,116 @@ export function ApiCourseDetailPage() {
 
   return (
     <PublicLayout>
-      <Container className="space-y-12 py-8 sm:py-12">
-        <nav aria-label="Đường dẫn" className="flex items-center gap-2 text-sm text-ink-secondary">
-          <Link
-            to="/courses"
-            className="underline-offset-4 hover:text-action-primary hover:underline"
-          >
-            Khóa học
-          </Link>
-          <span aria-hidden="true">/</span>
-          <span aria-current="page" className="truncate text-ink-primary">
-            {course.level}
-          </span>
-        </nav>
-        <CourseDetailHero
-          course={course}
-          access={{
-            kind: 'restricted',
-            label: 'Nội dung bài học được kiểm tra theo quyền enrollment.',
-            reason: 'Đăng nhập để tiếp tục.',
-          }}
-          primaryAction={{ label: 'Đăng ký khóa học', onClick: openCheckout }}
-          accessNote={`${formatVnd(course.priceVnd ?? '0')} · ${course.accessDurationMonths ?? 0} tháng truy cập`}
-        />
-        <div className="grid gap-12 lg:grid-cols-[minmax(0,1.2fr)_minmax(17rem,0.8fr)] lg:items-start">
-          <div className="min-w-0 space-y-10">
-            <CourseOverview description={course.description} />
-            {course.objectives.length > 0 && <CourseObjectives objectives={course.objectives} />}
-            {course.requirements.length > 0 && (
-              <section className="space-y-3">
-                <h2 className="font-display text-2xl font-bold">Yêu cầu đầu vào</h2>
-                <ul className="list-disc space-y-2 pl-5 text-ink-secondary">
-                  {course.requirements.map((item) => (
-                    <li key={item}>{item}</li>
+      <Container className="space-y-8 py-8 sm:py-12">
+        <Link
+          to="/courses"
+          className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-action-primary underline-offset-4 hover:underline"
+        >
+          <ArrowLeft aria-hidden="true" className="size-4" />
+          Danh sách khóa học
+        </Link>
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
+          <header className="flex flex-col justify-center rounded-3xl bg-surface-blue p-6 sm:p-9">
+            {!course.title.toLowerCase().includes(course.level.toLowerCase()) && (
+              <p className="mb-3 text-sm font-bold uppercase tracking-[0.14em] text-action-primary">
+                Trình độ {course.level}
+              </p>
+            )}
+            <h1 className="font-display text-3xl font-extrabold tracking-tight text-ink-primary sm:text-4xl">
+              {course.title}
+            </h1>
+            <div className="mt-4 flex flex-wrap gap-2 text-sm text-ink-secondary">
+              {course.chapterCount !== undefined && (
+                <span className="rounded-full bg-card-surface px-3 py-1">
+                  {course.chapterCount} chương
+                </span>
+              )}
+              {course.lessonCount !== undefined && (
+                <span className="rounded-full bg-card-surface px-3 py-1">
+                  {course.lessonCount} bài học
+                </span>
+              )}
+            </div>
+          </header>
+          <aside>
+            <Card className="p-5 sm:p-6">
+              <p className="text-sm font-semibold text-ink-secondary">Học phí</p>
+              <p className="mt-1 font-display text-3xl font-extrabold tabular-nums text-ink-primary">
+                {course.priceVnd ? formatVnd(course.priceVnd) : 'Đang cập nhật'}
+              </p>
+              {course.accessDurationMonths !== undefined && (
+                <p className="mt-2 text-sm text-ink-secondary">
+                  Truy cập trong {course.accessDurationMonths} tháng
+                </p>
+              )}
+              <Button className="mt-5 w-full" onClick={openCheckout}>
+                Đăng ký khóa học <ArrowRight aria-hidden="true" />
+              </Button>
+              <p className="mt-3 text-xs leading-5 text-ink-muted">
+                {session
+                  ? 'Bài học sẽ mở sau khi đăng ký được xác nhận.'
+                  : 'Đăng nhập hoặc tạo tài khoản để đăng ký khóa học.'}
+              </p>
+            </Card>
+          </aside>
+        </div>
+        {courseInformationCount > 0 && (
+          <div className={courseInformationGridClass}>
+            {course.description.trim() && (
+              <section className="rounded-2xl border border-border-subtle bg-card-surface p-5 sm:p-6">
+                <h2 className="font-display text-xl font-bold">Bạn sẽ học gì?</h2>
+                <p className="mt-3 whitespace-pre-line leading-7 text-ink-secondary">
+                  {course.description}
+                </p>
+              </section>
+            )}
+            {course.objectives.length > 0 && (
+              <section className="rounded-2xl bg-surface-lime p-5 sm:p-6">
+                <h2 className="font-display text-xl font-bold">Sau khóa học, bạn có thể</h2>
+                <ul className="mt-3 grid gap-3">
+                  {course.objectives.map((objective) => (
+                    <li key={objective} className="flex gap-2.5 leading-6 text-ink-primary">
+                      <Check
+                        aria-hidden="true"
+                        className="mt-1 size-4 shrink-0 text-action-primary"
+                        strokeWidth={2.5}
+                      />
+                      <span>{objective}</span>
+                    </li>
                   ))}
                 </ul>
               </section>
             )}
-            <section aria-labelledby="course-outline-heading" className="space-y-4">
-              <div className="space-y-2">
-                <h2 id="course-outline-heading" className="font-display text-2xl font-bold">
-                  Chương trình học
-                </h2>
-                <p className="text-sm leading-6 text-ink-secondary">
-                  Danh sách chương và bài học công khai. Nội dung học chỉ mở khi máy chủ xác nhận
-                  enrollment.
-                </p>
-              </div>
-              <CourseOutline sections={course.sections} onLessonSelect={openLesson} />
-            </section>
+            {course.requirements.length > 0 && (
+              <section className="rounded-2xl border border-border-subtle bg-card-surface p-5 sm:p-6">
+                <h2 className="font-display text-xl font-bold">Bạn cần chuẩn bị gì?</h2>
+                <ul className="mt-3 grid gap-3">
+                  {course.requirements.map((requirement) => (
+                    <li key={requirement} className="flex gap-2.5 leading-6 text-ink-secondary">
+                      <Check
+                        aria-hidden="true"
+                        className="mt-1 size-4 shrink-0 text-action-primary"
+                        strokeWidth={2.5}
+                      />
+                      <span>{requirement}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
           </div>
-          <aside className="space-y-4 lg:sticky lg:top-28">
-            <CoursePricingSummary
-              priceVnd={course.priceVnd ?? '0'}
-              durationMonths={course.accessDurationMonths ?? 0}
-              note="Hệ thống xác nhận giá và quyền truy cập khi tạo đơn."
-            />
-            <Card className="p-5">
-              <div className="flex items-center gap-2">
-                <LockKeyhole aria-hidden="true" className="size-5 text-action-primary" />
-                <h2 className="font-display text-lg font-bold">Quyền học</h2>
-              </div>
-              <p className="mt-3 text-sm leading-6 text-ink-secondary">
-                Đăng nhập để mua khóa học hoặc tiếp tục bài học. Đơn hàng chờ duyệt không tự cấp
-                quyền.
-              </p>
-              <Button className="mt-5 w-full" onClick={openCheckout}>
-                <BookOpenText aria-hidden="true" />
-                Tiếp tục
-              </Button>
-            </Card>
-          </aside>
-        </div>
-        <div className="flex flex-wrap items-center gap-3 border-t border-border-subtle pt-6">
-          <LinkButton to="/courses" variant="outline" startIcon={<ArrowLeft aria-hidden="true" />}>
-            Về danh mục
-          </LinkButton>
-          <Button onClick={openCheckout}>
-            Đăng ký khóa học <ArrowRight aria-hidden="true" />
-          </Button>
-        </div>
+        )}
+        <section aria-labelledby="course-outline-heading" className="space-y-4">
+          <div className="space-y-2">
+            <h2 id="course-outline-heading" className="font-display text-2xl font-bold">
+              Nội dung khóa học
+            </h2>
+            <p className="text-sm leading-6 text-ink-secondary">
+              Các chương và bài học được sắp xếp theo từng bước để bạn dễ theo dõi.
+            </p>
+          </div>
+          <CourseOutline sections={course.sections} onLessonSelect={openLesson} />
+        </section>
       </Container>
     </PublicLayout>
   )

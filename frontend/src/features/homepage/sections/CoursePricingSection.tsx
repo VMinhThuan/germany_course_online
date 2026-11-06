@@ -123,9 +123,11 @@ export function CoursePricingSection({
                               {course.title}
                             </Link>
                           </h3>
-                          <span className="shrink-0 rounded-full bg-brand-lime px-3 py-1 text-sm font-bold text-pastel-lime-ink">
-                            {course.level}
-                          </span>
+                          {!course.title.toLowerCase().includes(course.level.toLowerCase()) && (
+                            <span className="shrink-0 rounded-full bg-brand-lime px-3 py-1 text-sm font-bold text-pastel-lime-ink">
+                              {course.level}
+                            </span>
+                          )}
                         </div>
                       )}
                       <p className="max-w-2xl leading-7 text-ink-secondary">
@@ -151,10 +153,6 @@ export function CoursePricingSection({
                         )}
                       </ul>
                     </div>
-
-                    <p className="text-sm font-medium text-ink-muted">
-                      Nội dung khóa học được cấp theo enrollment do máy chủ xác minh.
-                    </p>
 
                     <div className="mt-auto flex flex-col gap-4 border-t border-border-subtle pt-4 sm:flex-row sm:items-end sm:justify-between">
                       <div>
