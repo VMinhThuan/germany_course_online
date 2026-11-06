@@ -39,6 +39,7 @@ import {
   chooseDiscount,
   normalizeCouponCode,
 } from "./pricing.js";
+import { DEFAULT_SITE_SETTINGS } from "../site-settings/defaults.js";
 
 const PAYMENT_CONFIGURATION_UNAVAILABLE = () =>
   new AppError(
@@ -1106,8 +1107,7 @@ export class CommerceService {
     const settings = await SiteSettings.findById("site")
       .select("+payment")
       .lean();
-    if (!settings) throw notFound("Site settings are not configured.");
-    return siteSettingsDto(settings);
+    return siteSettingsDto(settings ?? DEFAULT_SITE_SETTINGS);
   }
 
   async patchAdminSiteSettings(
@@ -1147,10 +1147,7 @@ export class CommerceService {
       if (!settings) {
         settings = new SiteSettings({
           _id: "site",
-          siteName: "PAniverseDeutsch",
-          heroTitle: "",
-          heroDescription: "",
-          footerDescription: "",
+          ...DEFAULT_SITE_SETTINGS,
           updatedAt,
         });
       }

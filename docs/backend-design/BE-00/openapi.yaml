@@ -32,7 +32,7 @@ paths:
       summary: Read allowlisted public site settings
       tags:
         - Public
-      description: "Access: PUBLIC. Public projection only"
+      description: "Access: PUBLIC. Public projection only. If settings have not been saved, default values are returned without creating a database record."
       parameters: []
       responses:
         "200":
@@ -9999,7 +9999,9 @@ components:
         footerDescription:
           type: string
         heroMedia:
-          $ref: "#/components/schemas/PublicMedia"
+          anyOf:
+            - $ref: "#/components/schemas/PublicMedia"
+            - type: "null"
       additionalProperties: false
       required:
         - siteName

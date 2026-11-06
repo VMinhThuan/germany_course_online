@@ -12,6 +12,7 @@ import type {
   MediaResourceType,
   MediaStorageAdapter,
 } from "../learning/media-storage.js";
+import { DEFAULT_SITE_SETTINGS } from "../site-settings/defaults.js";
 import {
   getAssociatedPublicMedia,
   toPublicMedia,
@@ -253,10 +254,9 @@ export class PublicCatalogService {
   }
 
   async getPublicSiteSettings() {
-    const settings = await SiteSettings.findById("site")
-      .select("-payment")
-      .lean();
-    if (!settings) throw notFound("Public site settings are not configured.");
+    const settings =
+      (await SiteSettings.findById("site").select("-payment").lean()) ??
+      DEFAULT_SITE_SETTINGS;
     const heroMedia = settings.heroAssetId
       ? await MediaAsset.findOne({
           _id: settings.heroAssetId,
@@ -275,7 +275,7 @@ export class PublicCatalogService {
       facebookUrl: settings.facebookUrl,
       zaloUrl: settings.zaloUrl,
       footerDescription: settings.footerDescription,
-      heroMedia: heroMedia ? toPublicMedia(heroMedia) : undefined,
+      heroMedia: heroMedia ? toPublicMedia(heroMedia) : null,
     };
   }
 

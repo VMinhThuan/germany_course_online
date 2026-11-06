@@ -1123,9 +1123,22 @@ describe("Express foundation, auth, and public APIs", () => {
       ).toBe(400);
     });
 
-    it("returns 404 when public site settings are not initialized", async () => {
+    it("returns safe defaults when public site settings are not initialized", async () => {
       const response = await request(app).get("/api/v1/site-settings/public");
-      expect(response.status).toBe(404);
+      expect(response.status).toBe(200);
+      expect(response.body.data).toEqual({
+        siteName: "PAniverseDeutsch",
+        logoUrl: null,
+        heroTitle: "",
+        heroDescription: "",
+        contactEmail: null,
+        contactPhone: null,
+        facebookUrl: null,
+        zaloUrl: null,
+        footerDescription: "",
+        heroMedia: null,
+      });
+      expect(await SiteSettings.countDocuments()).toBe(0);
     });
   });
 });

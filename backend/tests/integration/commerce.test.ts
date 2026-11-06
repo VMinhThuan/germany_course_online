@@ -545,6 +545,26 @@ describe("BE-03A purchase, manual approval, enrollment, and email outbox", () =>
     ).toBe(1);
   });
 
+  it("provides defaults before the first settings save and allows admin initialization", async () => {
+    const initial = await as(admin, "get", "/api/v1/admin/site-settings");
+    expect(initial.status).toBe(200);
+    expect(initial.body.data).toMatchObject({
+      siteName: "PAniverseDeutsch",
+      heroTitle: "",
+      heroDescription: "",
+      footerDescription: "",
+      payment: null,
+    });
+    expect(await SiteSettings.countDocuments()).toBe(0);
+
+    const saved = await as(admin, "patch", "/api/v1/admin/site-settings").send({
+      heroTitle: "Chào mừng",
+    });
+    expect(saved.status).toBe(200);
+    expect(saved.body.data.heroTitle).toBe("Chào mừng");
+    expect(await SiteSettings.countDocuments()).toBe(1);
+  });
+
   it("updates bank settings without overwriting unrelated settings or leaking them publicly", async () => {
     await SiteSettings.create({
       _id: "site",
