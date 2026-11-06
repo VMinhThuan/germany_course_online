@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { getYouTubeEmbedUrl, getYouTubeVideoId, YouTubeEmbed } from './YouTubeEmbed'
 
@@ -20,31 +20,26 @@ describe('YouTubeEmbed', () => {
     expect(getYouTubeVideoId('not a URL')).toBeNull()
   })
 
-  it('builds a privacy-enhanced embed URL without autoplay', () => {
+  it('builds a privacy-enhanced inline embed URL without autoplay', () => {
     expect(getYouTubeEmbedUrl(videoId)).toBe(
-      `https://www.youtube-nocookie.com/embed/${videoId}?rel=0`,
+      `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&playsinline=1`,
     )
     expect(getYouTubeEmbedUrl('bad-id')).toBeNull()
   })
 
-  it('loads the actual iframe only after the keyboard-accessible play button is activated', () => {
-    render(
-      <YouTubeEmbed
-        url={`https://www.youtube.com/watch?v=${videoId}`}
-        title={title}
-        poster="/assets/homepage/feature-interactive.webp"
-      />,
-    )
+  it('shows the native YouTube preview immediately without an extra play layer', () => {
+    render(<YouTubeEmbed url={`https://www.youtube.com/watch?v=${videoId}`} title={title} />)
 
-    expect(screen.queryByTitle(title)).not.toBeInTheDocument()
+    const frame = screen.getByTitle(title)
+    expect(frame).toHaveAttribute(
+      'src',
+      `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&playsinline=1`,
+    )
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Xem trên YouTube' })).toHaveAttribute(
       'href',
       `https://www.youtube.com/watch?v=${videoId}`,
     )
-    fireEvent.click(screen.getByRole('button', { name: `Tải video: ${title}` }))
-
-    const frame = screen.getByTitle(title)
-    expect(frame).toHaveAttribute('src', `https://www.youtube-nocookie.com/embed/${videoId}?rel=0`)
     expect(frame.getAttribute('src')).not.toContain('autoplay')
     expect(frame).toHaveAttribute('allowfullscreen')
   })

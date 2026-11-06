@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
-import { ExternalLink, Play } from 'lucide-react'
+import { ExternalLink } from 'lucide-react'
 import { cn } from '@/shared/ui/cn'
 
 const YOUTUBE_VIDEO_ID = /^[A-Za-z0-9_-]{11}$/
@@ -36,29 +35,21 @@ export function getYouTubeVideoId(url: string): string | null {
 
 export function getYouTubeEmbedUrl(videoId: string): string | null {
   return YOUTUBE_VIDEO_ID.test(videoId)
-    ? `https://www.youtube-nocookie.com/embed/${videoId}?rel=0`
+    ? `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&playsinline=1`
     : null
 }
 
 export function YouTubeEmbed({
   url,
   title,
-  poster,
   className,
 }: {
   url: string
   title: string
-  poster?: string
   className?: string
 }) {
   const videoId = getYouTubeVideoId(url)
-  const [loaded, setLoaded] = useState(false)
   const embedUrl = videoId ? getYouTubeEmbedUrl(videoId) : null
-  const iframeRef = useRef<HTMLIFrameElement>(null)
-
-  useEffect(() => {
-    if (loaded) iframeRef.current?.focus()
-  }, [loaded])
 
   if (!videoId || !embedUrl) {
     return (
@@ -77,45 +68,16 @@ export function YouTubeEmbed({
   return (
     <figure className={cn('min-w-0', className)}>
       <div className="homepage-video-embed relative isolate overflow-hidden rounded-[1.35rem] bg-ink-primary shadow-soft">
-        {!loaded ? (
-          <>
-            {poster ? (
-              <img
-                src={poster}
-                alt=""
-                width="1500"
-                height="1000"
-                loading="lazy"
-                className="absolute inset-0 size-full object-cover"
-              />
-            ) : (
-              <div aria-hidden="true" className="absolute inset-0 bg-ink-primary" />
-            )}
-            <div aria-hidden="true" className="absolute inset-0 bg-ink-primary/30" />
-            <button
-              type="button"
-              aria-label={`Tải video: ${title}`}
-              onClick={() => setLoaded(true)}
-              className="absolute inset-0 z-10 grid size-full place-items-center text-white outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-brand-lime"
-            >
-              <span className="grid size-16 place-items-center rounded-full bg-action-primary shadow-raised transition-transform hover:scale-105 sm:size-20">
-                <Play aria-hidden="true" className="ml-1 size-7 fill-current sm:size-8" />
-              </span>
-            </button>
-          </>
-        ) : (
-          <iframe
-            ref={iframeRef}
-            src={embedUrl}
-            title={title}
-            loading="lazy"
-            referrerPolicy="strict-origin-when-cross-origin"
-            allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            allowFullScreen
-            tabIndex={0}
-            className="absolute inset-0 size-full border-0"
-          />
-        )}
+        <iframe
+          src={embedUrl}
+          title={title}
+          loading="lazy"
+          referrerPolicy="strict-origin-when-cross-origin"
+          allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowFullScreen
+          tabIndex={0}
+          className="absolute inset-0 size-full border-0"
+        />
       </div>
       <figcaption className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm text-ink-secondary">
         <span>{title}</span>

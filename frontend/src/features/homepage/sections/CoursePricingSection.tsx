@@ -1,9 +1,10 @@
-import { ArrowRight, Check, Clock3 } from 'lucide-react'
+import { ArrowRight, BookOpenText, Clock3, ListChecks } from 'lucide-react'
 import { Link } from 'react-router'
 import type { CourseSummaryModel } from '@/domains/catalog/models'
 import { DomainState } from '@/domains/shared/presentation'
 import { formatVnd } from '@/shared/lib/format'
 import { Button, Container, LinkButton } from '@/shared/ui'
+import { BilingualSectionHeading } from '../components/BilingualSectionHeading'
 import { homepageContent } from '../content/homepage-content'
 
 export function CoursePricingSection({
@@ -23,23 +24,16 @@ export function CoursePricingSection({
     <section
       id="pricing"
       aria-labelledby="pricing-title"
-      className="scroll-mt-24 bg-surface-muted py-14 sm:py-18 lg:py-20"
+      data-homepage-reveal
+      className="homepage-section homepage-section--pricing scroll-mt-24 py-14 sm:py-18 lg:py-20"
     >
       <Container>
         <header className="mx-auto mb-8 max-w-2xl text-center sm:mb-10">
-          <p
-            lang="de"
-            className="inline-flex rounded-full bg-brand-pink px-3 py-1 text-sm font-bold uppercase tracking-[0.14em] text-ink-primary"
-          >
-            {pricing.eyebrow}
-          </p>
-          <h2
+          <BilingualSectionHeading
             id="pricing-title"
-            className="mt-3 font-display text-3xl font-extrabold tracking-tight text-ink-primary sm:text-4xl"
-          >
-            {pricing.title}
-          </h2>
-          <p className="mt-3 leading-7 text-ink-secondary">{pricing.description}</p>
+            german={pricing.eyebrow}
+            title={pricing.title}
+          />
         </header>
 
         {loading ? (
@@ -133,25 +127,28 @@ export function CoursePricingSection({
                       <p className="max-w-2xl leading-7 text-ink-secondary">
                         {course.shortDescription}
                       </p>
-                      <ul className="mt-4 grid gap-2.5">
-                        {(course.chapterCount !== undefined ||
-                          course.lessonCount !== undefined) && (
-                          <li className="flex items-start gap-2.5 text-sm leading-6 text-ink-secondary">
-                            <Check
-                              aria-hidden="true"
-                              className="mt-1 size-4 shrink-0 text-action-primary"
-                              strokeWidth={2.5}
-                            />
-                            <span>
-                              {course.chapterCount !== undefined && `${course.chapterCount} chương`}
-                              {course.chapterCount !== undefined &&
-                                course.lessonCount !== undefined &&
-                                ' · '}
-                              {course.lessonCount !== undefined && `${course.lessonCount} bài học`}
-                            </span>
-                          </li>
-                        )}
-                      </ul>
+                      {(course.chapterCount !== undefined || course.lessonCount !== undefined) && (
+                        <ul className="mt-4 flex flex-wrap gap-2">
+                          {course.chapterCount !== undefined && (
+                            <li className="inline-flex min-h-9 items-center gap-2 rounded-full bg-surface-blue px-3 py-1.5 text-sm font-semibold text-ink-secondary">
+                              <BookOpenText
+                                aria-hidden="true"
+                                className="size-4 text-action-primary"
+                              />
+                              {course.chapterCount} chương
+                            </li>
+                          )}
+                          {course.lessonCount !== undefined && (
+                            <li className="inline-flex min-h-9 items-center gap-2 rounded-full bg-brand-pink/45 px-3 py-1.5 text-sm font-semibold text-ink-secondary">
+                              <ListChecks
+                                aria-hidden="true"
+                                className="size-4 text-action-primary"
+                              />
+                              {course.lessonCount} bài học
+                            </li>
+                          )}
+                        </ul>
+                      )}
                     </div>
 
                     <div className="mt-auto flex flex-col gap-4 border-t border-border-subtle pt-4 sm:flex-row sm:items-end sm:justify-between">

@@ -21,7 +21,8 @@ describe('CoursePricingSection', () => {
     expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('Tiếng Đức A1.1')
     expect(screen.getByText(/1\.290\.000/)).toBeInTheDocument()
     expect(screen.getByText('12 tháng truy cập')).toBeInTheDocument()
-    expect(screen.getByText('4 chương · 7 bài học')).toBeInTheDocument()
+    expect(screen.getByText('4 chương')).toBeInTheDocument()
+    expect(screen.getByText('7 bài học')).toBeInTheDocument()
     expect(screen.queryByText(/học thử/i)).not.toBeInTheDocument()
     expect(
       container.querySelector('img[src="/assets/homepage/course-banner-a11.webp"]'),
@@ -91,7 +92,8 @@ describe('CoursePricingSection', () => {
     })
 
     expect(screen.getAllByRole('article')).toHaveLength(2)
-    expect(screen.getByText('8 chương · 15 bài học')).toBeInTheDocument()
+    expect(screen.getByText('8 chương')).toBeInTheDocument()
+    expect(screen.getByText('15 bài học')).toBeInTheDocument()
     expect(
       screen.getByRole('link', { name: 'Xem khóa học Tiếng Đức A2 · Giao tiếp tiếp nối' }),
     ).toHaveAttribute('href', '/courses/tieng-duc-a2')

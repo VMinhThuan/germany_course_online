@@ -1,26 +1,38 @@
 export const homepageContent = {
   hero: {
-    title: 'Học tiếng Đức từ những bước đầu tiên.',
+    title: 'Học tiếng Đức cho mục tiêu của bạn.',
     german: 'Deutsch lernen – Schritt für Schritt.',
     description:
-      'Khám phá lộ trình A1.1 với bài học dễ theo dõi, bài tập thực hành và ba chương học thử miễn phí.',
+      'Dù bạn hướng đến công việc, học tập hay một cuộc sống mới, hãy bắt đầu với những bài học rõ ràng và thực hành được ngay.',
   },
   courseIntro: {
-    title: 'Làm quen với tiếng Đức theo cách dễ hiểu.',
-    german: 'Deutsch einfach und verständlich lernen.',
-    description:
-      'Tiếng Đức A1.1 được chia theo chương, giúp bạn làm quen với kiến thức cơ bản và luyện tập qua bài học trực tuyến.',
+    title: 'Tiếng Đức có thể mở ra điều gì cho bạn?',
+    german: 'Wohin kann Deutsch dich bringen?',
+    image: '/assets/homepage/feature-listening.webp',
+    imageAlt: 'Một người học tiếng Đức bằng máy tính và ghi chú vào vở.',
+    opportunities: [
+      {
+        title: 'Thêm lựa chọn nghề nghiệp',
+        description: 'Mở rộng cơ hội làm việc tại Đức và trong môi trường quốc tế.',
+      },
+      {
+        title: 'Tự tin theo đuổi việc học',
+        description: 'Chuẩn bị ngôn ngữ cho kế hoạch học tập ở các quốc gia nói tiếng Đức.',
+      },
+      {
+        title: 'Chủ động trong cuộc sống mới',
+        description: 'Giao tiếp và hòa nhập dễ dàng hơn trong những tình huống hằng ngày.',
+      },
+    ],
   },
   courseOverview: {
     eyebrow: 'DIE PLATTFORM ENTDECKEN',
-    title: 'Giới thiệu nền tảng PAniverseDeutsch.',
-    description:
-      'Tổng quan website, các cấp độ tiếng Đức và cách bạn có thể học cùng PAniverseDeutsch.',
+    title: 'Khám phá cách học cùng PAniverseDeutsch.',
     videoUrl: 'https://www.youtube.com/watch?v=L-lkjyMArwE',
     videoTitle: 'Video giới thiệu tổng quan website PAniverseDeutsch',
-    poster: '/assets/homepage/feature-interactive.webp',
   },
   features: {
+    eyebrow: 'LERNEN AUF DEINE ART',
     title: 'Học theo cách phù hợp với bạn.',
     items: [
       {
@@ -52,8 +64,6 @@ export const homepageContent = {
   pricing: {
     eyebrow: 'UNSERE DEUTSCHKURSE',
     title: 'Chọn lộ trình học phù hợp.',
-    description:
-      'Khám phá lộ trình A1.1 và A1.2. Giá cùng thời hạn bên dưới chỉ là số liệu minh họa trong bản demo.',
     benefits: [
       'Cấu trúc bài học theo chương',
       'Nội dung học thử mở trực tiếp trên website',
@@ -82,10 +92,57 @@ export const homepageContent = {
       },
     ],
   },
+  testimonials: {
+    eyebrow: 'LERNEINDRÜCKE',
+    title: 'Mỗi bước tiến đều đáng tự hào.',
+    items: [
+      { name: 'Minh Anh', rating: 5, review: 'Bài học chia rõ từng phần nên mình dễ theo kịp.' },
+      {
+        name: 'Quốc Bảo',
+        rating: 5,
+        review: 'Có phần luyện tập ngay sau bài giảng, học xong nhớ lâu hơn.',
+      },
+      {
+        name: 'Thảo Vy',
+        rating: 5,
+        review: 'Mình có thể học theo thời gian rảnh và xem lại khi cần.',
+      },
+      {
+        name: 'Đức Huy',
+        rating: 4,
+        review: 'Cách học từng bước giúp mình đỡ ngại khi mới bắt đầu.',
+      },
+      {
+        name: 'Ngọc Linh',
+        rating: 5,
+        review: 'Phần nghe và ghi chú giúp mình tập trung hơn mỗi buổi.',
+      },
+      { name: 'Hoàng Nam', rating: 5, review: 'Mình biết rõ đang học đến đâu và cần ôn phần nào.' },
+      {
+        name: 'Mai Phương',
+        rating: 5,
+        review: 'Bài học dễ mở trên điện thoại, tiện tranh thủ lúc rảnh.',
+      },
+      {
+        name: 'Thanh Tùng',
+        rating: 4,
+        review: 'Tài liệu và bài tập đi cùng bài học nên khá thuận tiện.',
+      },
+      {
+        name: 'Hà My',
+        rating: 5,
+        review: 'Mình tự tin hơn khi luyện những câu giao tiếp đầu tiên.',
+      },
+      {
+        name: 'Gia Hân',
+        rating: 5,
+        review: 'Lộ trình rõ ràng giúp mình duy trì thói quen học mỗi ngày.',
+      },
+    ],
+  },
   faq: {
     eyebrow: 'HÄUFIGE FRAGEN',
     title: 'Giải đáp trước khi bắt đầu.',
-    description: 'Thông tin ngắn gọn về khóa học và cách sử dụng website.',
     questions: [
       {
         id: 'try-before-enrolling',
@@ -95,9 +152,9 @@ export const homepageContent = {
       },
       {
         id: 'course-content',
-        question: 'Khóa học A1.1 gồm những nội dung nào?',
+        question: 'Mỗi khóa học có những nội dung nào?',
         answer:
-          'Danh mục hiện hiển thị 4 chương và 7 bài học. Tên bài cùng nội dung đầy đủ vẫn đang được xác nhận.',
+          'Mỗi lộ trình có danh sách chương và bài học riêng. Bạn có thể xem đề cương trên trang chi tiết của khóa học.',
       },
       {
         id: 'mobile-learning',

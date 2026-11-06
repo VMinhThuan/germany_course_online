@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { useAuthSession } from '@/app/auth/auth-session'
@@ -8,6 +8,7 @@ import { CourseIntroduction } from '@/features/homepage/sections/CourseIntroduct
 import { CourseOverviewVideo } from '@/features/homepage/sections/CourseOverviewVideo'
 import { LearningFeaturesGrid } from '@/features/homepage/sections/LearningFeaturesGrid'
 import { LearningBenefitsSection } from '@/features/homepage/sections/LearningBenefitsSection'
+import { StudentTestimonialsSection } from '@/features/homepage/sections/StudentTestimonialsSection'
 import { FAQSection } from '@/features/homepage/sections/FAQSection'
 import { HomepageFooter } from '@/features/homepage/sections/HomepageFooter'
 import {
@@ -75,10 +76,50 @@ function PageFailure({ title, onRetry }: { title: string; onRetry: () => void })
 export function ApiPublicLandingPage() {
   const catalog = usePublicCourseCatalog()
   const settings = usePublicSiteSettings()
+  const homepageRef = useRef<HTMLDivElement>(null)
   usePageTitle(settings.data?.siteName || 'Học tiếng Đức')
+
+  useEffect(() => {
+    const homepage = homepageRef.current
+    const root = document.documentElement
+    root.classList.add('homepage-scroll-guard')
+
+    const cleanup = () => root.classList.remove('homepage-scroll-guard')
+    if (!homepage || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return cleanup
+    if (!('IntersectionObserver' in window)) return cleanup
+
+    const sections = Array.from(homepage.querySelectorAll<HTMLElement>('[data-homepage-reveal]'))
+    let initialized = false
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!initialized) {
+          sections.forEach((section) => section.setAttribute('data-homepage-revealed', 'false'))
+          initialized = true
+          homepage.setAttribute('data-homepage-reveal-ready', 'true')
+        }
+
+        entries.forEach((entry) => {
+          ;(entry.target as HTMLElement).setAttribute(
+            'data-homepage-revealed',
+            entry.isIntersecting ? 'true' : 'false',
+          )
+        })
+      },
+      { rootMargin: '-32px 0px -40px 0px', threshold: 0.08 },
+    )
+
+    sections.forEach((section) => observer.observe(section))
+    return () => {
+      observer.disconnect()
+      homepage.removeAttribute('data-homepage-reveal-ready')
+      sections.forEach((section) => section.removeAttribute('data-homepage-revealed'))
+      cleanup()
+    }
+  }, [])
+
   return (
     <PublicLayout homepage>
-      <>
+      <div ref={homepageRef} className="homepage-content">
         <PhotographicHero
           {...(settings.data?.heroTitle ? { title: settings.data.heroTitle } : {})}
           {...(settings.data?.heroDescription
@@ -103,8 +144,9 @@ export function ApiPublicLandingPage() {
           onRetry={() => void catalog.refetch()}
         />
         <LearningBenefitsSection />
+        <StudentTestimonialsSection />
         <FAQSection />
-      </>
+      </div>
     </PublicLayout>
   )
 }

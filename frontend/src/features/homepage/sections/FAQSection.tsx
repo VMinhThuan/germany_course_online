@@ -5,6 +5,7 @@ import {
   AccordionTrigger,
   Container,
 } from '@/shared/ui'
+import { BilingualSectionHeading } from '../components/BilingualSectionHeading'
 import { homepageContent } from '../content/homepage-content'
 
 export function FAQSection() {
@@ -14,23 +15,12 @@ export function FAQSection() {
     <section
       id="faq"
       aria-labelledby="faq-title"
-      className="scroll-mt-24 bg-surface-pink py-14 sm:py-18 lg:py-20"
+      data-homepage-reveal
+      className="homepage-section homepage-section--faq scroll-mt-24 py-14 sm:py-18 lg:py-20"
     >
       <Container>
         <header className="mx-auto mb-7 max-w-2xl text-center sm:mb-9">
-          <p
-            lang="de"
-            className="text-sm font-bold uppercase tracking-[0.14em] text-action-primary"
-          >
-            {faq.eyebrow}
-          </p>
-          <h2
-            id="faq-title"
-            className="mt-3 font-display text-3xl font-extrabold tracking-tight text-ink-primary sm:text-4xl"
-          >
-            {faq.title}
-          </h2>
-          <p className="mt-3 leading-7 text-ink-secondary">{faq.description}</p>
+          <BilingualSectionHeading id="faq-title" german={faq.eyebrow} title={faq.title} />
         </header>
 
         <Accordion

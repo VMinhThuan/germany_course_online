@@ -11,7 +11,7 @@ export function BilingualSectionHeading({
 }: {
   title: string
   german: string
-  description: string
+  description?: string
   as?: 'h1' | 'h2'
   align?: 'left' | 'center'
   id?: string
@@ -20,7 +20,19 @@ export function BilingualSectionHeading({
   const Heading = as
 
   return (
-    <div className={cn('space-y-3', align === 'center' && 'mx-auto text-center', className)}>
+    <div
+      className={cn(
+        'flex flex-col gap-3',
+        align === 'center' && 'mx-auto items-center text-center',
+        className,
+      )}
+    >
+      <p
+        lang="de"
+        className="inline-flex rounded-full bg-brand-pink px-3.5 py-1.5 text-xs font-extrabold uppercase tracking-[0.16em] text-ink-primary sm:text-sm"
+      >
+        {german}
+      </p>
       <Heading
         id={id}
         className={cn(
@@ -32,12 +44,11 @@ export function BilingualSectionHeading({
       >
         {title}
       </Heading>
-      <p lang="de" className="font-display text-base font-semibold text-action-primary sm:text-lg">
-        {german}
-      </p>
-      <p className="text-base leading-7 text-ink-secondary sm:text-lg sm:leading-8">
-        {description}
-      </p>
+      {description && (
+        <p className="text-base leading-7 text-ink-secondary sm:text-lg sm:leading-8">
+          {description}
+        </p>
+      )}
     </div>
   )
 }

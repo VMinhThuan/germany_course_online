@@ -18,6 +18,7 @@ export function PhotographicHero({
     <section
       id="hero"
       aria-labelledby="homepage-hero-title"
+      data-homepage-reveal
       className="homepage-hero relative overflow-hidden bg-page-surface"
     >
       <div className="homepage-hero__shape" aria-hidden="true" />

@@ -48,13 +48,12 @@ export function HomepageFooter({ signedIn = false }: { signedIn?: boolean }) {
   )
 
   return (
-    <footer id="footer-contact" className="scroll-mt-24 bg-ink-primary text-white">
+    <footer id="footer-contact" className="homepage-footer scroll-mt-24 bg-ink-primary text-white">
       <div className="mx-auto grid w-full max-w-7xl gap-9 px-4 py-10 sm:px-6 sm:py-12 md:grid-cols-2 lg:grid-cols-[1.35fr_0.8fr_0.9fr_1fr] lg:gap-10 lg:px-8">
         <div>
           <BrandLogo to="/" variant="light" className="-ml-2" />
           <p className="mt-4 max-w-sm text-sm leading-6 text-white/75">
-            {brandConfig.tagline}. Khám phá khóa học {brandConfig.courseName} qua bài học và phần
-            thực hành.
+            {brandConfig.tagline}. Khám phá các lộ trình tiếng Đức qua bài học và phần thực hành.
           </p>
         </div>
 
@@ -113,7 +112,7 @@ export function HomepageFooter({ signedIn = false }: { signedIn?: boolean }) {
           <p>
             © {new Date().getFullYear()} {brandConfig.name}
           </p>
-          <p>{brandConfig.courseName}</p>
+          <p>Học tiếng Đức trực tuyến</p>
         </div>
       </div>
     </footer>
