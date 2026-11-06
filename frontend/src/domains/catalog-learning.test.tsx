@@ -33,7 +33,7 @@ describe('catalog components', () => {
       />,
     )
 
-    expect(screen.getByText(A11_COURSE.level, { exact: true })).toBeVisible()
+    expect(screen.getByText(A11_COURSE.level, { exact: true })).toHaveClass('bg-brand-pink')
   })
 
   it('shows catalog loading, empty, and error states', () => {

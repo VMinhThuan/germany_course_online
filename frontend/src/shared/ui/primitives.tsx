@@ -168,6 +168,7 @@ const badgeStyles = cva(
       tone: {
         neutral: 'bg-surface-muted text-ink-secondary',
         brand: 'bg-brand-lime text-pastel-lime-ink',
+        pink: 'bg-brand-pink text-pastel-pink-ink',
         preview: 'bg-brand-blue text-pastel-blue-ink',
         success: 'bg-success-surface text-success-foreground',
         warning: 'bg-warning-surface text-warning-foreground',

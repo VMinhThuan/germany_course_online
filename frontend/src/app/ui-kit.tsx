@@ -434,6 +434,8 @@ export function UiKitPage() {
             <ResponsiveGrid minItemWidth="9rem" gap="md">
               <ColorSwatch name="Pastel blue" value="#C2E8F5" className="bg-brand-blue" />
               <ColorSwatch name="Lime" value="#D1F685" className="bg-brand-lime" />
+              <ColorSwatch name="Blush pink" value="#F7CBD8" className="bg-brand-pink" />
+              <ColorSwatch name="Pink surface" value="#FFF3F6" className="bg-surface-pink" />
               <ColorSwatch name="Ink" value="#203039" className="bg-ink-primary" inverse />
               <ColorSwatch name="Ink phụ" value="#4A5B63" className="bg-ink-secondary" inverse />
               <ColorSwatch name="CTA teal" value="#006B70" className="bg-action-primary" inverse />

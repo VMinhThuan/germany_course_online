@@ -29,7 +29,7 @@ export function LearningBenefitsSection() {
           {benefits.items.map((item, index) => (
             <li
               key={item.title}
-              className={`bg-card-surface p-5 sm:p-7 ${index === 0 ? 'sm:bg-surface-blue/55' : ''} ${index === 3 ? 'sm:bg-surface-lime/40' : ''}`}
+              className={`bg-card-surface p-5 sm:p-7 ${index === 0 ? 'sm:bg-surface-blue/55' : ''} ${index === 2 ? 'bg-surface-pink' : ''} ${index === 3 ? 'sm:bg-surface-lime/40' : ''}`}
             >
               <span
                 aria-hidden="true"

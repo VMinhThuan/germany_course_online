@@ -133,7 +133,7 @@ export function LearningBenefits({
 }
 
 export function CourseLevelBadge({ level }: { level: string }) {
-  return <Badge tone="brand">{level}</Badge>
+  return <Badge tone="pink">{level}</Badge>
 }
 
 export function FreePreviewBadge({ label = 'Học thử theo yêu cầu' }: { label?: string }) {
