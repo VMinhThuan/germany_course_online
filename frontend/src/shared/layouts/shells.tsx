@@ -68,7 +68,7 @@ function PublicMenu({
           className={cn(
             'flex min-h-11 items-center rounded-lg px-3 text-base font-semibold text-ink-secondary underline-offset-4 hover:bg-surface-muted hover:text-ink-primary hover:underline',
             desktop && 'justify-center px-0 hover:bg-transparent',
-            desktop && spread && 'min-w-0 flex-1 px-1 text-center text-lg xl:text-xl',
+            desktop && spread && 'min-w-0 flex-1 px-1 text-center text-base',
           )}
         >
           {item.label}
@@ -154,7 +154,7 @@ export function PublicShell({
               <>
                 <Link
                   to={authState.role === 'ADMIN' ? '/admin' : '/student/courses'}
-                  className="text-sm font-semibold text-ink-secondary underline-offset-4 hover:text-ink-primary hover:underline"
+                  className="text-base font-semibold text-ink-secondary underline-offset-4 hover:text-ink-primary hover:underline"
                 >
                   {authState.role === 'ADMIN' ? 'Khu vực quản trị' : 'Học của tôi'}
                 </Link>
@@ -181,14 +181,14 @@ export function PublicShell({
                 <>
                   <Link
                     to="/login"
-                    className="text-sm font-semibold text-ink-secondary underline-offset-4 hover:text-ink-primary hover:underline"
+                    className="text-base font-semibold text-ink-secondary underline-offset-4 hover:text-ink-primary hover:underline"
                   >
                     Đăng nhập
                   </Link>
                   {showRegister && (
                     <Link
                       to="/register"
-                      className="text-sm font-semibold text-ink-secondary underline-offset-4 hover:text-ink-primary hover:underline"
+                      className="text-base font-semibold text-ink-secondary underline-offset-4 hover:text-ink-primary hover:underline"
                     >
                       Tạo tài khoản
                     </Link>
@@ -196,7 +196,7 @@ export function PublicShell({
                 </>
               )
             )}
-            <LinkButton to={primaryAction.href} size="sm">
+            <LinkButton to={primaryAction.href} size="md">
               {primaryAction.label}
             </LinkButton>
           </div>
