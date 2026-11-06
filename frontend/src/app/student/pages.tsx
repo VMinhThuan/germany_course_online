@@ -1,26 +1,25 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { ArrowRight, BookOpenText, GraduationCap } from 'lucide-react'
+import { ArrowRight, BookOpenText } from 'lucide-react'
 import { Link } from 'react-router'
 import { useAuthSession } from '@/app/auth/auth-session'
 import { useStudentCourses, useStudentDashboard } from '@/data/student-demo/queries'
+import { useProductCourse } from '@/data/student-demo/product-queries'
+import type { StudentLearningCourseViewModel } from '@/data/student-demo/product-types'
 import type { StudentCourseRecord } from '@/data/student-demo/types'
 import { StudentShell } from '@/shared/layouts/shells'
-import { formatDateTimeInTimezone } from '@/shared/lib/format'
+import { formatDateInTimezone } from '@/shared/lib/format'
 import { setBrandPageTitle } from '@/config/brand'
-import { AccessStatePanel, EnrollmentStatusCard, CourseProgressStrip } from '@/domains'
 import type { CourseAccessViewModel } from '@/domains/catalog/models'
 import {
-  Badge,
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
   Container,
   EmptyState,
   ErrorState,
   LinkButton,
   PageHeader,
   Pagination,
+  Progress,
   SectionHeader,
   Skeleton,
 } from '@/shared/ui'
@@ -69,60 +68,87 @@ function Loading() {
   )
 }
 
-function CourseAccessCard({ record }: { record: StudentCourseRecord }) {
+function courseLearningSummary(course: StudentLearningCourseViewModel) {
+  const lessons = course.tree.sections
+    .flatMap((section) => section.lessons)
+    .filter((lesson) => lesson.countsTowardProgress)
+  const completed = lessons.filter((lesson) => lesson.progressStatus === 'COMPLETED').length
+  const currentLesson =
+    lessons.find((lesson) => lesson.progressStatus === 'IN_PROGRESS') ??
+    lessons.find((lesson) => lesson.progressStatus !== 'COMPLETED')
+  return {
+    lessons,
+    completed,
+    currentLesson,
+    percent: lessons.length ? (completed / lessons.length) * 100 : 0,
+  }
+}
+
+function StudentCourseCard({ record }: { record: StudentCourseRecord }) {
+  const { session } = useAuthSession()
   const access = accessView(record)
   const enrollment = record.enrollment
   const canLearn = access.kind === 'available'
   const canRenew = enrollment.status === 'ACTIVE' && access.kind === 'expired-display'
+  const course = useProductCourse(session?.id ?? '', enrollment.courseId)
+  const summary = course.data ? courseLearningSummary(course.data) : undefined
+  const currentLesson = summary?.currentLesson
   return (
     <Card>
       <CardContent className="grid gap-4 p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.12em] text-action-primary">
-              {enrollment.status === 'REVOKED'
-                ? 'Đã thu hồi'
-                : access.kind === 'expired-display'
-                  ? 'Đã hết hạn'
-                  : 'Đang hoạt động'}
-            </p>
-            <h3 className="mt-1 font-display text-xl font-bold">{enrollment.courseTitle}</h3>
+            <h3 className="font-display text-xl font-bold">
+              {course.data?.course.title ?? enrollment.courseTitle}
+            </h3>
             <p className="mt-1 text-sm text-ink-secondary">
-              Hết hạn: {formatDateTimeInTimezone(enrollment.expiresAt)}
+              Hết hạn: {formatDateInTimezone(enrollment.expiresAt)}
             </p>
           </div>
-          <Badge
-            tone={canLearn ? 'success' : enrollment.status === 'REVOKED' ? 'danger' : 'warning'}
-          >
-            {canLearn
-              ? 'Có thể học'
-              : enrollment.status === 'REVOKED'
-                ? 'Cần Admin khôi phục'
-                : 'Cần gia hạn'}
-          </Badge>
-        </div>
-        <AccessStatePanel access={access} />
-        {record.progress && (
-          <CourseProgressStrip label="Tiến độ do máy chủ tính" value={record.progress.percent} />
-        )}
-        <EnrollmentStatusCard enrollment={enrollment} />
-        <div className="flex flex-wrap gap-3">
-          {canLearn && (
-            <LinkButton to={`/learn/courses/${enrollment.courseId}`}>
-              Tiếp tục học <ArrowRight aria-hidden="true" />
-            </LinkButton>
-          )}
           {canRenew && (
-            <LinkButton to={`/student/courses/${enrollment.courseId}/renew`} variant="outline">
-              Xem gói gia hạn
+            <LinkButton
+              to={`/student/courses/${enrollment.courseId}/renew`}
+              variant="outline"
+              size="sm"
+            >
+              Gia hạn
             </LinkButton>
           )}
-          {enrollment.status === 'REVOKED' && (
-            <p className="self-center text-sm text-ink-secondary">
-              Liên hệ Admin để khôi phục enrollment.
-            </p>
-          )}
         </div>
+        {course.isPending ? (
+          <Skeleton className="h-10 w-full" />
+        ) : summary ? (
+          <div className="grid gap-3">
+            {summary.lessons.length > 0 && (
+              <Progress
+                value={summary.percent}
+                label={`${summary.completed}/${summary.lessons.length} bài đã hoàn thành`}
+              />
+            )}
+            <p className="text-sm text-ink-secondary">
+              {currentLesson
+                ? `Bài đang học: ${currentLesson.title}`
+                : summary.lessons.length
+                  ? 'Đã hoàn thành khóa học'
+                  : 'Chưa có bài học'}
+            </p>
+          </div>
+        ) : (
+          <p className="text-sm text-ink-muted">Chưa tải được tiến độ bài học.</p>
+        )}
+        {canLearn && (
+          <div>
+            <LinkButton
+              to={
+                currentLesson
+                  ? `/learn/lessons/${currentLesson.id}`
+                  : `/learn/courses/${enrollment.courseId}`
+              }
+            >
+              {currentLesson ? 'Tiếp tục học' : 'Xem lộ trình'} <ArrowRight aria-hidden="true" />
+            </LinkButton>
+          </div>
+        )}
       </CardContent>
     </Card>
   )
@@ -132,8 +158,8 @@ function EmptyCourses() {
   return (
     <EmptyState
       icon={<BookOpenText aria-hidden="true" className="size-6" />}
-      title="Chưa có khóa học được kích hoạt"
-      description="Sau khi Admin duyệt đơn, khóa học sẽ xuất hiện tại đây. Bạn có thể xem các khóa học đang mở."
+      title="Chưa có khóa học"
+      description="Khám phá các khóa học để bắt đầu lộ trình tiếng Đức của bạn."
       action={
         <LinkButton to="/courses" variant="outline">
           Khám phá khóa học
@@ -154,79 +180,33 @@ export function StudentDashboardPage() {
           <Loading />
         ) : dashboard.isError ? (
           <>
-            <PageHeader eyebrow="Không gian học viên" title="Tổng quan học tập" />
+            <PageHeader eyebrow="" title="Tổng quan học tập" />
             <ErrorState
               title="Chưa tải được tổng quan"
-              description="Máy chủ chưa trả về dữ liệu học viên. Kiểm tra API rồi thử lại."
+              description="Hãy thử tải lại sau ít phút."
               onRetry={() => void dashboard.refetch()}
             />
           </>
         ) : dashboard.data ? (
           <>
-            <Card className="overflow-hidden border-transparent bg-[linear-gradient(112deg,var(--brand-blue),#f8fdfe_68%)] shadow-soft">
-              <CardContent className="flex flex-col gap-5 p-5 sm:flex-row sm:items-end sm:justify-between sm:p-7">
-                <div className="max-w-2xl space-y-3">
-                  <Badge tone="brand">Không gian học viên</Badge>
-                  <h1 className="font-display text-3xl font-extrabold tracking-tight sm:text-4xl">
-                    Chào {dashboard.data.profile.displayName || dashboard.data.profile.email}
-                  </h1>
-                  <p className="max-w-xl leading-6 text-ink-secondary">
-                    Theo dõi quyền truy cập, tiến độ và các khóa học đã được kích hoạt.
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-2 rounded-2xl border border-white/80 bg-white/70 px-4 py-3 text-sm font-semibold text-ink-secondary">
-                  <GraduationCap aria-hidden="true" className="size-5 text-action-primary" />
-                  <span>{dashboard.data.courses.length} khóa học</span>
-                </div>
-              </CardContent>
-            </Card>
-            <div className="grid gap-8 xl:grid-cols-[minmax(0,1.4fr)_minmax(18rem,0.7fr)]">
-              <div className="grid content-start gap-4">
-                <SectionHeader
-                  title="Khóa học của tôi"
-                  description="Enrollment và phần trăm tiến độ lấy từ backend."
-                  action={
-                    <LinkButton to="/student/courses" variant="outline" size="sm">
-                      Xem tất cả <ArrowRight aria-hidden="true" />
-                    </LinkButton>
-                  }
-                />
-                {dashboard.data.courses.length ? (
-                  dashboard.data.courses.map((record) => (
-                    <CourseAccessCard key={record.enrollment.id} record={record} />
-                  ))
-                ) : (
-                  <EmptyCourses />
-                )}
+            <PageHeader eyebrow="" title="Tổng quan học tập" />
+            <SectionHeader
+              title="Khóa học của tôi"
+              action={
+                <LinkButton to="/student/courses" variant="outline" size="sm">
+                  Xem tất cả <ArrowRight aria-hidden="true" />
+                </LinkButton>
+              }
+            />
+            {dashboard.data.courses.length ? (
+              <div className="grid gap-4 xl:grid-cols-2">
+                {dashboard.data.courses.map((record) => (
+                  <StudentCourseCard key={record.enrollment.id} record={record} />
+                ))}
               </div>
-              <aside className="grid content-start gap-4">
-                <Card>
-                  <CardHeader>
-                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-action-primary">
-                      Bắt đầu
-                    </p>
-                    <CardTitle className="text-xl">Khám phá lộ trình</CardTitle>
-                  </CardHeader>
-                  <CardContent className="grid gap-3">
-                    <p className="text-sm leading-6 text-ink-secondary">
-                      Thông tin công khai có thể xem trước. Bài học riêng chỉ mở sau khi máy chủ xác
-                      nhận enrollment còn hiệu lực.
-                    </p>
-                    <LinkButton to="/courses" className="w-full justify-center">
-                      Xem khóa học <ArrowRight aria-hidden="true" />
-                    </LinkButton>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-5">
-                    <p className="text-sm font-semibold">Tiến độ được đồng bộ</p>
-                    <p className="mt-1 text-sm leading-6 text-ink-secondary">
-                      Hoàn thành bài học, bài tập và quiz sẽ cập nhật từ dữ liệu máy chủ.
-                    </p>
-                  </CardContent>
-                </Card>
-              </aside>
-            </div>
+            ) : (
+              <EmptyCourses />
+            )}
           </>
         ) : null}
       </Container>
@@ -243,28 +223,26 @@ export function StudentCoursesPage() {
     <ProductStudentLayout>
       <Container className="grid gap-8 py-6 sm:py-9">
         <PageHeader
-          eyebrow="Không gian học viên"
+          eyebrow=""
           title="Khóa học của tôi"
-          description="Theo dõi trạng thái enrollment, thời hạn và tiến độ do máy chủ trả về."
           actions={
             <LinkButton to="/courses" variant="outline">
               Khám phá khóa học
             </LinkButton>
           }
         />
-        <SectionHeader title="Enrollment" description="Đơn hàng chờ duyệt không cấp quyền học." />
         {courses.isPending ? (
           <Loading />
         ) : courses.isError ? (
           <ErrorState
             title="Chưa tải được khóa học"
-            description="Máy chủ chưa trả về danh sách enrollment."
+            description="Hãy thử tải lại sau ít phút."
             onRetry={() => void courses.refetch()}
           />
         ) : courses.data?.items.length ? (
           <div className="grid gap-5">
             {courses.data.items.map((record) => (
-              <CourseAccessCard key={record.enrollment.id} record={record} />
+              <StudentCourseCard key={record.enrollment.id} record={record} />
             ))}
           </div>
         ) : (

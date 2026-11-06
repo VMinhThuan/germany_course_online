@@ -1,7 +1,6 @@
 import {
   ChevronLeft,
   CircleHelp,
-  ClipboardList,
   GraduationCap,
   LayoutDashboard,
   Menu,
@@ -420,15 +419,13 @@ export function CheckoutShell({
 type StudentNavItem = { label: string; id: string; icon: LucideIcon }
 type ProductStudentNavItem = {
   label: string
-  href:
-    '/student' | '/student/courses' | '/student/progress' | '/student/orders' | '/student/profile'
+  href: '/student' | '/student/courses' | '/student/orders' | '/student/profile'
   icon: LucideIcon
 }
 
 const productStudentItems: ProductStudentNavItem[] = [
   { label: 'Tổng quan', href: '/student', icon: LayoutDashboard },
   { label: 'Khóa học của tôi', href: '/student/courses', icon: GraduationCap },
-  { label: 'Tiến độ', href: '/student/progress', icon: ClipboardList },
   { label: 'Đơn hàng', href: '/student/orders', icon: ShoppingBag },
   { label: 'Tài khoản', href: '/student/profile', icon: UserRound },
 ]
@@ -436,7 +433,6 @@ const productStudentItems: ProductStudentNavItem[] = [
 const studentItems: StudentNavItem[] = [
   { label: 'Tổng quan', id: 'preview-dashboard', icon: LayoutDashboard },
   { label: 'Khóa học', id: 'preview-courses', icon: GraduationCap },
-  { label: 'Tiến độ', id: 'preview-progress', icon: ClipboardList },
   { label: 'Đơn hàng', id: 'preview-orders', icon: ShoppingBag },
   { label: 'Tài khoản', id: 'preview-account', icon: UserRound },
 ]
@@ -494,12 +490,7 @@ export function StudentShell({
   return (
     <div className="min-h-screen bg-page-surface">
       <SkipLink />
-      <div className="min-h-[calc(100vh-2rem)] lg:grid lg:grid-cols-[15.5rem_minmax(0,1fr)]">
-        <header className="lg:col-span-2">
-          <PreviewNotice
-            text={productMode ? 'Khu vực học viên · Tiến độ được đồng bộ với tài khoản' : undefined}
-          />
-        </header>
+      <div className="min-h-screen lg:grid lg:grid-cols-[15.5rem_minmax(0,1fr)]">
         <aside
           aria-label="Điều hướng học viên chính"
           className="sticky top-0 hidden h-screen flex-col border-r border-border-subtle bg-card-surface lg:flex"
@@ -522,14 +513,12 @@ export function StudentShell({
           </div>
           <div className="border-t border-border-subtle p-4">
             <div className="rounded-xl bg-surface-lime p-3">
-              <p className="text-xs font-bold text-pastel-lime-ink">
-                {productMode ? 'Học tập trực tuyến' : brandConfig.name}
-              </p>
-              <p className="mt-1 text-xs leading-5 text-ink-secondary">
-                {productMode
-                  ? 'Quyền học và tiến độ do máy chủ xác nhận.'
-                  : 'Một lối đi gọn cho bài học, ghi chú và tiến độ.'}
-              </p>
+              <p className="text-xs font-bold text-pastel-lime-ink">{brandConfig.name}</p>
+              {!productMode && (
+                <p className="mt-1 text-xs leading-5 text-ink-secondary">
+                  Một lối đi gọn cho bài học, ghi chú và tiến độ.
+                </p>
+              )}
             </div>
           </div>
         </aside>
@@ -549,13 +538,20 @@ export function StudentShell({
                   aria-haspopup="dialog"
                 />
               </div>
-              <p className="truncate text-sm font-semibold text-ink-secondary">
-                {productMode ? `Xin chào, ${displayName}` : 'Bản xem trước học viên'}
-              </p>
+              {productMode ? (
+                <p className="flex min-w-0 items-baseline gap-1 text-sm text-ink-secondary sm:text-base">
+                  <span className="shrink-0">Xin chào,</span>
+                  <span className="truncate font-bold text-ink-primary">{displayName}</span>
+                </p>
+              ) : (
+                <p className="truncate text-sm font-semibold text-ink-secondary">
+                  Bản xem trước học viên
+                </p>
+              )}
             </div>
             {productMode ? (
               <DropdownMenu
-                label={displayName}
+                label="Tài khoản"
                 items={[
                   { label: 'Bảng điều khiển', onSelect: () => navigate('/student') },
                   { label: 'Khóa học của tôi', onSelect: () => navigate('/student/courses') },

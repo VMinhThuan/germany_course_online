@@ -1,6 +1,5 @@
 import { useEffect, type PropsWithChildren } from 'react'
 import { ArrowLeft } from 'lucide-react'
-import { Link } from 'react-router'
 import { DomainState } from '@/domains/shared/presentation'
 import { Container, ErrorState, LinkButton, PageHeader, Skeleton } from '@/shared/ui'
 import { ProductStudentLayout } from '@/app/student/pages'
@@ -27,13 +26,10 @@ export function ProductPage({
       <Container className="grid min-w-0 gap-7 py-6 sm:py-9">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <PageHeader eyebrow={eyebrow} title={title} {...(description ? { description } : {})} />
-          <Link
-            to={backTo}
-            className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-3 font-semibold text-ink-secondary hover:bg-surface-muted"
-          >
+          <LinkButton to={backTo} variant="outline" className="shrink-0">
             <ArrowLeft aria-hidden="true" className="size-4" />
             Quay lại
-          </Link>
+          </LinkButton>
         </div>
         {children}
       </Container>

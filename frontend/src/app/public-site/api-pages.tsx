@@ -74,12 +74,8 @@ export function ApiPublicLandingPage() {
 
   useLayoutEffect(() => {
     const homepage = homepageRef.current
-    const root = document.documentElement
-    root.classList.add('homepage-scroll-guard')
-
-    const cleanup = () => root.classList.remove('homepage-scroll-guard')
-    if (!homepage || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return cleanup
-    if (!('IntersectionObserver' in window)) return cleanup
+    if (!homepage || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    if (!('IntersectionObserver' in window)) return
 
     const sections = Array.from(homepage.querySelectorAll<HTMLElement>('[data-homepage-reveal]'))
     sections.forEach((section) => section.setAttribute('data-homepage-revealed', 'false'))
@@ -101,7 +97,6 @@ export function ApiPublicLandingPage() {
       observer.disconnect()
       homepage.removeAttribute('data-homepage-reveal-ready')
       sections.forEach((section) => section.removeAttribute('data-homepage-revealed'))
-      cleanup()
     }
   }, [])
 

@@ -272,6 +272,23 @@ export class LearningService {
     })
       .sort({ sortOrder: 1, _id: 1 })
       .lean();
+    const courseExercises = lessons.length
+      ? await Exercise.find({
+          lessonId: { $in: lessons.map((lesson) => lesson._id) },
+          status: "PUBLISHED",
+          deletedAt: null,
+        })
+          .select("_id lessonId title sortOrder")
+          .sort({ sortOrder: 1, _id: 1 })
+          .lean()
+      : [];
+    const exercisesByLesson = new Map<string, typeof courseExercises>();
+    for (const exercise of courseExercises) {
+      const key = exercise.lessonId.toString();
+      const rows = exercisesByLesson.get(key) ?? [];
+      rows.push(exercise);
+      exercisesByLesson.set(key, rows);
+    }
     const lessonProgress = await LessonProgress.find({
       userId: new Types.ObjectId(userId),
       lessonId: { $in: lessons.map((lesson) => lesson._id) },
@@ -306,6 +323,13 @@ export class LearningService {
           estimatedMinutes: lesson.estimatedMinutes,
           countsTowardProgress: lesson.countsTowardProgress,
           sortOrder: lesson.sortOrder,
+          exercises: (exercisesByLesson.get(lesson._id.toString()) ?? []).map(
+            (exercise) => ({
+              id: exercise._id.toString(),
+              title: exercise.title,
+              sortOrder: exercise.sortOrder,
+            }),
+          ),
           progress: progressByLesson.has(lesson._id.toString())
             ? lessonProgressDto(progressByLesson.get(lesson._id.toString())!)
             : {

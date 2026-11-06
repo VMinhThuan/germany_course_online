@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowRight, Check, LockKeyhole } from 'lucide-react'
+import { ArrowRight, BookOpenText, Check, ChevronLeft, ChevronRight, ListTree } from 'lucide-react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { useAuthSession } from '@/app/auth/auth-session'
 import {
@@ -19,9 +19,12 @@ import {
   useStartQuiz,
   useSubmitQuiz,
 } from '@/data/student-demo/product-queries'
+import type {
+  StudentLearningCourseViewModel,
+  StudentLessonWorkspaceViewModel,
+} from '@/data/student-demo/product-types'
 import { useStudentDashboard } from '@/data/student-demo/queries'
 import {
-  AccessStatePanel,
   ChapterItem,
   CourseProgressCard,
   CourseTree,
@@ -40,7 +43,16 @@ import {
 } from '@/domains'
 import { AudioPlayer, PDFViewer, VideoPlayer } from '@/domains/media'
 import { DomainState } from '@/domains/shared/presentation'
-import { Button, Card, ErrorState, LinkButton, SectionHeader, useNotifications } from '@/shared/ui'
+import {
+  Button,
+  Card,
+  ErrorState,
+  LinkButton,
+  Progress,
+  SectionHeader,
+  Sheet,
+  useNotifications,
+} from '@/shared/ui'
 import { ProductError, ProductLoading, ProductNotFound, ProductPage } from './shared'
 
 export function LearningCoursePage() {
@@ -48,9 +60,25 @@ export function LearningCoursePage() {
   const { session } = useAuthSession()
   const course = useProductCourse(session?.id ?? '', courseId)
   const navigate = useNavigate()
+  const trackedLessons =
+    course.data?.tree.sections
+      .flatMap((section) => section.lessons)
+      .filter((lesson) => lesson.countsTowardProgress) ?? []
+  const completedLessons = trackedLessons.filter(
+    (lesson) => lesson.progressStatus === 'COMPLETED',
+  ).length
+  const progressPercent = trackedLessons.length
+    ? (completedLessons / trackedLessons.length) * 100
+    : 0
 
   return (
-    <ProductPage title="Không gian khóa học" backTo="/student/courses">
+    <ProductPage
+      title={
+        course.data ? `Không gian khóa học: ${course.data.course.title}` : 'Không gian khóa học'
+      }
+      eyebrow=""
+      backTo="/student/courses"
+    >
       {course.isPending ? (
         <ProductLoading title="Đang tải khóa học" />
       ) : course.isError ? (
@@ -58,56 +86,19 @@ export function LearningCoursePage() {
       ) : !course.data ? (
         <ProductNotFound message="Khóa học này không có trong danh sách khóa học được cấp cho tài khoản." />
       ) : (
-        <div className="grid min-w-0 gap-6">
-          <LearningCourseHeader
-            title={course.data.course.title}
-            level={course.data.course.level}
-            access={course.data.access}
-            onBack={() => navigate('/student/courses')}
-            headingLevel={2}
+        <div className="grid min-w-0 gap-4">
+          <SectionHeader title="Lộ trình khóa học" />
+          <Progress
+            value={progressPercent}
+            label={`${completedLessons}/${trackedLessons.length} bài học hoàn thành`}
           />
-          <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
-            <section className="grid min-w-0 gap-4" aria-labelledby="course-map-title">
-              <SectionHeader
-                title="Lộ trình khóa học"
-                description="Khóa học → chương → bài học → bài tập. Máy chủ kiểm tra quyền truy cập trước khi trả nội dung học."
-              />
-              <CourseTree
-                tree={course.data.tree}
-                onSelectLesson={(lessonId) => navigate(`/learn/lessons/${lessonId}`)}
-                onSelectSection={(sectionId) =>
-                  navigate(`/learn/courses/${courseId}/sections/${sectionId}`)
-                }
-              />
-            </section>
-            <aside aria-label="Tiến độ khóa học" className="grid content-start gap-4">
-              <CourseProgressCard
-                courseTitle={course.data.course.title}
-                progress={course.data.progress}
-                href="/student/progress"
-                onContinue={() =>
-                  navigate(
-                    `/learn/lessons/${course.data.continueLessonId ?? course.data.tree.sections[0]?.lessons[0]?.id ?? ''}`,
-                  )
-                }
-              />
-              <AccessStatePanel access={course.data.access} />
-              {course.data.access.kind !== 'available' && (
-                <Card className="p-4">
-                  <p className="text-sm leading-6 text-ink-secondary">
-                    Nội dung bài học, media và đáp án được máy chủ kiểm tra cho từng yêu cầu.
-                  </p>
-                  <LinkButton
-                    to={`/courses/${course.data.course.slug}`}
-                    variant="outline"
-                    className="mt-3 w-full"
-                  >
-                    Xem thông tin khóa học
-                  </LinkButton>
-                </Card>
-              )}
-            </aside>
-          </div>
+          <CourseTree
+            tree={course.data.tree}
+            onSelectLesson={(lessonId) => navigate(`/learn/lessons/${lessonId}`)}
+            onSelectSection={(sectionId) =>
+              navigate(`/learn/courses/${courseId}/sections/${sectionId}`)
+            }
+          />
         </div>
       )}
     </ProductPage>
@@ -160,15 +151,83 @@ export function LearningSectionPage() {
   )
 }
 
+function LessonOutlineTree({
+  course,
+  lesson,
+  onSelectLesson,
+}: {
+  course: StudentLearningCourseViewModel
+  lesson: StudentLessonWorkspaceViewModel
+  onSelectLesson: (lessonId: string) => void
+}) {
+  return (
+    <nav aria-label={`Lộ trình ${course.course.title}`} className="grid gap-2">
+      {course.tree.sections.map((section, sectionIndex) => (
+        <details key={section.id} open={section.id === lesson.sectionId}>
+          <summary className="cursor-pointer rounded-lg px-2 py-2 text-sm font-semibold text-ink-primary hover:bg-surface-muted">
+            <span className="mr-2 text-xs font-bold text-action-primary">
+              Chương {sectionIndex + 1}
+            </span>
+            {section.title}
+          </summary>
+          <ol className="ml-2 grid gap-1 border-l border-border-subtle pl-2">
+            {section.lessons.map((item, lessonIndex) => {
+              const active = item.id === lesson.lesson.id
+              const status = item.progressStatus
+              return (
+                <li key={item.id} className="grid gap-1">
+                  <button
+                    type="button"
+                    aria-current={active ? 'page' : undefined}
+                    onClick={() => onSelectLesson(item.id)}
+                    className={`grid min-h-10 grid-cols-[1.5rem_minmax(0,1fr)_auto] items-center gap-2 rounded-lg px-2 text-left text-sm transition-colors hover:bg-surface-muted ${active ? 'bg-surface-blue font-semibold text-ink-primary' : 'text-ink-secondary'}`}
+                  >
+                    <span className="text-xs tabular-nums text-ink-muted">{lessonIndex + 1}.</span>
+                    <span className="min-w-0 truncate">{item.title}</span>
+                    <span className="text-[0.68rem] text-ink-muted">
+                      {status === 'COMPLETED' ? 'Xong' : status === 'IN_PROGRESS' ? 'Đang học' : ''}
+                    </span>
+                  </button>
+                  {item.exercises && item.exercises.length > 0 && (
+                    <details className="ml-6 rounded-lg bg-surface-muted/70 px-2">
+                      <summary className="cursor-pointer py-2 text-xs font-semibold text-ink-secondary">
+                        Bài tập ({item.exercises.length})
+                      </summary>
+                      <ul className="grid gap-1 pb-2">
+                        {item.exercises.map((exercise) => (
+                          <li key={exercise.id}>
+                            <Link
+                              to={`/learn/exercises/${exercise.id}`}
+                              className="block truncate rounded-md px-2 py-1.5 text-xs text-action-primary hover:bg-card-surface"
+                            >
+                              {exercise.title}
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+                </li>
+              )
+            })}
+          </ol>
+        </details>
+      ))}
+    </nav>
+  )
+}
+
 export function LearningLessonPage() {
   const { lessonId = '' } = useParams()
   const { session } = useAuthSession()
   const lesson = useProductLesson(session?.id ?? '', lessonId)
+  const course = useProductCourse(session?.id ?? '', lesson.data?.courseId ?? '')
   const note = useProductLessonNote(session?.id ?? '', lessonId)
   const saveNote = useSaveLessonNote(session?.id ?? '', lessonId)
   const completeLesson = useCompleteLesson(session?.id ?? '')
   const completeExercise = useCompleteExercise(session?.id ?? '')
   const [noteValue, setNoteValue] = useState<string>()
+  const [outlineOpen, setOutlineOpen] = useState(false)
   const navigate = useNavigate()
   const notifications = useNotifications()
 
@@ -187,6 +246,7 @@ export function LearningLessonPage() {
   return (
     <ProductPage
       title="Không gian bài học"
+      eyebrow=""
       backTo={lesson.data ? `/learn/courses/${lesson.data.courseId}` : '/student/courses'}
     >
       {lesson.isPending ? (
@@ -196,23 +256,25 @@ export function LearningLessonPage() {
       ) : !lesson.data ? (
         <ProductNotFound message="Bài học này không tồn tại hoặc tài khoản chưa được cấp quyền truy cập." />
       ) : (
-        <div className="grid min-w-0 gap-7">
+        <div className="grid min-w-0 gap-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <LinkButton to={`/learn/courses/${lesson.data.courseId}`} variant="outline">
-              {lesson.data.courseTitle}
-            </LinkButton>
-            <LessonCompletionIndicator completed={lesson.data.isCompleted} />
+            <Button
+              variant="outline"
+              className="lg:hidden"
+              startIcon={<ListTree aria-hidden="true" />}
+              onClick={() => setOutlineOpen(true)}
+            >
+              Nội dung khóa học
+            </Button>
+            <LessonCompletionIndicator
+              completed={lesson.data.isCompleted}
+              label="Bài học đã hoàn thành"
+            />
           </div>
-          <p className="-mb-3 text-sm font-semibold tracking-wide text-action-primary">
-            {lesson.data.sectionTitle ?? 'Chương học'} · Bài {lesson.data.lessonNumber ?? 1}
-          </p>
-          <div className="grid min-w-0 gap-7">
+          <div className="grid min-w-0 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_19rem]">
             <div className="grid min-w-0 gap-6">
               <section aria-label="Bài giảng của bài học" className="grid min-w-0 gap-3">
-                <SectionHeader
-                  title="Bài giảng của bài học"
-                  description="Nội dung và video hướng dẫn của bài học này."
-                />
+                <SectionHeader title="Bài giảng" />
                 <LessonContent content={{ ...lesson.data, media: [] }} headingLevel={3} fullWidth />
                 {lesson.data.access.kind === 'available' && (
                   <div className="grid w-full gap-4">
@@ -232,13 +294,10 @@ export function LearningLessonPage() {
                   </div>
                 )}
               </section>
-              <section aria-label="Bài tập của bài học" className="grid gap-3">
-                <SectionHeader
-                  title="Bài tập của bài học"
-                  description="Bài bắt buộc cần hoàn thành để mở trạng thái hoàn tất bài học."
-                />
-                {lesson.data.exercises.length ? (
-                  <div className="grid min-w-0 gap-4">
+              {lesson.data.exercises.length > 0 && (
+                <section aria-label="Bài tập của bài học" className="grid gap-3">
+                  <SectionHeader title="Bài tập" />
+                  <div className="grid min-w-0 gap-3">
                     {lesson.data.exercises.map((exercise) =>
                       exercise.exerciseType === 'FILE_BASED' ? (
                         <FileExercisePanel
@@ -254,18 +313,17 @@ export function LearningLessonPage() {
                         <Link
                           key={exercise.id}
                           to={exercise.href}
-                          className="flex min-h-24 items-center justify-between gap-3 rounded-2xl border border-border-subtle bg-card-surface p-4 hover:border-action-primary"
+                          className="flex min-h-16 items-center justify-between gap-3 rounded-xl border border-border-subtle bg-card-surface px-4 py-3 hover:border-action-primary"
                         >
-                          <span className="min-w-0">
-                            <span className="block font-semibold">{exercise.title}</span>
-                            <span className="mt-1 block text-xs text-ink-secondary">
-                              {exercise.isRequired ? 'Bắt buộc' : 'Tùy chọn'} ·{' '}
-                              {exercise.status === 'COMPLETED'
-                                ? 'Đã hoàn thành'
-                                : exercise.status === 'IN_PROGRESS'
-                                  ? 'Đang làm'
-                                  : 'Chưa bắt đầu'}
-                            </span>
+                          <span className="min-w-0 truncate font-semibold">{exercise.title}</span>
+                          <span className="shrink-0 text-xs text-ink-secondary">
+                            {exercise.status === 'COMPLETED'
+                              ? 'Hoàn thành'
+                              : exercise.status === 'IN_PROGRESS'
+                                ? 'Đang làm'
+                                : exercise.isRequired
+                                  ? 'Bắt buộc'
+                                  : 'Tùy chọn'}
                           </span>
                           <ArrowRight
                             aria-hidden="true"
@@ -275,32 +333,17 @@ export function LearningLessonPage() {
                       ),
                     )}
                   </div>
-                ) : lesson.data.access.kind !== 'available' ? (
-                  <Card className="flex items-center gap-3 p-4">
-                    <LockKeyhole aria-hidden="true" className="size-5 text-warning-foreground" />
-                    <p className="text-sm text-ink-secondary">
-                      Bài tập sẽ xuất hiện khi máy chủ xác nhận quyền học còn hiệu lực.
-                    </p>
-                  </Card>
-                ) : (
-                  <Card className="p-4 text-sm text-ink-secondary">Bài này chưa có bài tập.</Card>
-                )}
-              </section>
-              <section aria-label="Đáp án bài tập" className="grid gap-3">
-                <SectionHeader
-                  title="Đáp án bài tập"
-                  description="Video chữa bài giúp bạn đối chiếu cách làm."
-                />
-                {lesson.data.solutionVideo || lesson.data.solutionVideos?.length ? (
+                </section>
+              )}
+              {(lesson.data.solutionVideo || lesson.data.solutionVideos?.length) && (
+                <section aria-label="Đáp án bài tập" className="grid gap-3">
+                  <SectionHeader title="Đáp án" />
                   <div className="grid min-w-0 gap-5">
                     {lesson.data.solutionVideo && (
-                      <div className="grid gap-2">
-                        <p className="font-semibold">Video chữa bài · {lesson.data.lesson.title}</p>
-                        <YouTubeLessonPlayer
-                          video={lesson.data.solutionVideo}
-                          title={`Video chữa bài · ${lesson.data.lesson.title}`}
-                        />
-                      </div>
+                      <YouTubeLessonPlayer
+                        video={lesson.data.solutionVideo}
+                        title={`Video chữa bài · ${lesson.data.lesson.title}`}
+                      />
                     )}
                     {(lesson.data.solutionVideos ?? []).map((solution) => (
                       <div
@@ -312,14 +355,8 @@ export function LearningLessonPage() {
                       </div>
                     ))}
                   </div>
-                ) : (
-                  <Card className="p-4 text-sm text-ink-secondary">
-                    {lesson.data.hasRestrictedSolutionVideos
-                      ? 'Hoàn thành bài tập để mở video đáp án.'
-                      : 'Bài này chưa có đáp án.'}
-                  </Card>
-                )}
-              </section>
+                </section>
+              )}
               <section
                 id="notes"
                 className="scroll-mt-24 grid gap-3"
@@ -343,34 +380,49 @@ export function LearningLessonPage() {
                   />
                 )}
               </section>
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border-subtle pt-5">
+              <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)_minmax(0,1fr)] gap-2 border-t border-border-subtle pt-4">
                 <Button
                   variant="outline"
                   disabled={!lesson.data.previousLessonId}
+                  aria-label="Bài trước"
+                  className="min-w-0 gap-1 px-2 text-xs sm:text-sm"
                   onClick={() =>
                     lesson.data.previousLessonId &&
                     navigate(`/learn/lessons/${lesson.data.previousLessonId}`)
                   }
                 >
-                  Bài trước
+                  <ChevronLeft aria-hidden="true" className="size-4 shrink-0" />
+                  <span className="truncate">Bài trước</span>
                 </Button>
                 <Button
                   disabled={!lesson.data.canCompleteLesson || completeLesson.isPending}
                   loading={completeLesson.isPending}
+                  aria-label={
+                    lesson.data.isCompleted ? 'Đã hoàn thành bài học' : 'Hoàn thành bài học'
+                  }
+                  className="min-w-0 gap-1 px-2 text-xs sm:text-sm"
                   onClick={() => void markLessonComplete()}
                   startIcon={lesson.data.isCompleted ? <Check aria-hidden="true" /> : undefined}
                 >
-                  {lesson.data.isCompleted ? 'Đã hoàn thành' : 'Hoàn thành bài học'}
+                  <span className="truncate sm:hidden">
+                    {lesson.data.isCompleted ? 'Đã xong' : 'Hoàn thành'}
+                  </span>
+                  <span className="hidden truncate sm:inline">
+                    {lesson.data.isCompleted ? 'Đã hoàn thành' : 'Hoàn thành bài học'}
+                  </span>
                 </Button>
                 <Button
                   variant="outline"
                   disabled={!lesson.data.nextLessonId}
+                  aria-label="Bài tiếp"
+                  className="min-w-0 gap-1 px-2 text-xs sm:text-sm"
                   onClick={() =>
                     lesson.data.nextLessonId &&
                     navigate(`/learn/lessons/${lesson.data.nextLessonId}`)
                   }
                 >
-                  Bài tiếp
+                  <span className="truncate">Bài tiếp</span>
+                  <ChevronRight aria-hidden="true" className="size-4 shrink-0" />
                 </Button>
               </div>
               {completeLesson.isError && (
@@ -381,7 +433,49 @@ export function LearningLessonPage() {
                 />
               )}
             </div>
+            <aside
+              aria-label="Nội dung khóa học"
+              className="sticky top-[5.25rem] hidden max-h-[calc(100dvh-6rem)] min-w-0 self-start overflow-y-auto rounded-2xl border border-border-subtle bg-card-surface p-4 lg:block"
+            >
+              <h2 className="mb-3 flex items-center gap-2 font-display text-base font-bold">
+                <BookOpenText aria-hidden="true" className="size-4 text-action-primary" />
+                {lesson.data.courseTitle}
+              </h2>
+              {course.isPending ? (
+                <ProductLoading title="Đang tải nội dung khóa học" />
+              ) : course.data ? (
+                <LessonOutlineTree
+                  course={course.data}
+                  lesson={lesson.data}
+                  onSelectLesson={(nextLessonId) => navigate(`/learn/lessons/${nextLessonId}`)}
+                />
+              ) : (
+                <p className="text-sm text-ink-secondary">Chưa tải được nội dung khóa học.</p>
+              )}
+            </aside>
           </div>
+          <Sheet
+            open={outlineOpen}
+            onOpenChange={setOutlineOpen}
+            side="right"
+            title={lesson.data.courseTitle}
+            className="w-[min(24rem,calc(100vw-1.5rem))] lg:hidden"
+          >
+            {course.isPending ? (
+              <ProductLoading title="Đang tải nội dung khóa học" />
+            ) : course.data ? (
+              <LessonOutlineTree
+                course={course.data}
+                lesson={lesson.data}
+                onSelectLesson={(nextLessonId) => {
+                  setOutlineOpen(false)
+                  if (nextLessonId !== lessonId) navigate(`/learn/lessons/${nextLessonId}`)
+                }}
+              />
+            ) : (
+              <p className="text-sm text-ink-secondary">Chưa tải được nội dung khóa học.</p>
+            )}
+          </Sheet>
         </div>
       )}
     </ProductPage>
@@ -601,7 +695,10 @@ export function LearningQuizResultPage() {
   const navigate = useNavigate()
 
   return (
-    <ProductPage title="Kết quả bài kiểm tra" backTo="/student/progress">
+    <ProductPage
+      title="Kết quả bài kiểm tra"
+      backTo={lessonId ? `/learn/lessons/${lessonId}` : '/student/courses'}
+    >
       {result.isPending ? (
         <ProductLoading title="Đang tải kết quả" />
       ) : result.isError ? (

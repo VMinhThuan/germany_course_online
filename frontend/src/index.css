@@ -13,9 +13,6 @@
     scroll-behavior: smooth;
     scroll-padding-top: 5rem;
     background: var(--page-surface);
-  }
-
-  html.homepage-scroll-guard {
     overflow-x: clip;
     overscroll-behavior: none;
   }
@@ -24,6 +21,8 @@
     min-width: 320px;
     min-height: 100vh;
     margin: 0;
+    overflow-x: clip;
+    overscroll-behavior: none;
     background: var(--page-surface);
     color: var(--ink-primary);
     font-family: 'Source Sans 3 Variable', 'Segoe UI', sans-serif;
@@ -33,11 +32,6 @@
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-  }
-
-  html.homepage-scroll-guard body {
-    overflow-x: clip;
-    overscroll-behavior: none;
   }
 
   button,
@@ -96,10 +90,8 @@
 
 #root {
   min-height: 100vh;
-}
-
-html.homepage-scroll-guard #root {
   overflow-x: clip;
+  overscroll-behavior: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

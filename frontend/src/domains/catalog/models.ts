@@ -32,6 +32,7 @@ export interface LessonSummaryModel {
   estimatedMinutes?: number
   countsTowardProgress: boolean
   progressStatus: ProgressStatus
+  exercises?: readonly { id: string; title: string; sortOrder: number }[]
 }
 
 export interface CourseSectionModel {

@@ -274,7 +274,6 @@ export function LessonNotesEditor({
     <Card className="grid gap-4 p-5">
       <CardHeader className="p-0">
         <CardTitle>Ghi chú của bạn</CardTitle>
-        <p className="text-sm text-ink-secondary">Ghi lại điều bạn muốn nhớ cho bài học này.</p>
       </CardHeader>
       <label className="grid gap-2">
         <span className="text-sm font-semibold">Nội dung ghi chú</span>

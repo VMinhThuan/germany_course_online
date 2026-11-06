@@ -105,6 +105,7 @@ function toLessonSummary(lesson: {
   estimatedMinutes: number | null
   countsTowardProgress: boolean
   progress?: { status: string }
+  exercises?: readonly { id: string; title: string; sortOrder: number }[]
 }): LessonSummaryModel {
   return {
     id: lesson.id,
@@ -114,6 +115,7 @@ function toLessonSummary(lesson: {
     ...(lesson.estimatedMinutes !== null ? { estimatedMinutes: lesson.estimatedMinutes } : {}),
     countsTowardProgress: lesson.countsTowardProgress,
     progressStatus: lessonStatus(lesson.progress?.status),
+    ...(lesson.exercises ? { exercises: lesson.exercises } : {}),
   }
 }
 
@@ -337,9 +339,12 @@ const learning: StudentLearningRepository = {
       `/me/courses/${encodeURIComponent(courseId)}`,
     )
     const sections = overview.sections.map((section) => toSection(section, overview.course.id))
-    const firstIncomplete = overview.sections
+    const trackedLessons = overview.sections
       .flatMap((section) => section.lessons)
-      .find((lesson) => lesson.countsTowardProgress && lesson.progress.status !== 'COMPLETED')
+      .filter((lesson) => lesson.countsTowardProgress)
+    const firstIncomplete =
+      trackedLessons.find((lesson) => lesson.progress.status === 'IN_PROGRESS') ??
+      trackedLessons.find((lesson) => lesson.progress.status !== 'COMPLETED')
     return {
       course: {
         id: overview.course.id,

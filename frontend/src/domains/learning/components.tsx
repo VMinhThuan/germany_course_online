@@ -92,17 +92,68 @@ export function ChapterItem({
           </button>
         )}
       </SemanticHeading>
-      <ul className="grid gap-1">
-        {section.lessons.map((lesson) => (
-          <li key={lesson.id}>
-            <LessonRow
-              lesson={lesson}
-              current={currentLessonId === lesson.id}
-              {...(onSelectLesson ? { onSelect: onSelectLesson } : {})}
-            />
-          </li>
-        ))}
-      </ul>
+      <div className="overflow-x-auto px-2 pb-2">
+        <table className="w-full min-w-[34rem] border-collapse text-left text-sm">
+          <thead>
+            <tr className="border-b border-border-subtle text-xs font-semibold text-ink-muted">
+              <th scope="col" className="w-12 px-3 py-2">
+                #
+              </th>
+              <th scope="col" className="px-3 py-2">
+                Bài học
+              </th>
+              <th scope="col" className="w-36 px-3 py-2">
+                Trạng thái
+              </th>
+              <th scope="col" className="hidden w-32 px-3 py-2 md:table-cell">
+                Nội dung
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {section.lessons.map((lesson, index) => {
+              const current = currentLessonId === lesson.id
+              const lessonLink = onSelectLesson ? (
+                <button
+                  type="button"
+                  aria-current={current ? 'page' : undefined}
+                  onClick={() => onSelectLesson(lesson.id)}
+                  className="min-h-10 text-left font-semibold text-ink-primary hover:text-action-primary"
+                >
+                  {lesson.title}
+                </button>
+              ) : (
+                <span className="font-semibold text-ink-primary">{lesson.title}</span>
+              )
+              return (
+                <tr
+                  key={lesson.id}
+                  className={`border-b border-border-subtle last:border-b-0 ${current ? 'bg-surface-blue/70' : 'hover:bg-surface-muted/60'}`}
+                >
+                  <td className="px-3 py-2.5 tabular-nums text-ink-muted">{index + 1}</td>
+                  <td className="px-3 py-2.5">{lessonLink}</td>
+                  <td className="px-3 py-2.5">
+                    <LessonStatusIndicator
+                      status={
+                        lesson.progressStatus
+                          .toLowerCase()
+                          .replace('_', '-') as LessonCompletionPresentation
+                      }
+                    />
+                  </td>
+                  <td className="hidden px-3 py-2.5 text-xs text-ink-secondary md:table-cell">
+                    {lesson.estimatedMinutes
+                      ? `${lesson.estimatedMinutes} phút`
+                      : lesson.lessonType === 'LECTURE'
+                        ? 'Bài giảng'
+                        : 'Thực hành'}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
     </section>
   )
 }
@@ -416,15 +467,18 @@ export function LessonCompletionIndicator({
   label?: string
 }) {
   return (
-    <div role="status" className="inline-flex items-center gap-2 text-sm font-semibold">
+    <div
+      role="status"
+      className={`inline-flex min-h-10 items-center gap-2 rounded-xl px-3 text-sm font-bold ${completed ? 'bg-success-surface text-success-foreground' : 'bg-surface-muted text-ink-secondary'}`}
+    >
       {completed ? (
-        <span className="grid size-6 place-items-center rounded-full bg-success-surface text-success-foreground">
+        <span className="grid size-6 place-items-center rounded-full bg-white/70">
           <Check aria-hidden="true" className="size-4" />
         </span>
       ) : (
-        <span aria-hidden="true" className="size-6 rounded-full border-2 border-border-strong" />
+        <span aria-hidden="true" className="size-5 rounded-full border-2 border-current/50" />
       )}
-      {completed ? label : 'Bài học chưa hoàn thành'}
+      {completed ? label : 'Chưa hoàn thành'}
     </div>
   )
 }

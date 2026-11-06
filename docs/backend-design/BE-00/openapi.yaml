@@ -10170,6 +10170,10 @@ components:
           type: boolean
         sortOrder:
           type: integer
+        exercises:
+          type: array
+          items:
+            $ref: "#/components/schemas/StudentCourseExercise"
         progress:
           $ref: "#/components/schemas/LessonProgress"
       additionalProperties: false
@@ -10182,6 +10186,21 @@ components:
         - countsTowardProgress
         - sortOrder
         - progress
+    StudentCourseExercise:
+      type: object
+      properties:
+        id:
+          type: string
+          pattern: ^[a-fA-F0-9]{24}$
+        title:
+          type: string
+        sortOrder:
+          type: integer
+      additionalProperties: false
+      required:
+        - id
+        - title
+        - sortOrder
     StudentSection:
       type: object
       properties:
