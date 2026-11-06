@@ -20,10 +20,13 @@ import { cn } from '@/shared/ui/cn'
 
 type ShellProps = PropsWithChildren<{ className?: string }>
 
-const publicItems = [
-  { label: 'Lộ trình', href: '#dev-outline' },
-  { label: 'Từ vựng', href: '#dev-vocabulary' },
-  { label: 'Cách học', href: '#dev-method' },
+type PublicNavItem = { label: string; href: string }
+
+const publicItems: readonly PublicNavItem[] = [
+  { label: 'Trang chủ', href: '/' },
+  { label: 'Khóa học', href: '/courses' },
+  { label: 'Giới thiệu', href: '/#course-intro' },
+  { label: 'Liên hệ', href: '/#footer-contact' },
 ]
 
 function PreviewNotice({
@@ -38,37 +41,26 @@ function PreviewNotice({
   )
 }
 
-type PublicNavItem = { label: string; href: string }
-
 function PublicMenu({
-  items = publicItems,
   onNavigate,
   desktop = false,
-  spread = false,
 }: {
-  items?: readonly PublicNavItem[]
   onNavigate?: () => void
   desktop?: boolean
-  spread?: boolean
 }) {
   return (
     <nav
       aria-label="Điều hướng chính"
-      className={cn(
-        'grid gap-1',
-        desktop && 'flex items-center justify-center gap-7',
-        desktop && spread && 'w-full justify-between gap-2 xl:gap-5',
-      )}
+      className={cn('grid gap-1', desktop && 'flex items-center justify-center gap-4')}
     >
-      {items.map((item) => (
+      {publicItems.map((item) => (
         <Link
           key={item.href}
           to={item.href}
           onClick={onNavigate}
           className={cn(
             'flex min-h-11 items-center rounded-lg px-3 text-base font-semibold text-ink-secondary underline-offset-4 hover:bg-surface-muted hover:text-ink-primary hover:underline',
-            desktop && 'justify-center px-0 hover:bg-transparent',
-            desktop && spread && 'min-w-0 flex-1 px-1 text-center text-base',
+            desktop && 'justify-center px-2 hover:bg-transparent',
           )}
         >
           {item.label}
@@ -81,7 +73,6 @@ function PublicMenu({
 export function PublicShell({
   children,
   className,
-  navItems = publicItems,
   brandHref = '/',
   previewNotice = 'PAniverseDeutsch · Học tiếng Đức theo lộ trình',
   showPreviewNotice = true,
@@ -92,12 +83,9 @@ export function PublicShell({
   footerNavItems,
   footerCopyright,
   footerContent,
-  wideNavigation = false,
-  fullWidthHeader = false,
   menuDescription = 'Khám phá lộ trình học tiếng Đức',
   authState,
 }: ShellProps & {
-  navItems?: readonly PublicNavItem[]
   brandHref?: string
   previewNotice?: string
   showPreviewNotice?: boolean
@@ -108,8 +96,6 @@ export function PublicShell({
   footerNavItems?: readonly PublicNavItem[]
   footerCopyright?: string
   footerContent?: ReactNode
-  wideNavigation?: boolean
-  fullWidthHeader?: boolean
   menuDescription?: string
   authState?: {
     displayName: string
@@ -124,13 +110,7 @@ export function PublicShell({
       <SkipLink />
       <header className="sticky top-0 z-header border-b border-border-subtle/80 bg-card-surface/95 backdrop-blur-sm">
         {showPreviewNotice && <PreviewNotice text={previewNotice} />}
-        <Container
-          className={cn(
-            'grid h-[4.25rem] grid-cols-[minmax(max-content,1fr)_auto_minmax(max-content,1fr)] items-center gap-4',
-            fullWidthHeader &&
-              'max-w-none grid-cols-[auto_minmax(0,1fr)_auto] px-5 sm:px-8 lg:px-10 xl:px-12',
-          )}
-        >
+        <div className="grid h-[4.25rem] w-full grid-cols-[minmax(max-content,1fr)_auto_minmax(max-content,1fr)] items-center gap-4 px-5 sm:px-8 lg:px-10 xl:px-12">
           <Link
             to={brandHref}
             aria-label={brandConfig.name}
@@ -138,26 +118,24 @@ export function PublicShell({
           >
             {brandConfig.name}
           </Link>
-          <div
-            className={cn(
-              'hidden justify-self-center',
-              fullWidthHeader && 'w-full min-w-0 justify-self-stretch',
-              wideNavigation ? 'xl:block' : 'lg:block',
-            )}
-          >
-            <PublicMenu items={navItems} desktop spread={fullWidthHeader} />
+          <div className="hidden justify-self-center xl:block">
+            <PublicMenu desktop />
           </div>
-          <div
-            className={`hidden items-center justify-self-end gap-4 ${wideNavigation ? 'xl:flex' : 'lg:flex'}`}
-          >
+          <div className="hidden items-center justify-self-end gap-4 xl:flex">
             {authState ? (
               <>
-                <Link
-                  to={authState.role === 'ADMIN' ? '/admin' : '/student/courses'}
-                  className="text-base font-semibold text-ink-secondary underline-offset-4 hover:text-ink-primary hover:underline"
-                >
-                  {authState.role === 'ADMIN' ? 'Khu vực quản trị' : 'Học của tôi'}
-                </Link>
+                {authState.role === 'ADMIN' ? (
+                  <Link
+                    to="/admin"
+                    className="text-base font-semibold text-ink-secondary underline-offset-4 hover:text-ink-primary hover:underline"
+                  >
+                    Khu vực quản trị
+                  </Link>
+                ) : (
+                  <LinkButton to="/student/courses" size="md">
+                    Khóa học của tôi
+                  </LinkButton>
+                )}
                 <DropdownMenu
                   label={authState.displayName}
                   items={[
@@ -196,16 +174,8 @@ export function PublicShell({
                 </>
               )
             )}
-            <LinkButton to={primaryAction.href} size="md">
-              {primaryAction.label}
-            </LinkButton>
           </div>
-          <div
-            className={cn(
-              'col-start-3 justify-self-end',
-              wideNavigation ? 'xl:hidden' : 'lg:hidden',
-            )}
-          >
+          <div className={cn('col-start-3 justify-self-end', 'xl:hidden')}>
             <IconButton
               label={menuOpen ? 'Đóng điều hướng chính' : 'Mở điều hướng chính'}
               icon={
@@ -223,7 +193,7 @@ export function PublicShell({
               aria-haspopup="dialog"
             />
           </div>
-        </Container>
+        </div>
       </header>
       <Sheet
         open={menuOpen}
@@ -232,17 +202,28 @@ export function PublicShell({
         description={menuDescription}
       >
         <div className="grid gap-5">
-          <PublicMenu items={navItems} onNavigate={() => setMenuOpen(false)} />
+          <PublicMenu onNavigate={() => setMenuOpen(false)} />
           <div className="grid gap-2 border-t border-border-subtle pt-4">
             {authState ? (
               <>
-                <Link
-                  to={authState.role === 'ADMIN' ? '/admin' : '/student/courses'}
-                  onClick={() => setMenuOpen(false)}
-                  className="flex min-h-11 items-center px-3 font-semibold text-ink-secondary"
-                >
-                  {authState.role === 'ADMIN' ? 'Khu vực quản trị' : 'Học của tôi'}
-                </Link>
+                {authState.role === 'ADMIN' ? (
+                  <Link
+                    to="/admin"
+                    onClick={() => setMenuOpen(false)}
+                    className="flex min-h-11 items-center px-3 font-semibold text-ink-secondary"
+                  >
+                    Khu vực quản trị
+                  </Link>
+                ) : (
+                  <LinkButton
+                    to="/student/courses"
+                    size="md"
+                    className="w-full"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    Khóa học của tôi
+                  </LinkButton>
+                )}
                 <DropdownMenu
                   label={authState.displayName}
                   items={[
@@ -286,14 +267,6 @@ export function PublicShell({
                 </>
               )
             )}
-            <LinkButton
-              to={primaryAction.href}
-              size="md"
-              className="w-full"
-              onClick={() => setMenuOpen(false)}
-            >
-              {primaryAction.label}
-            </LinkButton>
           </div>
         </div>
       </Sheet>

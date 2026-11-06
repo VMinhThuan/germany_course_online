@@ -14,13 +14,7 @@ function HelpLayout({ children }: { children: ReactNode }) {
   return (
     <PublicShell
       showPreviewNotice={false}
-      navItems={[
-        { label: 'Trang chủ', href: '/' },
-        { label: 'Khóa học', href: '/courses' },
-        { label: 'Trợ giúp', href: '/help' },
-      ]}
       menuDescription="Thông tin học tiếng Đức"
-      primaryAction={{ label: 'Xem khóa học', href: '/courses' }}
       showRegister
       {...(session
         ? {

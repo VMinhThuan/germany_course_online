@@ -25,14 +25,7 @@ type LayoutKey = keyof typeof layouts
 function PreviewContent({ layout }: { layout: LayoutKey }) {
   if (layout === 'public') {
     return (
-      <PublicShell
-        navItems={[
-          { label: 'Lộ trình', href: '#dev-outline' },
-          { label: 'Từ vựng', href: '#dev-vocabulary' },
-          { label: 'Cách học', href: '#dev-method' },
-          { label: 'Bắt đầu xem', href: '/__dev/layouts/learning' },
-        ]}
-      >
+      <PublicShell>
         <div className="mx-auto grid w-full max-w-6xl gap-12 px-4 py-12 sm:px-6 sm:py-20 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-16 lg:px-8">
           <div className="space-y-6">
             <Badge tone="info">Bố cục công khai · mẫu</Badge>

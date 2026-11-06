@@ -179,6 +179,11 @@ export function CoursePricingSection({
             })}
           </div>
         )}
+        <div className="mt-8 flex justify-center">
+          <LinkButton to="/courses" endIcon={<ArrowRight aria-hidden="true" />}>
+            Xem tất cả khóa học
+          </LinkButton>
+        </div>
       </Container>
     </section>
   )

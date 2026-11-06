@@ -34,15 +34,7 @@ function PublicLayout({ children, homepage = false }: { children: ReactNode; hom
   return (
     <PublicShell
       showPreviewNotice={false}
-      navItems={[
-        { label: 'Trang chủ', href: '/' },
-        { label: 'Khóa học', href: '/courses' },
-        { label: 'Giới thiệu', href: '/#course-intro' },
-        { label: 'Liên hệ', href: '/#footer-contact' },
-      ]}
       menuDescription="Khám phá lộ trình học tiếng Đức"
-      primaryAction={{ label: homepage ? 'Xem khóa học' : 'Chọn khóa học', href: '/courses' }}
-      fullWidthHeader={homepage}
       showRegister
       {...(session
         ? {
