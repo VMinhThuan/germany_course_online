@@ -317,20 +317,24 @@ export function LessonContent({
   children,
   headingLevel = 1,
   fullWidth = false,
+  showLessonType = true,
 }: PropsWithChildren<{
   content: LessonContentViewModel
   headingLevel?: HeadingLevel
   fullWidth?: boolean
+  showLessonType?: boolean
 }>) {
   if (content.access.kind === 'restricted' || content.access.kind === 'expired-display')
     return <LockedContentPanel access={content.access} />
   return (
     <article className={fullWidth ? 'w-full space-y-7' : 'mx-auto w-full max-w-3xl space-y-7'}>
       <header className="space-y-3">
-        <p className="text-sm font-semibold text-action-primary">
-          {content.lesson.lessonType === 'LECTURE' ? 'Bài giảng' : 'Thực hành'}
-          {content.lesson.estimatedMinutes ? ` · ${content.lesson.estimatedMinutes} phút` : ''}
-        </p>
+        {showLessonType && (
+          <p className="text-sm font-semibold text-action-primary">
+            {content.lesson.lessonType === 'LECTURE' ? 'Bài giảng' : 'Thực hành'}
+            {content.lesson.estimatedMinutes ? ` · ${content.lesson.estimatedMinutes} phút` : ''}
+          </p>
+        )}
         <SemanticHeading
           level={headingLevel}
           className="font-display text-3xl font-extrabold tracking-tight sm:text-4xl"

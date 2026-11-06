@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { ChevronLeft, ChevronRight, Minus, Plus, Scan } from 'lucide-react'
 import type { PDFDocumentLoadingTask, PDFDocumentProxy, RenderTask } from 'pdfjs-dist'
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
@@ -12,7 +12,6 @@ type DocumentState = {
 }
 
 export function ProtectedPdfViewer({ src, title }: { src: string; title: string }) {
-  const instructionsId = useId()
   const hostRef = useRef<HTMLDivElement>(null)
   const canvasRefs = useRef<Array<HTMLCanvasElement | null>>([])
   const dragRef = useRef<{
@@ -271,22 +270,19 @@ export function ProtectedPdfViewer({ src, title }: { src: string; title: string 
         aria-label={`Trình xem PDF: ${title}`}
         role="region"
         tabIndex={0}
-        aria-describedby={instructionsId}
         onPointerDown={startPan}
         onPointerMove={movePan}
         onPointerUp={stopPan}
         onPointerCancel={stopPan}
         onLostPointerCapture={stopPan}
       >
-        <div
-          className={`grid min-h-full w-full min-w-full items-start justify-items-center p-3 ${showTwoPages ? 'grid-cols-2 gap-4' : 'grid-cols-1'}`}
-        >
+        <div className="flex min-h-full w-max min-w-full items-start justify-center gap-4 p-3">
           {loading ? (
-            <p role="status" className="col-span-full p-6 text-sm text-ink-secondary">
+            <p role="status" className="p-6 text-sm text-ink-secondary">
               Đang tải tài liệu PDF
             </p>
           ) : error ? (
-            <p role="alert" className="col-span-full p-6 text-sm text-danger-foreground">
+            <p role="alert" className="p-6 text-sm text-danger-foreground">
               {error}
             </p>
           ) : (
@@ -304,11 +300,6 @@ export function ProtectedPdfViewer({ src, title }: { src: string; title: string 
           )}
         </div>
       </div>
-      <p id={instructionsId} className="text-xs text-ink-muted">
-        Trên màn hình lớn, tài liệu hiển thị hai trang cạnh nhau; trên điện thoại, mỗi lần hiển thị
-        một trang. Kéo chuột để di chuyển trang khi phóng to. Việc ẩn nút tải xuống không ngăn chụp
-        màn hình hoặc sao chép nội dung.
-      </p>
     </div>
   )
 }

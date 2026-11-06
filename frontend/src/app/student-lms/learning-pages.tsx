@@ -188,16 +188,16 @@ function LessonOutlineTree({
                       {status === 'COMPLETED' ? 'Xong' : status === 'IN_PROGRESS' ? 'Đang học' : ''}
                     </span>
                   </button>
-                  {item.exercises && item.exercises.length > 0 && (
+                  {active && lesson.exercises.length > 0 && (
                     <details className="ml-6 rounded-lg bg-surface-muted/70 px-2">
                       <summary className="cursor-pointer py-2 text-xs font-semibold text-ink-secondary">
-                        Bài tập ({item.exercises.length})
+                        Bài tập ({lesson.exercises.length})
                       </summary>
                       <ul className="grid gap-1 pb-2">
-                        {item.exercises.map((exercise) => (
+                        {lesson.exercises.map((exercise) => (
                           <li key={exercise.id}>
                             <Link
-                              to={`/learn/exercises/${exercise.id}`}
+                              to={exercise.href}
                               className="block truncate rounded-md px-2 py-1.5 text-xs text-action-primary hover:bg-card-surface"
                             >
                               {exercise.title}
@@ -275,7 +275,12 @@ export function LearningLessonPage() {
             <div className="grid min-w-0 gap-6">
               <section aria-label="Bài giảng của bài học" className="grid min-w-0 gap-3">
                 <SectionHeader title="Bài giảng" />
-                <LessonContent content={{ ...lesson.data, media: [] }} headingLevel={3} fullWidth />
+                <LessonContent
+                  content={{ ...lesson.data, media: [] }}
+                  headingLevel={3}
+                  fullWidth
+                  showLessonType={false}
+                />
                 {lesson.data.access.kind === 'available' && (
                   <div className="grid w-full gap-4">
                     <YouTubeLessonPlayer
@@ -335,7 +340,7 @@ export function LearningLessonPage() {
                   </div>
                 </section>
               )}
-              {(lesson.data.solutionVideo || lesson.data.solutionVideos?.length) && (
+              {Boolean(lesson.data.solutionVideo || lesson.data.solutionVideos?.length) && (
                 <section aria-label="Đáp án bài tập" className="grid gap-3">
                   <SectionHeader title="Đáp án" />
                   <div className="grid min-w-0 gap-5">
