@@ -14,7 +14,7 @@ type DocumentState = {
 export function ProtectedPdfViewer({ src, title }: { src: string; title: string }) {
   const instructionsId = useId()
   const hostRef = useRef<HTMLDivElement>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const canvasRefs = useRef<Array<HTMLCanvasElement | null>>([])
   const dragRef = useRef<{
     pointerId: number
     x: number
@@ -125,49 +125,79 @@ export function ProtectedPdfViewer({ src, title }: { src: string; title: string 
     return () => observer.disconnect()
   }, [])
 
+  const pageCount = document?.numPages ?? 0
+  const showTwoPages = hostWidth >= 640
+  const firstVisiblePage = showTwoPages ? Math.floor((pageNumber - 1) / 2) * 2 + 1 : pageNumber
+  const lastVisiblePage = Math.min(pageCount, firstVisiblePage + (showTwoPages ? 1 : 0))
+  const visiblePageNumbers =
+    pageCount > 0
+      ? Array.from(
+          { length: Math.max(1, lastVisiblePage - firstVisiblePage + 1) },
+          (_, index) => firstVisiblePage + index,
+        )
+      : []
+  const visiblePagesKey = visiblePageNumbers.join(',')
+  const lastPageStart = showTwoPages ? Math.ceil(pageCount / 2) * 2 - 1 : pageCount
+
   useEffect(() => {
-    if (!document || !canvasRef.current || !hostWidth) return
+    if (!document || !hostWidth || !visiblePagesKey) return
     let cancelled = false
-    let renderTask: RenderTask | undefined
-    void document
-      .getPage(pageNumber)
-      .then((page) => {
-        if (cancelled || !canvasRef.current) return
+    const renderTasks: RenderTask[] = []
+    const pageNumbers = visiblePagesKey.split(',').map(Number)
+    const columns = showTwoPages && pageNumbers.length > 1 ? 2 : 1
+    const pageSlotWidth = (hostWidth - 24 - (columns === 2 ? 16 : 0)) / columns
+
+    void Promise.all(
+      pageNumbers.map(async (pageNumberToRender, index) => {
+        const page = await document.getPage(pageNumberToRender)
+        const canvas = canvasRefs.current[index]
+        if (cancelled || !canvas) return
         const baseViewport = page.getViewport({ scale: 1 })
-        const scale = Math.min(1, Math.max(0.25, (hostWidth - 24) / baseViewport.width)) * zoom
+        const scale = Math.min(1, Math.max(0.25, pageSlotWidth / baseViewport.width)) * zoom
         const viewport = page.getViewport({ scale })
         const outputScale = Math.min(window.devicePixelRatio || 1, 2)
-        const canvas = canvasRef.current
         const context = canvas.getContext('2d')
         if (!context) throw new Error('Canvas is unavailable')
         canvas.width = Math.floor(viewport.width * outputScale)
         canvas.height = Math.floor(viewport.height * outputScale)
         canvas.style.width = `${Math.floor(viewport.width)}px`
         canvas.style.height = `${Math.floor(viewport.height)}px`
-        renderTask = page.render({
+        const renderTask = page.render({
           canvas,
           canvasContext: context,
           viewport,
           transform: outputScale === 1 ? undefined : [outputScale, 0, 0, outputScale, 0, 0],
         })
-        return renderTask.promise
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setDocumentState((current) =>
-            current.src === src
-              ? { ...current, error: 'Không hiển thị được trang PDF này.' }
-              : current,
-          )
-        }
-      })
+        renderTasks.push(renderTask)
+        await renderTask.promise
+      }),
+    ).catch(() => {
+      if (!cancelled) {
+        setDocumentState((current) =>
+          current.src === src
+            ? { ...current, error: 'Không hiển thị được trang PDF này.' }
+            : current,
+        )
+      }
+    })
     return () => {
       cancelled = true
-      renderTask?.cancel()
+      renderTasks.forEach((task) => task.cancel())
     }
-  }, [document, hostWidth, pageNumber, src, zoom])
+  }, [document, hostWidth, showTwoPages, src, visiblePagesKey, zoom])
 
-  const pageCount = document?.numPages ?? 0
+  function changePage(direction: -1 | 1) {
+    const step = showTwoPages ? 2 : 1
+    setDocumentState((current) => {
+      if (current.src !== src) return current
+      const currentFirstPage = showTwoPages
+        ? Math.floor((current.pageNumber - 1) / 2) * 2 + 1
+        : current.pageNumber
+      const nextPage = Math.max(1, Math.min(lastPageStart, currentFirstPage + direction * step))
+      return { ...current, pageNumber: nextPage }
+    })
+  }
+
   return (
     <div className="grid min-w-0 gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border-subtle bg-card-surface p-2">
@@ -176,32 +206,24 @@ export function ProtectedPdfViewer({ src, title }: { src: string; title: string 
             type="button"
             className="min-h-11 min-w-11 rounded-lg border border-border-subtle disabled:opacity-40"
             aria-label="Trang trước"
-            disabled={pageNumber <= 1 || loading || Boolean(error)}
-            onClick={() =>
-              setDocumentState((current) =>
-                current.src === src
-                  ? { ...current, pageNumber: Math.max(1, current.pageNumber - 1) }
-                  : current,
-              )
-            }
+            disabled={firstVisiblePage <= 1 || loading || Boolean(error)}
+            onClick={() => changePage(-1)}
           >
             <ChevronLeft aria-hidden="true" className="mx-auto size-5" />
           </button>
           <span aria-live="polite" className="min-w-24 text-center text-sm tabular-nums">
-            {pageCount ? `${pageNumber} / ${pageCount}` : '— / —'}
+            {pageCount
+              ? firstVisiblePage < lastVisiblePage
+                ? `${firstVisiblePage}–${lastVisiblePage} / ${pageCount}`
+                : `${firstVisiblePage} / ${pageCount}`
+              : '— / —'}
           </span>
           <button
             type="button"
             className="min-h-11 min-w-11 rounded-lg border border-border-subtle disabled:opacity-40"
             aria-label="Trang sau"
-            disabled={pageNumber >= pageCount || loading || Boolean(error)}
-            onClick={() =>
-              setDocumentState((current) =>
-                current.src === src
-                  ? { ...current, pageNumber: Math.min(pageCount, current.pageNumber + 1) }
-                  : current,
-              )
-            }
+            disabled={firstVisiblePage >= lastPageStart || loading || Boolean(error)}
+            onClick={() => changePage(1)}
           >
             <ChevronRight aria-hidden="true" className="mx-auto size-5" />
           </button>
@@ -245,7 +267,7 @@ export function ProtectedPdfViewer({ src, title }: { src: string; title: string 
       </div>
       <div
         ref={hostRef}
-        className={`min-h-80 max-h-[min(72vh,52rem)] min-w-0 overflow-auto overscroll-contain rounded-xl border border-border-subtle bg-surface-muted ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+        className={`min-h-80 max-h-[min(72vh,52rem)] min-w-0 overflow-auto overscroll-contain rounded-xl border border-border-subtle bg-surface-muted md:max-h-[min(66dvh,58rem)] ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
         aria-label={`Trình xem PDF: ${title}`}
         role="region"
         tabIndex={0}
@@ -256,28 +278,36 @@ export function ProtectedPdfViewer({ src, title }: { src: string; title: string 
         onPointerCancel={stopPan}
         onLostPointerCapture={stopPan}
       >
-        <div className="grid min-h-full w-max min-w-full place-items-start justify-center p-3">
+        <div
+          className={`grid min-h-full w-full min-w-full items-start justify-items-center p-3 ${showTwoPages ? 'grid-cols-2 gap-4' : 'grid-cols-1'}`}
+        >
           {loading ? (
-            <p role="status" className="p-6 text-sm text-ink-secondary">
+            <p role="status" className="col-span-full p-6 text-sm text-ink-secondary">
               Đang tải tài liệu PDF
             </p>
           ) : error ? (
-            <p role="alert" className="p-6 text-sm text-danger-foreground">
+            <p role="alert" className="col-span-full p-6 text-sm text-danger-foreground">
               {error}
             </p>
           ) : (
-            <canvas
-              ref={canvasRef}
-              aria-label={`${title}, trang ${pageNumber}`}
-              className="block max-w-none select-none rounded-sm bg-white shadow-md ring-1 ring-border-subtle"
-              draggable={false}
-            />
+            visiblePageNumbers.map((visiblePage, index) => (
+              <canvas
+                key={visiblePage}
+                ref={(canvas) => {
+                  canvasRefs.current[index] = canvas
+                }}
+                aria-label={`${title}, trang ${visiblePage}`}
+                className="block max-w-none select-none rounded-sm bg-white shadow-md ring-1 ring-border-subtle"
+                draggable={false}
+              />
+            ))
           )}
         </div>
       </div>
       <p id={instructionsId} className="text-xs text-ink-muted">
-        Kéo chuột để di chuyển trang khi phóng to. Tài liệu hiển thị trong trình xem; việc ẩn nút
-        tải xuống không ngăn chụp màn hình hoặc sao chép nội dung.
+        Trên màn hình lớn, tài liệu hiển thị hai trang cạnh nhau; trên điện thoại, mỗi lần hiển thị
+        một trang. Kéo chuột để di chuyển trang khi phóng to. Việc ẩn nút tải xuống không ngăn chụp
+        màn hình hoặc sao chép nội dung.
       </p>
     </div>
   )

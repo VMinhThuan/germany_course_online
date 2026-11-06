@@ -96,6 +96,7 @@ export function BaseDialog({
   footer,
   tone = 'info',
   closeLabel = 'Đóng hộp thoại',
+  size = 'default',
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -105,6 +106,7 @@ export function BaseDialog({
   footer?: ReactNode
   tone?: Exclude<DialogKind, 'confirm'>
   closeLabel?: string
+  size?: 'default' | 'wide'
 }) {
   const Icon =
     tone === 'error'
@@ -125,7 +127,13 @@ export function BaseDialog({
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-overlay bg-overlay data-[state=open]:animate-overlay-in data-[state=closed]:animate-overlay-out" />
-        <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-overlay grid max-h-[min(90dvh,48rem)] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-5 overflow-y-auto rounded-card border border-border-subtle bg-card-surface p-5 shadow-raised outline-none sm:p-7">
+        <DialogPrimitive.Content
+          className={cn(
+            'fixed left-1/2 top-1/2 z-overlay grid max-h-[min(90dvh,48rem)] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-5 overflow-y-auto rounded-card border border-border-subtle bg-card-surface p-5 shadow-raised outline-none sm:p-7',
+            size === 'wide' &&
+              'md:max-h-[min(94dvh,64rem)] md:w-[calc(100vw-2rem)] md:max-w-[min(96vw,88rem)]',
+          )}
+        >
           <div className="flex items-start gap-4 pr-8">
             <span className={cn('grid size-11 shrink-0 place-items-center rounded-2xl', iconTone)}>
               <Icon aria-hidden="true" className="size-5" />

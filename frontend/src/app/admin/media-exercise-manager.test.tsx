@@ -214,7 +214,9 @@ describe('AdminExercisePdfManager', () => {
 
     expect(await screen.findByText('arbeitsblatt.pdf')).toBeVisible()
     await user.click(screen.getByRole('button', { name: 'Xem trước' }))
-    expect(await screen.findByRole('dialog', { name: 'Xem trước PDF' })).toBeVisible()
+    const previewDialog = await screen.findByRole('dialog', { name: 'Xem trước PDF' })
+    expect(previewDialog).toBeVisible()
+    expect(previewDialog).toHaveClass('md:max-w-[min(96vw,88rem)]')
     expect(adminRepository.createMediaPreviewAccess).toHaveBeenCalledWith(pdf.id)
 
     await user.click(screen.getByRole('button', { name: 'Đóng hộp thoại' }))

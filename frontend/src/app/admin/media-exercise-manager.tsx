@@ -890,7 +890,7 @@ export function AdminExercisePdfManager({
         open={preview !== null}
         onOpenChange={(open) => !open && setPreview(null)}
         title="Xem trước PDF"
-        description={preview?.title ?? 'Nội dung của tệp PDF đính kèm.'}
+        size="wide"
       >
         {preview && previewMedia && (
           <section className="grid gap-3">
