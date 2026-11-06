@@ -486,6 +486,7 @@ export function StudentShell({
   const location = useLocation()
   const navigate = useNavigate()
   const currentRoute = location.pathname
+  const isLessonWorkspace = productMode && currentRoute.startsWith('/learn/lessons/')
 
   return (
     <div className="min-h-screen bg-page-surface">
@@ -495,7 +496,7 @@ export function StudentShell({
           aria-label="Điều hướng học viên chính"
           className="sticky top-0 hidden h-screen flex-col border-r border-border-subtle bg-card-surface lg:flex"
         >
-          <div className="flex h-[4.75rem] items-center border-b border-border-subtle px-5">
+          <div className="flex h-16 items-center border-b border-border-subtle px-5">
             <BrandLogo compact to={productMode ? '/student' : '/__dev/layouts/student'} />
           </div>
           <div className="flex-1 overflow-y-auto px-3 py-6">
@@ -526,7 +527,7 @@ export function StudentShell({
           <div
             role="region"
             aria-label="Điều khiển học viên"
-            className="sticky top-0 z-header flex h-[4.25rem] items-center justify-between gap-3 border-b border-border-subtle bg-card-surface/95 px-4 backdrop-blur-sm sm:px-6 lg:px-8"
+            className="sticky top-0 z-header flex h-16 items-center justify-between gap-3 border-b border-border-subtle bg-card-surface/95 px-4 backdrop-blur-sm sm:px-6 lg:px-8"
           >
             <div className="flex min-w-0 items-center gap-3">
               <div className="lg:hidden">
@@ -595,6 +596,7 @@ export function StudentShell({
               data-layout-route={currentRoute}
               className={cn(
                 'mx-auto w-full max-w-[88rem] px-4 py-8 outline-none sm:px-6 sm:py-10 lg:px-8',
+                isLessonWorkspace && 'max-w-none lg:px-5',
                 className,
               )}
             >

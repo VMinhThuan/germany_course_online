@@ -248,6 +248,7 @@ export function LearningLessonPage() {
       title="Không gian bài học"
       eyebrow=""
       backTo={lesson.data ? `/learn/courses/${lesson.data.courseId}` : '/student/courses'}
+      wide
     >
       {lesson.isPending ? (
         <ProductLoading title="Đang tải bài học" />
@@ -440,7 +441,7 @@ export function LearningLessonPage() {
             </div>
             <aside
               aria-label="Nội dung khóa học"
-              className="sticky top-[5.25rem] hidden max-h-[calc(100dvh-6rem)] min-w-0 self-start overflow-y-auto rounded-2xl border border-border-subtle bg-card-surface p-4 lg:block"
+              className="sticky top-[4.5rem] hidden max-h-[calc(100dvh-5rem)] min-w-0 self-start overflow-y-auto rounded-2xl border border-border-subtle bg-card-surface p-4 lg:block"
             >
               <h2 className="mb-3 flex items-center gap-2 font-display text-base font-bold">
                 <BookOpenText aria-hidden="true" className="size-4 text-action-primary" />

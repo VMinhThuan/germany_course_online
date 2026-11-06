@@ -11,11 +11,13 @@ export function ProductPage({
   description,
   children,
   backTo = '/student',
+  wide = false,
 }: PropsWithChildren<{
   title: string
   eyebrow?: string
   description?: string
   backTo?: string
+  wide?: boolean
 }>) {
   useEffect(() => {
     setBrandPageTitle(title)
@@ -23,7 +25,9 @@ export function ProductPage({
 
   return (
     <ProductStudentLayout>
-      <Container className="grid min-w-0 gap-7 py-6 sm:py-9">
+      <Container
+        className={`grid min-w-0 gap-7 py-6 sm:py-9 ${wide ? 'max-w-none px-0 sm:px-0 lg:px-0' : ''}`}
+      >
         <div className="flex flex-wrap items-start justify-between gap-4">
           <PageHeader eyebrow={eyebrow} title={title} {...(description ? { description } : {})} />
           <LinkButton to={backTo} variant="outline" className="shrink-0">
