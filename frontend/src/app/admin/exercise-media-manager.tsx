@@ -667,17 +667,18 @@ export function AdminExerciseMediaManager({
     }
   }
 
-  const previewView: MediaViewModel | null = preview
-    ? {
-        id: preview.access.assetId,
-        title: preview.title,
-        mediaType: preview.access.mediaType,
-        src: preview.access.url,
-        signedUrlExpiresAt: preview.access.expiresAt,
-        canDownload: false,
-        availability: 'ready',
-      }
-    : null
+  const previewView: MediaViewModel | null =
+    preview && preview.access.mediaType !== 'FILE'
+      ? {
+          id: preview.access.assetId,
+          title: preview.title,
+          mediaType: preview.access.mediaType,
+          src: preview.access.url,
+          signedUrlExpiresAt: preview.access.expiresAt,
+          canDownload: false,
+          availability: 'ready',
+        }
+      : null
 
   return (
     <>

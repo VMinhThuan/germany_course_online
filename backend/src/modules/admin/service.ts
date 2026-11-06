@@ -1847,7 +1847,7 @@ export class AdminService {
     const provider = this.storage.provider ?? null;
     const supportedMediaTypes =
       provider === "CLOUDINARY"
-        ? (["IMAGE", "PDF", "AUDIO"] as const)
+        ? (["IMAGE", "PDF", "AUDIO", "FILE"] as const)
         : provider === "S3_COMPATIBLE"
           ? (["IMAGE", "VIDEO", "PDF", "AUDIO"] as const)
           : ([] as const);
@@ -1857,6 +1857,7 @@ export class AdminService {
             IMAGE: await this.storage.listUploadFolders?.("IMAGE"),
             PDF: await this.storage.listUploadFolders?.("PDF"),
             AUDIO: await this.storage.listUploadFolders?.("AUDIO"),
+            FILE: await this.storage.listUploadFolders?.("FILE"),
           }
         : undefined;
     return {
@@ -1868,6 +1869,7 @@ export class AdminService {
               IMAGE: uploadFoldersByMediaType.IMAGE ?? [],
               PDF: uploadFoldersByMediaType.PDF ?? [],
               AUDIO: uploadFoldersByMediaType.AUDIO ?? [],
+              FILE: uploadFoldersByMediaType.FILE ?? [],
             },
           }
         : {}),
@@ -2003,6 +2005,12 @@ export class AdminService {
       );
     const assetId = new Types.ObjectId();
     const provider = this.storage.provider ?? "S3_COMPATIBLE";
+    if (input.mediaType === "FILE" && provider !== "CLOUDINARY")
+      throw new AppError(
+        422,
+        "MEDIA_TYPE_UNSUPPORTED",
+        "Generic content files are only supported by Cloudinary.",
+      );
     if (input.assetFolder && provider !== "CLOUDINARY")
       throw new AppError(
         422,
@@ -2018,13 +2026,21 @@ export class AdminService {
         "MEDIA_FOLDER_UNAVAILABLE",
         "The selected media folder is unavailable.",
       );
+    const resourceType = cloudinaryResourceType(
+      provider,
+      input.mediaType,
+      input.mimeType,
+    );
+    const uniqueId = randomUUID().replaceAll("-", "");
+    const extension = input.originalName.split(".").at(-1)?.toLowerCase();
     const storageKey =
       this.storage.createStorageKey?.(
         input.mediaType,
-        randomUUID().replaceAll("-", ""),
+        input.mediaType === "FILE" && resourceType === "raw"
+          ? `${uniqueId}.${extension}`
+          : uniqueId,
         input.assetFolder,
       ) ?? `media/${randomUUID()}`;
-    const resourceType = cloudinaryResourceType(provider, input.mediaType);
     const deliveryType = provider === "CLOUDINARY" ? "authenticated" : null;
     let signed;
     try {
@@ -3256,10 +3272,18 @@ function resolveMediaStorage(
 function cloudinaryResourceType(
   provider: MediaProvider,
   mediaType: string,
+  mimeType?: string,
 ): MediaResourceType | null {
   if (provider !== "CLOUDINARY") return null;
   if (mediaType === "IMAGE" || mediaType === "PDF") return "image";
   if (mediaType === "AUDIO") return "video";
+  if (mediaType === "FILE") {
+    if (mimeType?.startsWith("image/") || mimeType === "application/pdf")
+      return "image";
+    if (mimeType?.startsWith("video/") || mimeType?.startsWith("audio/"))
+      return "video";
+    return "raw";
+  }
   return null;
 }
 

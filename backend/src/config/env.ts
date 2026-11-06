@@ -103,6 +103,13 @@ const environmentSchema = z.object({
       .regex(/^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/)
       .optional(),
   ),
+  CLOUDINARY_WEB_CONTENT_FOLDER: optionalText.pipe(
+    z
+      .string()
+      .max(230)
+      .regex(/^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/)
+      .optional(),
+  ),
   CLOUDINARY_FOLDER_MODE: z.enum(["fixed", "dynamic"]).default("dynamic"),
 });
 
@@ -152,6 +159,7 @@ export type AppConfig = {
         audioFolder: string;
         courseBannerFolder: string;
         lessonAudioFolder: string;
+        webContentFolder?: string;
         folderMode: "fixed" | "dynamic";
         signedUrlTtlSeconds: number;
       }
@@ -347,11 +355,14 @@ export function parseEnvironment(
     env.CLOUDINARY_COURSE_BANNER_FOLDER ?? "course-banner";
   const cloudinaryLessonAudioFolder =
     env.CLOUDINARY_LESSON_AUDIO_FOLDER ?? "lesson-audio";
+  const cloudinaryWebContentFolder =
+    env.CLOUDINARY_WEB_CONTENT_FOLDER ?? "web-content";
   const cloudinaryFolders = [
     cloudinaryPdfFolder,
     cloudinaryAudioFolder,
     cloudinaryCourseBannerFolder,
     cloudinaryLessonAudioFolder,
+    cloudinaryWebContentFolder,
   ];
   if (
     anyCloudinary &&
@@ -410,6 +421,7 @@ export function parseEnvironment(
           audioFolder: cloudinaryAudioFolder,
           courseBannerFolder: cloudinaryCourseBannerFolder,
           lessonAudioFolder: cloudinaryLessonAudioFolder,
+          webContentFolder: cloudinaryWebContentFolder,
           folderMode: env.CLOUDINARY_FOLDER_MODE,
           signedUrlTtlSeconds: env.MEDIA_SIGNED_URL_TTL_SECONDS,
         }

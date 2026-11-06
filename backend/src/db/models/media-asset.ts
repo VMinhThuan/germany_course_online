@@ -12,7 +12,7 @@ const mediaAssetSchema = new Schema(
     originalName: { type: String, required: true, maxlength: 255 },
     mediaType: {
       type: String,
-      enum: ["IMAGE", "VIDEO", "AUDIO", "PDF"],
+      enum: ["IMAGE", "VIDEO", "AUDIO", "PDF", "FILE"],
       required: true,
     },
     mimeType: { type: String, required: true, maxlength: 160 },

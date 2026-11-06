@@ -598,7 +598,7 @@ export interface ApiAdminSiteSettings {
 export interface ApiAdminMediaAsset {
   id: string
   originalName: string
-  mediaType: 'IMAGE' | 'VIDEO' | 'AUDIO' | 'PDF'
+  mediaType: 'IMAGE' | 'VIDEO' | 'AUDIO' | 'PDF' | 'FILE'
   mimeType: string
   fileSize: number
   durationSeconds: number | null
@@ -660,12 +660,12 @@ export interface ApiMediaPreviewAccess {
   assetId: string
   url: string
   expiresAt: string
-  mediaType: 'IMAGE' | 'VIDEO' | 'AUDIO' | 'PDF'
+  mediaType: 'IMAGE' | 'VIDEO' | 'AUDIO' | 'PDF' | 'FILE'
   mimeType: string
 }
 
 export interface ApiMediaCapabilities {
   activeProvider: 'S3_COMPATIBLE' | 'CLOUDINARY' | null
-  supportedMediaTypes: Array<'IMAGE' | 'VIDEO' | 'AUDIO' | 'PDF'>
-  uploadFoldersByMediaType?: Partial<Record<'IMAGE' | 'AUDIO' | 'PDF', string[]>>
+  supportedMediaTypes: Array<'IMAGE' | 'VIDEO' | 'AUDIO' | 'PDF' | 'FILE'>
+  uploadFoldersByMediaType?: Partial<Record<'IMAGE' | 'AUDIO' | 'PDF' | 'FILE', string[]>>
 }

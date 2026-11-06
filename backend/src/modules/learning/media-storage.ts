@@ -239,15 +239,19 @@ export class CloudinaryMediaStorage implements MediaStorageAdapter {
 
   async signRead(input: SignMediaInput): Promise<SignedMediaUrl> {
     const resourceType =
-      input.resourceType ?? resourceTypeForMedia(input.mediaType);
-    const format = input.format ?? formatForMime(input.mimeType);
+      input.resourceType ??
+      resourceTypeForMedia(input.mediaType, input.mimeType);
+    const rawGenericFile = input.mediaType === "FILE" && resourceType === "raw";
+    const format = rawGenericFile
+      ? ""
+      : (input.format ?? formatForMime(input.mimeType) ?? "");
     const folders = foldersForMedia(this.config, input.mediaType);
     if (
       !resourceType ||
-      !format ||
+      (!format && !rawGenericFile) ||
       !folders.length ||
-      !isValidCloudinaryPublicId(input.storageKey, folders) ||
-      resourceType !== resourceTypeForMedia(input.mediaType) ||
+      !isValidCloudinaryPublicId(input.storageKey, folders, rawGenericFile) ||
+      resourceType !== resourceTypeForMedia(input.mediaType, input.mimeType) ||
       (input.deliveryType && input.deliveryType !== "authenticated")
     ) {
       throw mediaUnavailable(
@@ -265,7 +269,7 @@ export class CloudinaryMediaStorage implements MediaStorageAdapter {
       resource_type: resourceType,
       type: "authenticated" as const,
       expires_at: Math.floor(expiresAt.getTime() / 1000),
-      attachment: false,
+      attachment: input.mediaType === "FILE",
     };
     const url = cloudinary.utils.private_download_url(
       input.storageKey,
@@ -279,12 +283,14 @@ export class CloudinaryMediaStorage implements MediaStorageAdapter {
     input: CreateUploadInput,
   ): Promise<MediaUploadInstructions> {
     const resourceType =
-      input.resourceType ?? resourceTypeForMedia(input.mediaType);
+      input.resourceType ??
+      resourceTypeForMedia(input.mediaType, input.mimeType);
+    const rawGenericFile = input.mediaType === "FILE" && resourceType === "raw";
     const configuredFolders = foldersForMedia(this.config, input.mediaType);
     const folder = input.assetFolder ?? configuredFolders[0];
     if (
       !resourceType ||
-      resourceType !== resourceTypeForMedia(input.mediaType) ||
+      resourceType !== resourceTypeForMedia(input.mediaType, input.mimeType) ||
       !folder ||
       !configuredFolders.length ||
       !configuredFolders.some((root) => isValidCloudinaryFolder(folder, root))
@@ -296,7 +302,7 @@ export class CloudinaryMediaStorage implements MediaStorageAdapter {
       );
     }
     if (
-      !isValidCloudinaryPublicId(input.storageKey, [folder]) ||
+      !isValidCloudinaryPublicId(input.storageKey, [folder], rawGenericFile) ||
       (input.deliveryType && input.deliveryType !== "authenticated")
     ) {
       throw mediaUnavailable(
@@ -402,10 +408,17 @@ export class CloudinaryMediaStorage implements MediaStorageAdapter {
     input: VerifyMediaInput,
   ): Promise<UploadedObjectMetadata | null> {
     const resourceType =
-      input.resourceType ?? resourceTypeForMedia(input.mediaType);
+      input.resourceType ??
+      resourceTypeForMedia(input.mediaType, input.mimeType);
+    const rawGenericFile = input.mediaType === "FILE" && resourceType === "raw";
     if (
       !resourceType ||
-      resourceType !== resourceTypeForMedia(input.mediaType) ||
+      resourceType !== resourceTypeForMedia(input.mediaType, input.mimeType) ||
+      !isValidCloudinaryPublicId(
+        input.storageKey,
+        foldersForMedia(this.config, input.mediaType),
+        rawGenericFile,
+      ) ||
       input.deliveryType !== "authenticated"
     )
       throw mediaUnavailable("Cloudinary upload delivery metadata is invalid.");
@@ -613,9 +626,17 @@ function cloudinaryMetadata(
 
 function resourceTypeForMedia(
   mediaType?: string,
+  mimeType?: string,
 ): MediaResourceType | undefined {
   if (mediaType === "PDF" || mediaType === "IMAGE") return "image";
   if (mediaType === "AUDIO") return "video";
+  if (mediaType === "FILE") {
+    if (mimeType?.startsWith("image/") || mimeType === "application/pdf")
+      return "image";
+    if (mimeType?.startsWith("video/") || mimeType?.startsWith("audio/"))
+      return "video";
+    return "raw";
+  }
   return undefined;
 }
 
@@ -627,6 +648,7 @@ function foldersForMedia(
   if (mediaType === "PDF") return [config.pdfFolder];
   if (mediaType === "AUDIO")
     return [...new Set([config.audioFolder, config.lessonAudioFolder])];
+  if (mediaType === "FILE") return [config.webContentFolder ?? "web-content"];
   return [];
 }
 
@@ -659,6 +681,7 @@ function formatMatchesMedia(
   mimeType: string,
   format: string | null,
 ): boolean {
+  if (mediaType === "FILE") return true;
   if (!format) return false;
   return (
     (mediaType === "IMAGE" &&
@@ -699,11 +722,17 @@ function validateStorageKey(storageKey: string): void {
 function isValidCloudinaryPublicId(
   storageKey: string,
   folders: readonly string[],
+  requireExtension = false,
 ): boolean {
+  const validPublicId = requireExtension
+    ? /^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*\.[A-Za-z0-9]{1,16}$/.test(
+        storageKey,
+      )
+    : /^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/.test(storageKey);
   return (
     typeof storageKey === "string" &&
     storageKey.length <= 255 &&
-    /^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/.test(storageKey) &&
+    validPublicId &&
     folders.some((folder) => storageKey.startsWith(`${folder}/`))
   );
 }

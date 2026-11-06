@@ -293,10 +293,11 @@ const mimeByType = {
   AUDIO: ["audio/mpeg", "audio/mp4", "audio/wav", "audio/ogg"],
   PDF: ["application/pdf"],
 } as const;
+const MAX_WEB_CONTENT_FILE_BYTES = 100_000_000;
 export const uploadIntentSchema = z
   .strictObject({
     originalName: z.string().trim().min(1).max(255),
-    mediaType: z.enum(["IMAGE", "VIDEO", "AUDIO", "PDF"]),
+    mediaType: z.enum(["IMAGE", "VIDEO", "AUDIO", "PDF", "FILE"]),
     mimeType: z.string().trim().toLowerCase().max(160),
     fileSize: z.number().int().min(1),
     visibility: z.enum(["PUBLIC", "ENROLLED"]),
@@ -309,12 +310,22 @@ export const uploadIntentSchema = z
       .optional(),
   })
   .superRefine((value, ctx) => {
-    const allowed = mimeByType[value.mediaType] as readonly string[];
-    if (!allowed.includes(value.mimeType))
+    const isGenericFile = value.mediaType === "FILE";
+    const allowed: readonly string[] =
+      value.mediaType === "FILE" ? [] : mimeByType[value.mediaType];
+    if (
+      (isGenericFile &&
+        !/^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*$/.test(
+          value.mimeType,
+        )) ||
+      (!isGenericFile && !allowed.includes(value.mimeType))
+    )
       ctx.addIssue({
         code: "custom",
         path: ["mimeType"],
-        message: "MIME type is not allowed for this media type.",
+        message: isGenericFile
+          ? "MIME type is invalid."
+          : "MIME type is not allowed for this media type.",
       });
     const extension = value.originalName.split(".").at(-1)?.toLowerCase();
     const extensionMime: Record<string, string> = {
@@ -331,17 +342,23 @@ export const uploadIntentSchema = z
       oga: "audio/ogg",
       pdf: "application/pdf",
     };
-    if (!extension || extensionMime[extension] !== value.mimeType)
+    const validExtension = isGenericFile
+      ? Boolean(extension && /^[a-z0-9]{1,16}$/.test(extension))
+      : Boolean(extension && extensionMime[extension] === value.mimeType);
+    if (!validExtension)
       ctx.addIssue({
         code: "custom",
         path: ["originalName"],
-        message: "File extension does not match its media type.",
+        message: isGenericFile
+          ? "File must have a safe extension."
+          : "File extension does not match its media type.",
       });
     const maxBytes: Record<string, number> = {
       IMAGE: 20 * 1024 * 1024,
       VIDEO: 250 * 1024 * 1024,
       AUDIO: 50 * 1024 * 1024,
       PDF: 40 * 1024 * 1024,
+      FILE: MAX_WEB_CONTENT_FILE_BYTES,
     };
     if (value.fileSize > maxBytes[value.mediaType]!)
       ctx.addIssue({
@@ -357,7 +374,7 @@ export const mediaListQuerySchema = z.strictObject({
   page,
   pageSize,
   q: text(120).optional(),
-  mediaType: z.enum(["IMAGE", "VIDEO", "AUDIO", "PDF"]).optional(),
+  mediaType: z.enum(["IMAGE", "VIDEO", "AUDIO", "PDF", "FILE"]).optional(),
   visibility: z.enum(["PUBLIC", "ENROLLED"]).optional(),
   uploadStatus: z.enum(["PENDING", "READY", "DELETING", "DELETED"]).optional(),
   provider: z.enum(["S3_COMPATIBLE", "CLOUDINARY"]).optional(),

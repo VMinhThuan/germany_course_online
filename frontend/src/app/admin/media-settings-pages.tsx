@@ -18,6 +18,7 @@ import {
   folderRoots,
   mediaAccept as mediaAcceptForType,
   mediaAcceptForTypes,
+  mediaMimeTypeForUpload,
   mediaTypeForFile,
   uploadFolders,
   validateAdminMediaFile,
@@ -37,7 +38,14 @@ import {
 } from './shared'
 
 function mediaTypeLabel(mediaType: ApiAdminMediaAsset['mediaType']) {
-  return { IMAGE: 'Hình ảnh', VIDEO: 'Video', AUDIO: 'Âm thanh', PDF: 'PDF' }[mediaType]
+  const labels = {
+    IMAGE: 'Hình ảnh',
+    VIDEO: 'Video',
+    AUDIO: 'Âm thanh',
+    PDF: 'PDF',
+    FILE: 'Tệp nội dung',
+  }
+  return labels[mediaType]
 }
 
 function uploadStatusLabel(status?: ApiAdminMediaAsset['uploadStatus']) {
@@ -53,14 +61,11 @@ function folderLabel(folder: string, folders: readonly string[], mediaType: Admi
     (candidate) => folder === candidate || folder.startsWith(`${candidate}/`),
   )
   const ending = root?.split('/').at(-1)?.toLowerCase()
-  const rootLabel =
-    mediaType === 'IMAGE'
-      ? 'Ảnh khóa học'
-      : mediaType === 'PDF'
-        ? 'Tài liệu PDF'
-        : ending === 'lesson-audio'
-          ? 'Âm thanh bài tập'
-          : 'Âm thanh trắc nghiệm'
+  let rootLabel: string
+  if (mediaType === 'IMAGE') rootLabel = 'Ảnh khóa học'
+  else if (mediaType === 'PDF') rootLabel = 'Tài liệu PDF'
+  else if (mediaType === 'FILE') rootLabel = 'Nội dung website'
+  else rootLabel = ending === 'lesson-audio' ? 'Âm thanh bài tập' : 'Âm thanh trắc nghiệm'
   const subfolder =
     root && folder !== root ? folder.slice(root.length + 1).replaceAll('/', ' / ') : ''
   return subfolder ? `${rootLabel} · ${subfolder}` : rootLabel
@@ -173,7 +178,7 @@ export function AdminMediaPage() {
   const [title, setTitle] = useState('')
   const [sortOrder, setSortOrder] = useState('0')
   const [associationNotice, setAssociationNotice] = useState('')
-  const folderOptions = (['IMAGE', 'PDF', 'AUDIO'] as const).flatMap((type) =>
+  const folderOptions = (['IMAGE', 'PDF', 'AUDIO', 'FILE'] as const).flatMap((type) =>
     uploadFolders(capabilities.data, type).map((folder) => ({ folder, mediaType: type })),
   )
   const folderSelectionRequired = capabilities.data?.activeProvider === 'CLOUDINARY'
@@ -232,7 +237,7 @@ export function AdminMediaPage() {
         {
           originalName: file.name,
           mediaType: type,
-          mimeType: file.type,
+          mimeType: mediaMimeTypeForUpload(file),
           fileSize: file.size,
           visibility,
           ...(canSelectFolder && selectedFolder ? { assetFolder: selectedFolder } : {}),
@@ -441,7 +446,7 @@ export function AdminMediaPage() {
               }}
               options={[
                 { value: '', label: 'Tất cả' },
-                ...['IMAGE', 'VIDEO', 'AUDIO', 'PDF'].map((value) => ({
+                ...['IMAGE', 'VIDEO', 'AUDIO', 'PDF', 'FILE'].map((value) => ({
                   value,
                   label: mediaTypeLabel(value as ApiAdminMediaAsset['mediaType']),
                 })),
@@ -636,7 +641,7 @@ export function AdminMediaPage() {
           setUploadOpen(open)
         }}
         title="Tải tệp lên thư viện"
-        description="Chọn nơi lưu và tệp muốn thêm. Mỗi nơi nhận một loại tệp riêng."
+        description="Chọn thư mục lưu rồi tải tệp vào thư viện nội dung."
         footer={
           <>
             <Button
@@ -818,7 +823,15 @@ export function AdminMediaPage() {
           <AdminFeedback success={uploadSuccess} />
         </div>
       </BaseDialog>
+      {detail.data?.media.mediaType === 'FILE' && (
+        <AdminCard title="Tệp nội dung website">
+          <p className="text-sm leading-6 text-ink-secondary">
+            Tệp này được lưu và quản lý độc lập. Chức năng gắn vào nội dung sẽ được bổ sung sau.
+          </p>
+        </AdminCard>
+      )}
       <AdminCard
+        {...(detail.data?.media.mediaType === 'FILE' ? { className: 'hidden' } : {})}
         title="Gắn tệp vào bài học hoặc bài tập"
         description="Chọn nội dung và mục đích sử dụng để gắn tệp đúng chỗ."
       >
@@ -935,6 +948,22 @@ export function AdminMediaPage() {
 }
 
 function MediaAssetPreview({ access, title }: { access: ApiMediaPreviewAccess; title: string }) {
+  if (access.mediaType === 'FILE')
+    return (
+      <section className="grid gap-2 rounded-xl border border-border-subtle bg-white p-3">
+        <p className="text-xs text-ink-muted">
+          Liên kết tải xuống có hiệu lực đến {formatDateTimeInTimezone(access.expiresAt)}
+        </p>
+        <a
+          className="w-fit rounded-lg bg-action-primary px-4 py-2 text-sm font-semibold text-white"
+          href={access.url}
+          rel="noreferrer"
+          target="_blank"
+        >
+          Tải tệp xuống: {title}
+        </a>
+      </section>
+    )
   const media: MediaViewModel = {
     id: access.assetId,
     title,

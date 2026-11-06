@@ -1,5 +1,5 @@
 import mongoose, { Types } from "mongoose";
-type MediaType = "IMAGE" | "VIDEO" | "AUDIO" | "PDF";
+type MediaType = "IMAGE" | "VIDEO" | "AUDIO" | "PDF" | "FILE";
 
 type Doc = Record<string, unknown>;
 

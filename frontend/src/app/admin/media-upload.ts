@@ -1,7 +1,7 @@
 import { adminRepository } from '@/data/api/admin-repository'
 import type { ApiMediaCapabilities } from '@/lib/api/types'
 
-export type AdminMediaType = 'IMAGE' | 'VIDEO' | 'AUDIO' | 'PDF'
+export type AdminMediaType = 'IMAGE' | 'VIDEO' | 'AUDIO' | 'PDF' | 'FILE'
 
 const extensionMime: Record<AdminMediaType, Record<string, string>> = {
   IMAGE: {
@@ -21,13 +21,16 @@ const extensionMime: Record<AdminMediaType, Record<string, string>> = {
     oga: 'audio/ogg',
   },
   PDF: { pdf: 'application/pdf' },
+  FILE: {},
 }
 
+const MAX_WEB_CONTENT_FILE_BYTES = 100_000_000
 const maxBytes: Record<AdminMediaType, number> = {
   IMAGE: 20 * 1024 * 1024,
   VIDEO: 250 * 1024 * 1024,
   AUDIO: 50 * 1024 * 1024,
   PDF: 40 * 1024 * 1024,
+  FILE: MAX_WEB_CONTENT_FILE_BYTES,
 }
 
 export function mediaTypeForFile(file: File | null): AdminMediaType | null {
@@ -39,19 +42,42 @@ export function mediaTypeForFile(file: File | null): AdminMediaType | null {
   return null
 }
 
+export function mediaMimeTypeForUpload(file: File) {
+  if (file.type) return file.type
+  const extension = file.name.split('.').at(-1)?.toLowerCase() ?? ''
+  for (const mediaType of ['IMAGE', 'VIDEO', 'AUDIO', 'PDF'] as const) {
+    const mimeType = extensionMime[mediaType][extension]
+    if (mimeType) return mimeType
+  }
+  return 'application/octet-stream'
+}
+
 export function validateAdminMediaFile(file: File, mediaType: AdminMediaType) {
   const extension = file.name.split('.').at(-1)?.toLowerCase() ?? ''
   const expectedMime = extensionMime[mediaType][extension]
-  if (!expectedMime || expectedMime !== file.type)
+  const genericFileIsValid =
+    mediaType === 'FILE' &&
+    /^[a-z0-9]{1,16}$/.test(extension) &&
+    (!file.type || /^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*$/i.test(file.type))
+  if (mediaType === 'FILE' ? !genericFileIsValid : !expectedMime || expectedMime !== file.type)
     return `Chọn tệp ${mediaTypeLabel(mediaType)} đúng định dạng.`
   if (file.size <= 0) return 'Tệp chưa có nội dung. Hãy chọn tệp khác.'
-  if (file.size > maxBytes[mediaType])
-    return `Tệp ${mediaTypeLabel(mediaType)} vượt quá ${maxBytes[mediaType] / 1024 / 1024} MB.`
+  if (file.size > maxBytes[mediaType]) {
+    const maxSizeMb =
+      mediaType === 'FILE' ? '100' : String(maxBytes[mediaType] / 1024 / 1024)
+    return `Tệp ${mediaTypeLabel(mediaType)} vượt quá ${maxSizeMb} MB.`
+  }
   return null
 }
 
 export function mediaTypeLabel(mediaType: AdminMediaType) {
-  return { IMAGE: 'ảnh', VIDEO: 'video', AUDIO: 'âm thanh', PDF: 'PDF' }[mediaType]
+  return {
+    IMAGE: 'ảnh',
+    VIDEO: 'video',
+    AUDIO: 'âm thanh',
+    PDF: 'PDF',
+    FILE: 'tệp nội dung',
+  }[mediaType]
 }
 
 export function mediaAccept(mediaType: AdminMediaType) {
@@ -59,6 +85,7 @@ export function mediaAccept(mediaType: AdminMediaType) {
 }
 
 export function mediaAcceptForTypes(mediaTypes: readonly AdminMediaType[]) {
+  if (mediaTypes.includes('FILE')) return '*/*'
   const extensions = mediaTypes.flatMap((mediaType) =>
     Object.keys(extensionMime[mediaType]).map((extension) => `.${extension}`),
   )
@@ -123,7 +150,7 @@ export async function uploadAdminMedia(
     {
       originalName: file.name,
       mediaType,
-      mimeType: file.type,
+      mimeType: mediaMimeTypeForUpload(file),
       fileSize: file.size,
       visibility,
       ...(assetFolder ? { assetFolder } : {}),
