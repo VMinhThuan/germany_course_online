@@ -14,7 +14,7 @@ export function FAQSection() {
     <section
       id="faq"
       aria-labelledby="faq-title"
-      className="scroll-mt-24 bg-surface-blue/35 py-14 sm:py-18 lg:py-20"
+      className="scroll-mt-24 bg-surface-pink py-14 sm:py-18 lg:py-20"
     >
       <Container>
         <header className="mx-auto mb-7 max-w-2xl text-center sm:mb-9">

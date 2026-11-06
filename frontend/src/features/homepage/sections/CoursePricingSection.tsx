@@ -29,7 +29,7 @@ export function CoursePricingSection({
         <header className="mx-auto mb-8 max-w-2xl text-center sm:mb-10">
           <p
             lang="de"
-            className="text-sm font-bold uppercase tracking-[0.14em] text-action-primary"
+            className="inline-flex rounded-full bg-brand-pink px-3 py-1 text-sm font-bold uppercase tracking-[0.14em] text-ink-primary"
           >
             {pricing.eyebrow}
           </p>

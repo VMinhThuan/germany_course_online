@@ -9,7 +9,7 @@ export function CourseIntroduction() {
     <section
       id="course-intro"
       aria-labelledby="course-intro-title"
-      className="scroll-mt-24 bg-card-surface py-14 sm:py-18 lg:py-20"
+      className="scroll-mt-24 bg-surface-pink py-14 sm:py-18 lg:py-20"
     >
       <Container>
         <BilingualSectionHeading
