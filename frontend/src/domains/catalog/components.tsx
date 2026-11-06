@@ -157,15 +157,22 @@ export function CourseCard({
   onOpen?: () => void
 }) {
   const [imageFailed, setImageFailed] = useState(false)
+  const hasCourseImage = Boolean(course.thumbnailUrl && !imageFailed)
   return (
     <Card className="flex min-w-0 flex-col overflow-hidden shadow-soft">
-      <div className="relative aspect-[16/9] overflow-hidden bg-surface-blue">
-        {course.thumbnailUrl && !imageFailed ? (
+      <div
+        className={
+          hasCourseImage
+            ? 'overflow-hidden bg-surface-blue'
+            : 'relative aspect-[16/9] overflow-hidden bg-surface-blue'
+        }
+      >
+        {hasCourseImage && course.thumbnailUrl ? (
           <img
             src={course.thumbnailUrl}
             alt=""
             onError={() => setImageFailed(true)}
-            className="size-full object-cover"
+            className="block h-auto w-full"
           />
         ) : (
           <div className="grid size-full place-items-center text-pastel-blue-ink">
@@ -173,23 +180,23 @@ export function CourseCard({
             <span className="sr-only">Ảnh khóa học chưa có</span>
           </div>
         )}
-        <div className="absolute left-3 top-3">
-          <CourseLevelBadge level={course.level} />
-        </div>
       </div>
       <CardHeader className="flex-1">
-        <CardTitle>
-          {href ? (
-            <Link
-              className="rounded-sm underline-offset-4 hover:text-action-primary hover:underline focus-visible:outline-2 focus-visible:outline-action-focus"
-              to={href}
-            >
-              {course.title}
-            </Link>
-          ) : (
-            course.title
-          )}
-        </CardTitle>
+        <div className="flex items-start justify-between gap-3">
+          <CardTitle className="min-w-0">
+            {href ? (
+              <Link
+                className="rounded-sm underline-offset-4 hover:text-action-primary hover:underline focus-visible:outline-2 focus-visible:outline-action-focus"
+                to={href}
+              >
+                {course.title}
+              </Link>
+            ) : (
+              course.title
+            )}
+          </CardTitle>
+          <CourseLevelBadge level={course.level} />
+        </div>
         <p className="text-sm leading-6 text-ink-secondary">{course.shortDescription}</p>
         {access?.kind === 'customer-preview' && (
           <div className="pt-2">

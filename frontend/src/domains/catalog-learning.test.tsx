@@ -11,8 +11,15 @@ import { CourseTree, LessonRow, LockedContentPanel } from '@/domains/learning'
 import { A11_COURSE, MOCK_PREVIEW_MANIFEST } from '@/data/mock'
 
 describe('catalog components', () => {
-  it('renders a course card with its fallback-safe local image and price', () => {
-    render(<CourseCard course={A11_COURSE} onOpen={() => undefined} />)
+  it('renders course artwork without covering it and keeps the level beside the title', () => {
+    const { container } = render(<CourseCard course={A11_COURSE} onOpen={() => undefined} />)
+    const courseImage = container.querySelector<HTMLImageElement>(
+      `img[src="${A11_COURSE.thumbnailUrl}"]`,
+    )
+
+    expect(courseImage).toHaveClass('block', 'h-auto', 'w-full')
+    expect(courseImage?.parentElement).not.toHaveClass('relative')
+    expect(screen.getByText(A11_COURSE.level, { exact: true })).toBeVisible()
     expect(screen.getByRole('heading', { name: A11_COURSE.title })).toBeVisible()
     expect(screen.getByText(/1\.290\.000/)).toBeVisible()
     expect(screen.getByRole('button', { name: /Xem khóa học/ })).toBeVisible()

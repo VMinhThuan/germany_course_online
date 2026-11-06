@@ -28,6 +28,35 @@ describe('CoursePricingSection', () => {
     ).not.toBeNull()
   })
 
+  it('shows an uploaded banner at its original ratio without covering it with card labels', () => {
+    const { container } = renderPricing()
+    const banner = container.querySelector<HTMLImageElement>(
+      'img[src="/assets/homepage/course-banner-a11.webp"]',
+    )
+
+    expect(banner).toHaveClass('block', 'h-auto', 'w-full')
+    expect(banner?.parentElement).not.toHaveClass('homepage-course-banner')
+    expect(screen.getByRole('heading', { level: 3, name: PUBLIC_DEMO_COURSE.title })).toBeVisible()
+    expect(screen.getByText(PUBLIC_DEMO_COURSE.level, { exact: true })).toBeVisible()
+    expect(
+      screen.getByRole('link', {
+        name: `Xem khóa học ${PUBLIC_DEMO_COURSE.title}`,
+      }),
+    ).toHaveAttribute('href', '/courses/tieng-duc-a1-1')
+  })
+
+  it('keeps the level and title overlay for the built-in fallback artwork', () => {
+    const course = { ...PUBLIC_DEMO_COURSE }
+    delete course.thumbnailUrl
+    const { container } = renderPricing({ courses: [course] })
+
+    expect(
+      container.querySelector('img[src="/assets/homepage/paniverse-hero.webp"]'),
+    ).not.toBeNull()
+    expect(screen.getByRole('heading', { level: 3, name: course.title })).toBeVisible()
+    expect(screen.getByText(course.level, { exact: true })).toBeVisible()
+  })
+
   it('formats only the supplied course price and access duration', () => {
     renderPricing({
       courses: [{ ...PUBLIC_DEMO_COURSE, priceVnd: '1290000', accessDurationMonths: 12 }],
@@ -56,11 +85,10 @@ describe('CoursePricingSection', () => {
 
     expect(screen.getAllByRole('article')).toHaveLength(2)
     expect(screen.getByText('8 chương · 15 bài học')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Tiếng Đức A2/ })).toHaveAttribute(
-      'href',
-      '/courses/tieng-duc-a2',
-    )
-    expect(screen.getAllByRole('link', { name: 'Xem nội dung khóa' })).toHaveLength(2)
+    expect(
+      screen.getByRole('link', { name: 'Xem khóa học Tiếng Đức A2 · Giao tiếp tiếp nối' }),
+    ).toHaveAttribute('href', '/courses/tieng-duc-a2')
+    expect(screen.getAllByRole('link', { name: /Xem nội dung khóa Tiếng Đức/ })).toHaveLength(2)
   })
 
   it('renders loading, error and empty states from repository state', () => {
