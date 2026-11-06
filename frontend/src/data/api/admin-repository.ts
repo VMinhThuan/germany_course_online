@@ -40,6 +40,11 @@ function idempotent(key: string | undefined) {
 
 const pathId = (id: string) => encodeURIComponent(id)
 
+async function listAssetAssociations(path: string) {
+  const response = await apiRequest<ApiAssetAssociation[] | { items: ApiAssetAssociation[] }>(path)
+  return Array.isArray(response) ? { items: response } : response
+}
+
 export const adminRepository = {
   listCourses(filters: Query = {}) {
     return apiRequest<ApiPage<ApiAdminCourse>>(
@@ -348,7 +353,7 @@ export const adminRepository = {
     return apiRequest<void>(`/admin/media-assets/${pathId(assetId)}`, { method: 'DELETE' })
   },
   listLessonAssets(lessonId: string) {
-    return apiRequest<{ items: ApiAssetAssociation[] }>(`/admin/lessons/${pathId(lessonId)}/assets`)
+    return listAssetAssociations(`/admin/lessons/${pathId(lessonId)}/assets`)
   },
   linkLessonAsset(
     lessonId: string,
@@ -367,9 +372,7 @@ export const adminRepository = {
     )
   },
   listExerciseAssets(exerciseId: string) {
-    return apiRequest<{ items: ApiAssetAssociation[] }>(
-      `/admin/exercises/${pathId(exerciseId)}/assets`,
-    )
+    return listAssetAssociations(`/admin/exercises/${pathId(exerciseId)}/assets`)
   },
   linkExerciseAsset(
     exerciseId: string,
