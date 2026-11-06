@@ -7,6 +7,7 @@ export type PublicMediaDto = {
   title?: string;
   mediaType: "IMAGE" | "VIDEO" | "AUDIO" | "PDF";
   mimeType: string;
+  url?: string;
 };
 
 export async function getAssociatedPublicMedia(

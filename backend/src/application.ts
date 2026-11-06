@@ -97,7 +97,7 @@ export function createApp(
     logger,
     mediaStorage,
   );
-  const catalogService = new PublicCatalogService();
+  const catalogService = new PublicCatalogService(mediaStorage);
   const learningService = new LearningService();
   const quizService = new QuizService(learningService);
   const mediaAccessService = new MediaAccessService(

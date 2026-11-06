@@ -16,6 +16,11 @@ import {
 } from "../../src/http/server-lifecycle.js";
 import { verifyAccessToken } from "../../src/modules/auth/jwt.js";
 import { FakeEmailService } from "../../src/modules/auth/email-service.js";
+import type {
+  MediaStorageAdapter,
+  SignMediaInput,
+  SignedMediaUrl,
+} from "../../src/modules/learning/media-storage.js";
 import {
   Course,
   CourseSection,
@@ -58,6 +63,19 @@ function cookieFrom(response: request.Response): string {
   return cookie;
 }
 
+class FakePublicMediaStorage implements MediaStorageAdapter {
+  readonly provider = "CLOUDINARY" as const;
+  readonly signedInputs: SignMediaInput[] = [];
+
+  async signRead(input: SignMediaInput): Promise<SignedMediaUrl> {
+    this.signedInputs.push(input);
+    return {
+      url: `https://media.example.test/${input.storageKey}`,
+      expiresAt: new Date(Date.now() + 5 * 60_000),
+    };
+  }
+}
+
 async function registerUser(overrides: Partial<typeof student> = {}) {
   return request(app)
     .post("/api/v1/auth/register")
@@ -73,6 +91,7 @@ async function createPublishedCourse(
     price?: string;
     slug?: string;
     thumbnailAssetId?: mongoose.Types.ObjectId;
+    bannerAssetId?: mongoose.Types.ObjectId;
   } = {},
 ) {
   const course = await Course.create({
@@ -85,7 +104,7 @@ async function createPublishedCourse(
     requirements: ["None"],
     level: "A1",
     thumbnailAssetId: options.thumbnailAssetId ?? null,
-    bannerAssetId: null,
+    bannerAssetId: options.bannerAssetId ?? null,
     introVideoAssetId: null,
     price: mongoose.Types.Decimal128.fromString(options.price ?? "1950000"),
     accessDurationMonths: 12,
@@ -834,6 +853,51 @@ describe("Express foundation, auth, and public APIs", () => {
   });
 
   describe("public course catalog", () => {
+    it("uses a published course banner as its catalog image and includes signed media URLs", async () => {
+      const storage = new FakePublicMediaStorage();
+      const banner = await MediaAsset.create({
+        originalName: "german-a1-banner.jpg",
+        mediaType: "IMAGE",
+        mimeType: "image/jpeg",
+        fileSize: 1234,
+        provider: "CLOUDINARY",
+        storageKey: "course-banner/german-a1-cover",
+        resourceType: "image",
+        deliveryType: "authenticated",
+        format: "jpg",
+        visibility: "PUBLIC",
+        uploadStatus: "READY",
+        deletedAt: null,
+      });
+      await createPublishedCourse({ bannerAssetId: banner._id });
+      const publicApp = createApp(config, {
+        emailService: fakeEmail,
+        mediaStorage: storage,
+        readiness: () => true,
+      });
+
+      const catalog = await request(publicApp).get("/api/v1/courses");
+      expect(catalog.status).toBe(200);
+      expect(catalog.body.data.items[0].thumbnailUrl).toBe(
+        "https://media.example.test/course-banner/german-a1-cover",
+      );
+
+      const detail = await request(publicApp).get("/api/v1/courses/german-a1");
+      expect(detail.status).toBe(200);
+      expect(detail.body.data.banner).toMatchObject({
+        id: banner._id.toString(),
+        mediaType: "IMAGE",
+        url: "https://media.example.test/course-banner/german-a1-cover",
+      });
+      expect(storage.signedInputs).toHaveLength(2);
+      expect(storage.signedInputs[0]).toMatchObject({
+        storageKey: "course-banner/german-a1-cover",
+        mediaType: "IMAGE",
+        resourceType: "image",
+        deliveryType: "authenticated",
+      });
+    });
+
     it("lists published non-deleted courses for an anonymous request with stable pagination and exact money strings", async () => {
       await createPublishedCourse({
         price: "900719925474099312345",

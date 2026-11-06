@@ -34,7 +34,7 @@ function mapDetail(course: ApiCourseDetail): CourseDetailModel {
       title: course.title,
       level: course.level,
       shortDescription: course.shortDescription,
-      thumbnailUrl: course.thumbnail?.url ?? null,
+      thumbnailUrl: course.thumbnail?.url ?? course.banner?.url ?? null,
       price: course.price,
       accessDurationMonths: course.accessDurationMonths,
       status: 'PUBLISHED',

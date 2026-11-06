@@ -6,7 +6,12 @@ import {
   MediaAsset,
   SiteSettings,
 } from "../../db/models/index.js";
+import type { MediaProvider } from "../../config/env.js";
 import { notFound } from "../../shared/errors.js";
+import type {
+  MediaResourceType,
+  MediaStorageAdapter,
+} from "../learning/media-storage.js";
 import {
   getAssociatedPublicMedia,
   toPublicMedia,
@@ -40,6 +45,8 @@ type PublicSection = {
 };
 
 export class PublicCatalogService {
+  constructor(private readonly mediaStorage: MediaStorageAdapter) {}
+
   async listCourses(query: CourseListQuery) {
     const filter: Record<string, unknown> = {
       status: "PUBLISHED",
@@ -59,7 +66,7 @@ export class PublicCatalogService {
     const sort = sortFor(query.sort);
     const courses = await Course.find(filter)
       .select(
-        "code title slug level shortDescription thumbnailAssetId price accessDurationMonths status sortOrder",
+        "code title slug level shortDescription thumbnailAssetId bannerAssetId price accessDurationMonths status sortOrder",
       )
       .sort(sort)
       .skip((query.page - 1) * query.pageSize)
@@ -103,6 +110,33 @@ export class PublicCatalogService {
       countsByCourse.set(key, counts);
     }
 
+    const imageAssetIds = [
+      ...new Map(
+        courses
+          .flatMap((course) => [course.thumbnailAssetId, course.bannerAssetId])
+          .filter((assetId) => Boolean(assetId))
+          .map((assetId) => [String(assetId), assetId] as const),
+      ).values(),
+    ];
+    const imageAssets = imageAssetIds.length
+      ? await MediaAsset.find({
+          _id: { $in: imageAssetIds },
+          mediaType: "IMAGE",
+          visibility: "PUBLIC",
+          deletedAt: null,
+          uploadStatus: { $nin: ["PENDING", "DELETING", "DELETED"] },
+        }).select("+provider +storageKey +resourceType +deliveryType")
+      : [];
+    const imagesById = new Map<string, PublicMediaDto>();
+    await Promise.all(
+      imageAssets.map(async (asset) => {
+        imagesById.set(
+          String(asset.get("_id")),
+          await this.toPublicCourseMedia(asset),
+        );
+      }),
+    );
+
     return {
       items: courses.map((course) => {
         const counts = countsByCourse.get(String(course._id)) ?? {
@@ -116,7 +150,10 @@ export class PublicCatalogService {
           title: course.title,
           level: course.level,
           shortDescription: course.shortDescription,
-          thumbnailUrl: null,
+          thumbnailUrl:
+            imagesById.get(String(course.thumbnailAssetId))?.url ??
+            imagesById.get(String(course.bannerAssetId))?.url ??
+            null,
           price: decimalIntegerString(course.price),
           accessDurationMonths: course.accessDurationMonths,
           status: "PUBLISHED" as const,
@@ -260,7 +297,7 @@ export class PublicCatalogService {
       visibility: "PUBLIC",
       deletedAt: null,
       uploadStatus: { $nin: ["PENDING", "DELETING", "DELETED"] },
-    });
+    }).select("+provider +storageKey +resourceType +deliveryType");
     if (!asset) return undefined;
     const isPublishedCourseReference = await Course.exists({
       _id: courseId,
@@ -272,8 +309,46 @@ export class PublicCatalogService {
         { introVideoAssetId: asset._id },
       ],
     });
-    return isPublishedCourseReference ? toPublicMedia(asset) : undefined;
+    return isPublishedCourseReference
+      ? this.toPublicCourseMedia(asset)
+      : undefined;
   }
+
+  private async toPublicCourseMedia(
+    asset: mongoose.Document,
+  ): Promise<PublicMediaDto> {
+    const media = toPublicMedia(asset);
+    const adapter = resolveMediaStorage(
+      this.mediaStorage,
+      asset.get("provider"),
+    );
+    if (!adapter) return media;
+
+    const signed = await adapter.signRead({
+      storageKey: asset.get("storageKey") as string,
+      mimeType: media.mimeType,
+      mediaType: media.mediaType,
+      resourceType: asset.get("resourceType") as MediaResourceType | null,
+      deliveryType: asset.get("deliveryType") as
+        "upload" | "private" | "authenticated" | null,
+      format: asset.get("format") as string | null,
+    });
+    return { ...media, url: signed.url };
+  }
+}
+
+function resolveMediaStorage(
+  storage: MediaStorageAdapter,
+  providerValue: unknown,
+): MediaStorageAdapter | undefined {
+  if (providerValue !== "S3_COMPATIBLE" && providerValue !== "CLOUDINARY")
+    return undefined;
+  const provider = providerValue as MediaProvider;
+  const resolved = storage.resolve?.(provider);
+  if (resolved) return resolved;
+  if (!storage.resolve && (!storage.provider || storage.provider === provider))
+    return storage;
+  return undefined;
 }
 
 function sortFor(value: CourseListQuery["sort"]): Record<string, 1 | -1> {

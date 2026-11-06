@@ -26,7 +26,12 @@ describe('A1.1 real API data mapping', () => {
       price: '1000000',
       accessDurationMonths: 6,
       thumbnail: null,
-      banner: null,
+      banner: {
+        id: 'banner-id',
+        mediaType: 'IMAGE',
+        mimeType: 'image/jpeg',
+        url: 'https://media.example.test/course-banner.jpg',
+      },
       introMedia: null,
       sections: [
         {
@@ -53,6 +58,7 @@ describe('A1.1 real API data mapping', () => {
 
     expect(course).toMatchObject({
       title: 'Niveau A1.1',
+      thumbnailUrl: 'https://media.example.test/course-banner.jpg',
       priceVnd: '1000000',
       accessDurationMonths: 6,
       sections: [
