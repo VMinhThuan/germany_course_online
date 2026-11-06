@@ -83,6 +83,7 @@ export interface MediaStorageAdapter {
   ): string;
   listUploadFolders?(mediaType: string): Promise<string[]>;
   signRead(input: SignMediaInput): Promise<SignedMediaUrl>;
+  signPlayback?(input: SignMediaInput): string;
   createUpload?(input: CreateUploadInput): Promise<MediaUploadInstructions>;
   headObject?(storageKey: string): Promise<UploadedObjectMetadata | null>;
   verifyUpload?(
@@ -277,6 +278,37 @@ export class CloudinaryMediaStorage implements MediaStorageAdapter {
       urlOptions,
     );
     return { url, expiresAt };
+  }
+
+  signPlayback(input: SignMediaInput): string {
+    const resourceType =
+      input.resourceType ??
+      resourceTypeForMedia(input.mediaType, input.mimeType);
+    const format = input.format ?? formatForMime(input.mimeType ?? "");
+    const folders = foldersForMedia(this.config, "FILE");
+    if (
+      input.mediaType !== "FILE" ||
+      !input.mimeType?.startsWith("video/") ||
+      resourceType !== "video" ||
+      input.deliveryType !== "authenticated" ||
+      !format ||
+      !isValidCloudinaryPublicId(input.storageKey, folders)
+    ) {
+      throw mediaUnavailable(
+        "Cloudinary playback metadata is incomplete or unsupported.",
+      );
+    }
+
+    return cloudinary.url(input.storageKey, {
+      cloud_name: this.config.cloudName,
+      api_secret: this.config.apiSecret,
+      secure: true,
+      resource_type: "video",
+      type: "authenticated",
+      format,
+      sign_url: true,
+      force_version: false,
+    });
   }
 
   async createUpload(

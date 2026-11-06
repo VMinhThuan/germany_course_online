@@ -1,9 +1,13 @@
 import { Container } from '@/shared/ui'
 import { BilingualSectionHeading } from '../components/BilingualSectionHeading'
-import { YouTubeEmbed } from '../components/YouTubeEmbed'
+import { HomepageVideoPlayer } from '../components/HomepageVideoPlayer'
 import { homepageContent } from '../content/homepage-content'
 
-export function CourseOverviewVideo() {
+export function CourseOverviewVideo({
+  videoUrl,
+}: {
+  videoUrl: string | null
+}) {
   const { courseOverview } = homepageContent
 
   return (
@@ -21,8 +25,8 @@ export function CourseOverviewVideo() {
             german={courseOverview.eyebrow}
           />
         </header>
-        <YouTubeEmbed
-          url={courseOverview.videoUrl}
+        <HomepageVideoPlayer
+          url={videoUrl}
           title={courseOverview.videoTitle}
           className="mx-auto max-w-4xl"
         />

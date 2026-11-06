@@ -104,7 +104,7 @@ paths:
         relatedCollections:
           - site_settings
           - media_assets
-        frontendOperation: No current typed settings method
+        frontendOperation: apiPublicRepository.getPublicSiteSettings
         query: none
         requestBody: none
         responseData: PublicSiteSettings
@@ -10003,9 +10003,14 @@ components:
           anyOf:
             - $ref: "#/components/schemas/PublicMedia"
             - type: "null"
+        introVideo:
+          anyOf:
+            - $ref: "#/components/schemas/PublicMedia"
+            - type: "null"
       additionalProperties: false
       required:
         - siteName
+        - introVideo
     Session:
       type: object
       properties:

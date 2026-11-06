@@ -28,8 +28,7 @@ export const homepageContent = {
   courseOverview: {
     eyebrow: 'DIE PLATTFORM ENTDECKEN',
     title: 'Khám phá cách học cùng PAniverseDeutsch.',
-    videoUrl: 'https://www.youtube.com/watch?v=L-lkjyMArwE',
-    videoTitle: 'Video giới thiệu tổng quan website PAniverseDeutsch',
+    videoTitle: 'Video giới thiệu PAniverseDeutsch',
   },
   features: {
     eyebrow: 'LERNEN AUF DEINE ART',

@@ -92,6 +92,7 @@ export interface ApiPublicSiteSettings {
   zaloUrl: string | null
   footerDescription: string
   heroMedia: ApiPublicMedia | null
+  introVideo: ApiPublicMedia | null
 }
 
 export interface ApiEnrollment {

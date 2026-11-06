@@ -118,7 +118,9 @@ export function ApiPublicLandingPage() {
           </Container>
         )}
         <CourseIntroduction />
-        <CourseOverviewVideo />
+        <CourseOverviewVideo
+          videoUrl={settings.data?.introVideo?.url ?? null}
+        />
         <LearningFeaturesGrid />
         <CoursePricingSection
           courses={catalog.data ?? []}

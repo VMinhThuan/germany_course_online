@@ -45,6 +45,9 @@ type PublicSection = {
   lessons: PublicLesson[];
 };
 
+// This single media asset is intentionally published on the public homepage.
+const HOMEPAGE_INTRO_VIDEO_ASSET_ID = "6aedaa5852b258cead709444";
+
 export class PublicCatalogService {
   constructor(private readonly mediaStorage: MediaStorageAdapter) {}
 
@@ -265,6 +268,7 @@ export class PublicCatalogService {
           uploadStatus: { $nin: ["PENDING", "DELETING", "DELETED"] },
         })
       : null;
+    const introVideo = await this.getHomepageIntroVideo();
     return {
       siteName: settings.siteName,
       logoUrl: null,
@@ -276,6 +280,44 @@ export class PublicCatalogService {
       zaloUrl: settings.zaloUrl,
       footerDescription: settings.footerDescription,
       heroMedia: heroMedia ? toPublicMedia(heroMedia) : null,
+      introVideo,
+    };
+  }
+
+  private async getHomepageIntroVideo(): Promise<PublicMediaDto | null> {
+    const asset = await MediaAsset.findOne({
+      _id: new mongoose.Types.ObjectId(HOMEPAGE_INTRO_VIDEO_ASSET_ID),
+      provider: "CLOUDINARY",
+      mediaType: "FILE",
+      mimeType: /^video\//,
+      resourceType: "video",
+      deliveryType: "authenticated",
+      deletedAt: null,
+      uploadStatus: "READY",
+    })
+      .select("+provider +storageKey +resourceType +deliveryType")
+      .lean();
+    if (!asset) return null;
+
+    const adapter = resolveMediaStorage(this.mediaStorage, asset.provider);
+    if (!adapter?.signPlayback) return null;
+    const url = adapter.signPlayback({
+      storageKey: asset.storageKey,
+      mimeType: asset.mimeType,
+      mediaType: "FILE",
+      resourceType: asset.resourceType as MediaResourceType | null,
+      deliveryType: asset.deliveryType as
+        | "upload"
+        | "private"
+        | "authenticated"
+        | null,
+      format: asset.format ?? null,
+    });
+    return {
+      id: String(asset._id),
+      mediaType: "VIDEO",
+      mimeType: asset.mimeType,
+      url,
     };
   }
 
