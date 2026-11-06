@@ -13641,6 +13641,9 @@ components:
         uploadFoldersByMediaType:
           type: object
           properties:
+            IMAGE:
+              type: array
+              items: { type: string }
             PDF:
               type: array
               items: { type: string }

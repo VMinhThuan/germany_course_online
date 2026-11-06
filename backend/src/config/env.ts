@@ -89,6 +89,20 @@ const environmentSchema = z.object({
       .regex(/^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/)
       .optional(),
   ),
+  CLOUDINARY_COURSE_BANNER_FOLDER: optionalText.pipe(
+    z
+      .string()
+      .max(230)
+      .regex(/^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/)
+      .optional(),
+  ),
+  CLOUDINARY_LESSON_AUDIO_FOLDER: optionalText.pipe(
+    z
+      .string()
+      .max(230)
+      .regex(/^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/)
+      .optional(),
+  ),
   CLOUDINARY_FOLDER_MODE: z.enum(["fixed", "dynamic"]).default("dynamic"),
 });
 
@@ -136,6 +150,8 @@ export type AppConfig = {
         apiSecret: string;
         pdfFolder: string;
         audioFolder: string;
+        courseBannerFolder: string;
+        lessonAudioFolder: string;
         folderMode: "fixed" | "dynamic";
         signedUrlTtlSeconds: number;
       }
@@ -327,12 +343,26 @@ export function parseEnvironment(
     env.MEDIA_PROVIDER ?? (anyMedia ? "S3_COMPATIBLE" : undefined);
   const cloudinaryPdfFolder = env.CLOUDINARY_PDF_FOLDER ?? "lesson-pdf";
   const cloudinaryAudioFolder = env.CLOUDINARY_AUDIO_FOLDER ?? "quiz-audio";
+  const cloudinaryCourseBannerFolder =
+    env.CLOUDINARY_COURSE_BANNER_FOLDER ?? "course-banner";
+  const cloudinaryLessonAudioFolder =
+    env.CLOUDINARY_LESSON_AUDIO_FOLDER ?? "lesson-audio";
+  const cloudinaryFolders = [
+    cloudinaryPdfFolder,
+    cloudinaryAudioFolder,
+    cloudinaryCourseBannerFolder,
+    cloudinaryLessonAudioFolder,
+  ];
   if (
     anyCloudinary &&
-    foldersOverlap(cloudinaryPdfFolder, cloudinaryAudioFolder)
+    cloudinaryFolders.some((folder, index) =>
+      cloudinaryFolders
+        .slice(index + 1)
+        .some((other) => foldersOverlap(folder, other)),
+    )
   ) {
     throw new Error(
-      "Invalid environment configuration: Cloudinary PDF and audio folders must be different",
+      "Invalid environment configuration: Cloudinary media folders must be different",
     );
   }
 
@@ -378,6 +408,8 @@ export function parseEnvironment(
           apiSecret: env.CLOUDINARY_API_SECRET!,
           pdfFolder: cloudinaryPdfFolder,
           audioFolder: cloudinaryAudioFolder,
+          courseBannerFolder: cloudinaryCourseBannerFolder,
+          lessonAudioFolder: cloudinaryLessonAudioFolder,
           folderMode: env.CLOUDINARY_FOLDER_MODE,
           signedUrlTtlSeconds: env.MEDIA_SIGNED_URL_TTL_SECONDS,
         }

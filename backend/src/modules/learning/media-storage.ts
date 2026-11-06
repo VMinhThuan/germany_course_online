@@ -241,12 +241,12 @@ export class CloudinaryMediaStorage implements MediaStorageAdapter {
     const resourceType =
       input.resourceType ?? resourceTypeForMedia(input.mediaType);
     const format = input.format ?? formatForMime(input.mimeType);
-    const folder = folderForMedia(this.config, input.mediaType);
+    const folders = foldersForMedia(this.config, input.mediaType);
     if (
       !resourceType ||
       !format ||
-      !folder ||
-      !isValidCloudinaryPublicId(input.storageKey, folder) ||
+      !folders.length ||
+      !isValidCloudinaryPublicId(input.storageKey, folders) ||
       resourceType !== resourceTypeForMedia(input.mediaType) ||
       (input.deliveryType && input.deliveryType !== "authenticated")
     ) {
@@ -280,28 +280,27 @@ export class CloudinaryMediaStorage implements MediaStorageAdapter {
   ): Promise<MediaUploadInstructions> {
     const resourceType =
       input.resourceType ?? resourceTypeForMedia(input.mediaType);
-    const configuredFolder = folderForMedia(this.config, input.mediaType);
-    const folder = input.assetFolder ?? configuredFolder;
+    const configuredFolders = foldersForMedia(this.config, input.mediaType);
+    const folder = input.assetFolder ?? configuredFolders[0];
     if (
       !resourceType ||
       resourceType !== resourceTypeForMedia(input.mediaType) ||
       !folder ||
-      !configuredFolder ||
-      !isValidCloudinaryFolder(folder, configuredFolder) ||
-      !["PDF", "AUDIO"].includes(input.mediaType ?? "")
+      !configuredFolders.length ||
+      !configuredFolders.some((root) => isValidCloudinaryFolder(folder, root))
     ) {
       throw new AppError(
         422,
         "MEDIA_TYPE_UNSUPPORTED",
-        "Cloudinary currently accepts PDF and audio uploads only.",
+        "Cloudinary does not support this media type or folder.",
       );
     }
     if (
-      !isValidCloudinaryPublicId(input.storageKey, folder) ||
+      !isValidCloudinaryPublicId(input.storageKey, [folder]) ||
       (input.deliveryType && input.deliveryType !== "authenticated")
     ) {
       throw mediaUnavailable(
-        "Cloudinary upload is limited to authenticated PDF and audio assets.",
+        "Cloudinary uploads are limited to authenticated media in configured folders.",
       );
     }
     const timestamp = Math.floor(this.now().getTime() / 1000);
@@ -337,31 +336,36 @@ export class CloudinaryMediaStorage implements MediaStorageAdapter {
   }
 
   async listUploadFolders(mediaType: string): Promise<string[]> {
-    const rootFolder = folderForMedia(this.config, mediaType);
-    if (!rootFolder) return [];
-    try {
-      const response = await cloudinary.api.sub_folders(rootFolder, {
-        ...this.apiOptions({}),
-        max_results: 500,
-      });
-      const folders = Array.isArray(response.folders)
-        ? response.folders
-            .map((folder: unknown) =>
-              folder && typeof folder === "object" && "path" in folder
-                ? (folder as { path?: unknown }).path
-                : null,
-            )
-            .filter(
-              (folder: unknown): folder is string =>
-                typeof folder === "string" &&
-                isValidCloudinaryFolder(folder, rootFolder),
-            )
-        : [];
-      return [...new Set([rootFolder, ...folders])].sort();
-    } catch {
-      // Keep the configured destination usable if folder browsing is unavailable.
-      return [rootFolder];
-    }
+    const rootFolders = foldersForMedia(this.config, mediaType);
+    if (!rootFolders.length) return [];
+    const foldersByRoot = await Promise.all(
+      rootFolders.map(async (rootFolder) => {
+        try {
+          const response = await cloudinary.api.sub_folders(rootFolder, {
+            ...this.apiOptions({}),
+            max_results: 500,
+          });
+          const folders = Array.isArray(response.folders)
+            ? response.folders
+                .map((folder: unknown) =>
+                  folder && typeof folder === "object" && "path" in folder
+                    ? (folder as { path?: unknown }).path
+                    : null,
+                )
+                .filter(
+                  (folder: unknown): folder is string =>
+                    typeof folder === "string" &&
+                    isValidCloudinaryFolder(folder, rootFolder),
+                )
+            : [];
+          return [rootFolder, ...folders];
+        } catch {
+          // Keep each configured destination usable if folder browsing is unavailable.
+          return [rootFolder];
+        }
+      }),
+    );
+    return [...new Set(foldersByRoot.flat())].sort();
   }
 
   createStorageKey(
@@ -369,17 +373,19 @@ export class CloudinaryMediaStorage implements MediaStorageAdapter {
     uniqueId: string,
     assetFolder?: string,
   ): string {
-    const rootFolder = folderForMedia(this.config, mediaType);
-    const folder = assetFolder ?? rootFolder;
+    const rootFolders = foldersForMedia(this.config, mediaType);
+    const folder = assetFolder ?? rootFolders[0];
     if (
-      !rootFolder ||
+      !rootFolders.length ||
       !folder ||
-      !isValidCloudinaryFolder(folder, rootFolder)
+      !rootFolders.some((rootFolder) =>
+        isValidCloudinaryFolder(folder, rootFolder),
+      )
     ) {
       throw new AppError(
         422,
         "MEDIA_TYPE_UNSUPPORTED",
-        "Cloudinary currently accepts PDF and audio uploads only.",
+        "Cloudinary does not support this media type or folder.",
       );
     }
     return `${folder}/${uniqueId}`;
@@ -478,8 +484,21 @@ export class CloudinaryMediaStorage implements MediaStorageAdapter {
   private resourceTypeFromKey(
     storageKey: string,
   ): MediaResourceType | undefined {
-    if (storageKey.startsWith(`${this.config.pdfFolder}/`)) return "image";
-    if (storageKey.startsWith(`${this.config.audioFolder}/`)) return "video";
+    if (
+      foldersForMedia(this.config, "PDF").some((folder) =>
+        storageKey.startsWith(`${folder}/`),
+      ) ||
+      foldersForMedia(this.config, "IMAGE").some((folder) =>
+        storageKey.startsWith(`${folder}/`),
+      )
+    )
+      return "image";
+    if (
+      foldersForMedia(this.config, "AUDIO").some((folder) =>
+        storageKey.startsWith(`${folder}/`),
+      )
+    )
+      return "video";
     return undefined;
   }
 
@@ -595,21 +614,26 @@ function cloudinaryMetadata(
 function resourceTypeForMedia(
   mediaType?: string,
 ): MediaResourceType | undefined {
-  if (mediaType === "PDF") return "image";
+  if (mediaType === "PDF" || mediaType === "IMAGE") return "image";
   if (mediaType === "AUDIO") return "video";
   return undefined;
 }
 
-function folderForMedia(
+function foldersForMedia(
   config: NonNullable<AppConfig["cloudinaryMedia"]>,
   mediaType?: string,
-): string | undefined {
-  if (mediaType === "PDF") return config.pdfFolder;
-  if (mediaType === "AUDIO") return config.audioFolder;
-  return undefined;
+): string[] {
+  if (mediaType === "IMAGE") return [config.courseBannerFolder];
+  if (mediaType === "PDF") return [config.pdfFolder];
+  if (mediaType === "AUDIO")
+    return [...new Set([config.audioFolder, config.lessonAudioFolder])];
+  return [];
 }
 
 function formatForMime(mimeType: string): string | undefined {
+  if (mimeType === "image/jpeg") return "jpg";
+  if (mimeType === "image/png") return "png";
+  if (mimeType === "image/webp") return "webp";
   if (mimeType === "application/pdf") return "pdf";
   if (mimeType === "audio/mpeg") return "mp3";
   if (mimeType === "audio/mp4") return "m4a";
@@ -619,6 +643,9 @@ function formatForMime(mimeType: string): string | undefined {
 }
 
 function mimeForFormat(format: string): string | null {
+  if (["jpg", "jpeg"].includes(format)) return "image/jpeg";
+  if (format === "png") return "image/png";
+  if (format === "webp") return "image/webp";
   if (format === "pdf") return "application/pdf";
   if (["mp3", "mpeg"].includes(format)) return "audio/mpeg";
   if (["m4a", "mp4"].includes(format)) return "audio/mp4";
@@ -634,6 +661,9 @@ function formatMatchesMedia(
 ): boolean {
   if (!format) return false;
   return (
+    (mediaType === "IMAGE" &&
+      ["image/jpeg", "image/png", "image/webp"].includes(mimeType) &&
+      mimeForFormat(format) === mimeType) ||
     (mediaType === "PDF" &&
       mimeType === "application/pdf" &&
       format === "pdf") ||
@@ -668,13 +698,13 @@ function validateStorageKey(storageKey: string): void {
 
 function isValidCloudinaryPublicId(
   storageKey: string,
-  folder: string,
+  folders: readonly string[],
 ): boolean {
   return (
     typeof storageKey === "string" &&
     storageKey.length <= 255 &&
     /^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/.test(storageKey) &&
-    storageKey.startsWith(`${folder}/`)
+    folders.some((folder) => storageKey.startsWith(`${folder}/`))
   );
 }
 

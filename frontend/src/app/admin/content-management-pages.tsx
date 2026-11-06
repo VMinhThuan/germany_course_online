@@ -39,10 +39,11 @@ import {
   useStableIdempotencyKey,
 } from './shared'
 import {
-  AdminExercisePdfPicker,
-  uploadAndAttachExercisePdf,
-  type ExercisePdfSelection,
-} from './media-exercise-manager'
+  AdminExerciseMediaPicker,
+  uploadAndAttachExerciseMedia,
+  type ExerciseMediaSelection,
+} from './exercise-media-manager'
+import { CourseBannerField, uploadCourseBanner } from './course-banner-field'
 
 function coursePath(courseId: string) {
   return `/admin/courses/${encodeURIComponent(courseId)}`
@@ -698,8 +699,8 @@ export function AdminExercisesPage() {
   const [title, setTitle] = useState('')
   const [instructions, setInstructions] = useState('')
   const [exerciseType, setExerciseType] = useState<'FILE_BASED' | 'QUIZ'>('FILE_BASED')
-  const [pdf, setPdf] = useState<ExercisePdfSelection | null>(null)
-  const [pdfProgress, setPdfProgress] = useState<number | null>(null)
+  const [mediaSelections, setMediaSelections] = useState<ExerciseMediaSelection[]>([])
+  const [mediaProgress, setMediaProgress] = useState<number | null>(null)
   const [isSavingExercise, setIsSavingExercise] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [validation, setValidation] = useState('')
@@ -747,16 +748,16 @@ export function AdminExercisesPage() {
         key: idempotency.get(input),
       })
       idempotency.clear()
-      if (exercise.exerciseType === 'FILE_BASED' && pdf) {
+      if (mediaSelections.length > 0) {
         try {
-          await uploadAndAttachExercisePdf(exercise.id, pdf, setPdfProgress)
-          notifications.success('Đã tạo bài tập và gắn PDF.')
+          await uploadAndAttachExerciseMedia(exercise.id, mediaSelections, setMediaProgress)
+          notifications.success('Đã tạo bài tập và gắn tệp.')
         } catch (error) {
           notifications.error(
-            'Bài tập đã tạo nhưng chưa gắn được PDF',
+            'Bài tập đã tạo nhưng chưa gắn được tệp',
             error instanceof Error
               ? `${error.message} Bạn có thể mở bài tập để thử lại.`
-              : 'Mở bài tập để thử tải hoặc chọn PDF lại.',
+              : 'Mở bài tập để thử tải hoặc chọn tệp lại.',
           )
         }
       } else {
@@ -764,7 +765,7 @@ export function AdminExercisesPage() {
       }
       setTitle('')
       setInstructions('')
-      setPdf(null)
+      setMediaSelections([])
       setCourseId('')
       setSectionId('')
       setLessonId('')
@@ -943,7 +944,7 @@ export function AdminExercisesPage() {
             <Button
               type="submit"
               form="admin-create-exercise"
-              loading={isSavingExercise || create.isPending || pdfProgress !== null}
+              loading={isSavingExercise || create.isPending || mediaProgress !== null}
             >
               Tạo bài tập
             </Button>
@@ -1028,7 +1029,6 @@ export function AdminExercisesPage() {
               value={exerciseType}
               onChange={(value) => {
                 setExerciseType(value as typeof exerciseType)
-                if (value === 'QUIZ') setPdf(null)
               }}
               options={[
                 { value: 'FILE_BASED', label: 'Bài tập PDF' },
@@ -1044,17 +1044,15 @@ export function AdminExercisesPage() {
             required
             placeholder="Ví dụ: Mở tệp, hoàn thành bài rồi đánh dấu đã làm."
           />
-          {exerciseType === 'FILE_BASED' && (
-            <AdminExercisePdfPicker
-              value={pdf}
-              onChange={setPdf}
-              disabled={isSavingExercise || pdfProgress !== null}
-            />
-          )}
-          {pdfProgress !== null && (
+          <AdminExerciseMediaPicker
+            value={mediaSelections}
+            onChange={setMediaSelections}
+            disabled={isSavingExercise || mediaProgress !== null}
+          />
+          {mediaProgress !== null && (
             <div className="rounded-xl bg-surface-muted p-3 text-sm" role="status">
-              <p>Đang tải PDF lên {pdfProgress}%</p>
-              <progress className="mt-2 block w-full" value={pdfProgress} max={100} />
+              <p>Đang tải tệp lên {mediaProgress}%</p>
+              <progress className="mt-2 block w-full" value={mediaProgress} max={100} />
             </div>
           )}
           {validation && (
@@ -1154,8 +1152,8 @@ export function AdminLessonCreatePage() {
   const [newExercise, setNewExercise] = useState('')
   const [newExerciseInstructions, setNewExerciseInstructions] = useState('')
   const [exerciseType, setExerciseType] = useState<'FILE_BASED' | 'QUIZ'>('FILE_BASED')
-  const [exercisePdf, setExercisePdf] = useState<ExercisePdfSelection | null>(null)
-  const [exercisePdfProgress, setExercisePdfProgress] = useState<number | null>(null)
+  const [exerciseMedia, setExerciseMedia] = useState<ExerciseMediaSelection[]>([])
+  const [exerciseMediaProgress, setExerciseMediaProgress] = useState<number | null>(null)
   const [validation, setValidation] = useState('')
 
   useEffect(() => {
@@ -1230,16 +1228,20 @@ export function AdminLessonCreatePage() {
             key: idempotency.get(exerciseInput),
           })
           idempotency.clear()
-          if (exercise.exerciseType === 'FILE_BASED' && exercisePdf) {
+          if (exerciseMedia.length > 0) {
             try {
-              await uploadAndAttachExercisePdf(exercise.id, exercisePdf, setExercisePdfProgress)
-              notifications.success('Đã tạo bài tập và gắn PDF.')
+              await uploadAndAttachExerciseMedia(
+                exercise.id,
+                exerciseMedia,
+                setExerciseMediaProgress,
+              )
+              notifications.success('Đã tạo bài tập và gắn tệp.')
             } catch (error) {
               notifications.error(
-                'Bài học đã tạo nhưng PDF chưa gắn được',
+                'Bài học đã tạo nhưng chưa gắn được tệp',
                 error instanceof Error
                   ? `${error.message} Bạn có thể mở bài học để thử lại.`
-                  : 'Mở bài học để thử tải hoặc chọn PDF lại.',
+                  : 'Mở bài học để thử tải hoặc chọn tệp lại.',
               )
             }
           } else {
@@ -1372,7 +1374,6 @@ export function AdminLessonCreatePage() {
                 value={exerciseType}
                 onChange={(value) => {
                   setExerciseType(value as typeof exerciseType)
-                  if (value === 'QUIZ') setExercisePdf(null)
                 }}
                 options={[
                   { value: 'FILE_BASED', label: 'Bài tập PDF' },
@@ -1387,19 +1388,17 @@ export function AdminLessonCreatePage() {
               rows={2}
               placeholder="Nêu rõ học viên cần làm gì"
             />
-            {exerciseType === 'FILE_BASED' && (
-              <AdminExercisePdfPicker
-                value={exercisePdf}
-                onChange={setExercisePdf}
-                disabled={
-                  create.isPending || createExercise.isPending || exercisePdfProgress !== null
-                }
-              />
-            )}
-            {exercisePdfProgress !== null && (
+            <AdminExerciseMediaPicker
+              value={exerciseMedia}
+              onChange={setExerciseMedia}
+              disabled={
+                create.isPending || createExercise.isPending || exerciseMediaProgress !== null
+              }
+            />
+            {exerciseMediaProgress !== null && (
               <div className="rounded-xl bg-surface-muted p-3 text-sm" role="status">
-                <p>Đang tải PDF lên {exercisePdfProgress}%</p>
-                <progress className="mt-2 block w-full" value={exercisePdfProgress} max={100} />
+                <p>Đang tải tệp lên {exerciseMediaProgress}%</p>
+                <progress className="mt-2 block w-full" value={exerciseMediaProgress} max={100} />
               </div>
             )}
           </div>
@@ -1480,7 +1479,7 @@ export function AdminLessonCreatePage() {
           <AdminFeedback error={create.error} />
           <Button
             type="submit"
-            loading={create.isPending || createExercise.isPending || exercisePdfProgress !== null}
+            loading={create.isPending || createExercise.isPending || exerciseMediaProgress !== null}
             startIcon={<Plus aria-hidden="true" className="size-4" />}
           >
             Tạo bài học
@@ -1537,8 +1536,8 @@ export function AdminLessonDetailPage({
   const [newExercise, setNewExercise] = useState('')
   const [newExerciseInstructions, setNewExerciseInstructions] = useState('')
   const [exerciseType, setExerciseType] = useState<'FILE_BASED' | 'QUIZ'>('FILE_BASED')
-  const [exercisePdf, setExercisePdf] = useState<ExercisePdfSelection | null>(null)
-  const [exercisePdfProgress, setExercisePdfProgress] = useState<number | null>(null)
+  const [exerciseMedia, setExerciseMedia] = useState<ExerciseMediaSelection[]>([])
+  const [exerciseMediaProgress, setExerciseMediaProgress] = useState<number | null>(null)
   const [isAddingExercise, setIsAddingExercise] = useState(false)
   const [exerciseError, setExerciseError] = useState('')
   const [validation, setValidation] = useState('')
@@ -1645,7 +1644,7 @@ export function AdminLessonDetailPage({
       completionMode: exerciseType === 'QUIZ' ? 'QUIZ_SUBMISSION' : 'MANUAL',
       isRequired: true,
       sortOrder: exercises.data?.length ?? 0,
-      status: exerciseType === 'QUIZ' ? 'DRAFT' : 'PUBLISHED',
+      status: 'PUBLISHED',
     }
     setIsAddingExercise(true)
     try {
@@ -1656,22 +1655,25 @@ export function AdminLessonDetailPage({
       idempotency.clear()
       setNewExercise('')
       setNewExerciseInstructions('')
-      if (exercise.exerciseType === 'FILE_BASED' && exercisePdf) {
+      if (exerciseMedia.length > 0) {
         try {
-          await uploadAndAttachExercisePdf(exercise.id, exercisePdf, setExercisePdfProgress)
-          notifications.success('Đã tạo bài tập và gắn PDF.')
+          await uploadAndAttachExerciseMedia(exercise.id, exerciseMedia, setExerciseMediaProgress)
+          notifications.success('Đã tạo bài tập và gắn tệp.')
         } catch (error) {
           setExerciseError(
             error instanceof Error
-              ? `Bài tập đã được tạo nhưng PDF chưa gắn được. ${error.message} Hãy mở bài tập để thử lại.`
-              : 'Bài tập đã được tạo nhưng PDF chưa gắn được. Hãy mở bài tập để thử lại.',
+              ? `Bài tập đã được tạo nhưng chưa gắn hết tệp. ${error.message} Hãy mở bài tập để thử lại.`
+              : 'Bài tập đã được tạo nhưng chưa gắn hết tệp. Hãy mở bài tập để thử lại.',
           )
-          notifications.error('Chưa gắn được PDF', 'Bài tập đã tạo. Mở phần chỉnh sửa để thử lại.')
+          notifications.error(
+            'Chưa gắn được hết tệp',
+            'Bài tập đã tạo. Mở phần chỉnh sửa để thử lại.',
+          )
         }
       } else {
         notifications.success('Đã tạo bài tập.')
       }
-      if (exercise.exerciseType === 'FILE_BASED') setExercisePdf(null)
+      setExerciseMedia([])
       if (exercise.exerciseType === 'QUIZ')
         navigate(exercisePath(courseId, sectionId, lessonId, exercise.id))
     } catch {
@@ -1795,7 +1797,6 @@ export function AdminLessonDetailPage({
                 onChange={(value) => {
                   setExerciseType(value as typeof exerciseType)
                   setExerciseError('')
-                  if (value === 'QUIZ') setExercisePdf(null)
                 }}
                 options={[
                   { value: 'FILE_BASED', label: 'Bài tập PDF' },
@@ -1815,19 +1816,17 @@ export function AdminLessonDetailPage({
                 ? 'Bài tập PDF sẽ hiển thị ngay sau khi được tạo.'
                 : 'Bài trắc nghiệm sẽ hiển thị sau khi hoàn thiện câu hỏi.'}
             </p>
-            {exerciseType === 'FILE_BASED' && (
-              <AdminExercisePdfPicker
-                value={exercisePdf}
-                onChange={setExercisePdf}
-                disabled={
-                  isAddingExercise || createExercise.isPending || exercisePdfProgress !== null
-                }
-              />
-            )}
-            {exercisePdfProgress !== null && (
+            <AdminExerciseMediaPicker
+              value={exerciseMedia}
+              onChange={setExerciseMedia}
+              disabled={
+                isAddingExercise || createExercise.isPending || exerciseMediaProgress !== null
+              }
+            />
+            {exerciseMediaProgress !== null && (
               <div className="rounded-xl bg-surface-muted p-3 text-sm" role="status">
-                <p>Đang tải PDF lên {exercisePdfProgress}%</p>
-                <progress className="mt-2 block w-full" value={exercisePdfProgress} max={100} />
+                <p>Đang tải tệp lên {exerciseMediaProgress}%</p>
+                <progress className="mt-2 block w-full" value={exerciseMediaProgress} max={100} />
               </div>
             )}
             {exerciseError && (
@@ -1841,7 +1840,9 @@ export function AdminLessonDetailPage({
             <AdminFeedback error={createExercise.error} />
             <Button
               type="button"
-              loading={isAddingExercise || createExercise.isPending || exercisePdfProgress !== null}
+              loading={
+                isAddingExercise || createExercise.isPending || exerciseMediaProgress !== null
+              }
               onClick={() => void addExercise()}
               startIcon={<Plus aria-hidden="true" className="size-4" />}
             >
@@ -1960,6 +1961,8 @@ export function AdminCourseEditorPage({ courseId }: { courseId: string }) {
   const remove = useAdminMutation(() => adminRepository.deleteCourse(courseId))
   const [form, setForm] = useState<Partial<ApiAdminCourse>>({})
   const [success, setSuccess] = useState('')
+  const [bannerFile, setBannerFile] = useState<File | null>(null)
+  const [bannerProgress, setBannerProgress] = useState<number | null>(null)
 
   useEffect(() => {
     if (!course.data) return
@@ -1981,7 +1984,10 @@ export function AdminCourseEditorPage({ courseId }: { courseId: string }) {
   async function save(event: FormEvent) {
     event.preventDefault()
     setSuccess('')
+    let uploadedBannerAssetId: string | undefined
     try {
+      if (bannerFile)
+        uploadedBannerAssetId = await uploadCourseBanner(bannerFile, setBannerProgress)
       await update.mutateAsync({
         code: form.code,
         title: form.title,
@@ -1993,10 +1999,18 @@ export function AdminCourseEditorPage({ courseId }: { courseId: string }) {
         price: form.price,
         accessDurationMonths: form.accessDurationMonths,
         sortOrder: form.sortOrder,
+        bannerAssetId: uploadedBannerAssetId ?? form.bannerAssetId ?? null,
       })
+      if (uploadedBannerAssetId)
+        setForm((old) => ({ ...old, bannerAssetId: uploadedBannerAssetId! }))
+      setBannerFile(null)
       setSuccess('Đã lưu thông tin khóa học.')
     } catch {
+      if (uploadedBannerAssetId)
+        await adminRepository.deleteMedia(uploadedBannerAssetId).catch(() => undefined)
       /* Error is shown below the form. */
+    } finally {
+      setBannerProgress(null)
     }
   }
 
@@ -2133,11 +2147,20 @@ export function AdminCourseEditorPage({ courseId }: { courseId: string }) {
             }
             rows={3}
           />
-          <p className="rounded-xl bg-surface-muted p-3 text-sm leading-6 text-ink-secondary">
-            Ảnh bìa khóa học sẽ được thêm sau khi hoàn tất cách lưu ảnh.
-          </p>
+          <CourseBannerField
+            assetId={form.bannerAssetId}
+            file={bannerFile}
+            onFileChange={setBannerFile}
+            disabled={update.isPending || bannerProgress !== null}
+          />
+          {bannerProgress !== null && (
+            <div role="status" className="rounded-xl bg-surface-muted p-3 text-sm">
+              Đang tải ảnh bìa lên {bannerProgress}%
+              <progress className="mt-2 block w-full" value={bannerProgress} max={100} />
+            </div>
+          )}
           <AdminFeedback error={update.error} success={success} />
-          <Button type="submit" loading={update.isPending}>
+          <Button type="submit" loading={update.isPending || bannerProgress !== null}>
             Lưu thay đổi
           </Button>
         </form>

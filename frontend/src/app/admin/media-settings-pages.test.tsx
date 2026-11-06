@@ -76,10 +76,11 @@ describe('admin media library', () => {
   beforeEach(() => {
     vi.mocked(adminRepository.getMediaCapabilities).mockResolvedValue({
       activeProvider: 'CLOUDINARY',
-      supportedMediaTypes: ['PDF', 'AUDIO'],
+      supportedMediaTypes: ['IMAGE', 'PDF', 'AUDIO'],
       uploadFoldersByMediaType: {
+        IMAGE: ['course-banner'],
         PDF: ['lesson-pdf', 'lesson-pdf/lektion-1'],
-        AUDIO: ['quiz-audio'],
+        AUDIO: ['quiz-audio', 'lesson-audio'],
       },
     })
     vi.mocked(adminRepository.getMediaDetail).mockResolvedValue({
@@ -107,7 +108,7 @@ describe('admin media library', () => {
     renderMediaPage()
 
     await screen.findByLabelText('Tìm kiếm')
-    await user.selectOptions(screen.getByLabelText('Nơi lưu'), 'CLOUDINARY')
+    await user.selectOptions(screen.getByLabelText('Dịch vụ lưu trữ'), 'CLOUDINARY')
     await user.selectOptions(screen.getByLabelText('Tình trạng'), 'READY')
     await user.type(screen.getByLabelText('Tìm kiếm'), 'lesson')
 
@@ -135,7 +136,7 @@ describe('admin media library', () => {
       name: 'audio',
       file: () => new File(['mock audio'], 'question.mp3', { type: 'audio/mpeg' }),
       mediaType: 'AUDIO',
-      assetFolder: 'quiz-audio',
+      assetFolder: 'lesson-audio',
     },
   ])(
     'uploads a supported $name through the signed provider intent',
@@ -146,10 +147,11 @@ describe('admin media library', () => {
 
       await screen.findByLabelText('Tìm kiếm')
       await user.click(screen.getByRole('button', { name: 'Tải tệp lên' }))
+      const dialog = await screen.findByRole('dialog', { name: 'Tải tệp lên thư viện' })
+      await user.selectOptions(within(dialog).getByLabelText('Thư mục lưu'), assetFolder)
       await user.upload(screen.getByLabelText('Tệp'), selectedFile)
       const fileInput = screen.getByLabelText('Tệp') as HTMLInputElement
       expect(fileInput.files?.[0]?.name).toBe(selectedFile.name)
-      await user.selectOptions(screen.getByLabelText('Thư mục lưu'), assetFolder)
       fireEvent.submit(document.getElementById('admin-media-upload')!)
       await waitFor(() => expect(adminRepository.createUploadIntent).toHaveBeenCalled())
 
@@ -215,9 +217,7 @@ describe('admin media library', () => {
     expect(secondDeleteButton).toBeEnabled()
 
     finishDelete?.()
-    await waitFor(() =>
-      expect(firstDeleteButton).not.toHaveAttribute('aria-busy'),
-    )
+    await waitFor(() => expect(firstDeleteButton).not.toHaveAttribute('aria-busy'))
   })
 
   it('rejects a file whose MIME type does not match its extension before creating an intent', async () => {
@@ -226,15 +226,13 @@ describe('admin media library', () => {
 
     await screen.findByLabelText('Tìm kiếm')
     await user.click(screen.getByRole('button', { name: 'Tải tệp lên' }))
-    await user.upload(
-      screen.getByLabelText('Tệp'),
-      new File(['not a pdf'], 'lesson.pdf', { type: 'text/plain' }),
-    )
-    fireEvent.submit(document.getElementById('admin-media-upload')!)
+    const dialog = await screen.findByRole('dialog', { name: 'Tải tệp lên thư viện' })
+    await user.selectOptions(within(dialog).getByLabelText('Thư mục lưu'), 'lesson-pdf')
+    fireEvent.change(screen.getByLabelText('Tệp'), {
+      target: { files: [new File(['not a pdf'], 'lesson.pdf', { type: 'text/plain' })] },
+    })
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Tệp không đúng định dạng hoặc vượt quá dung lượng cho phép',
-    )
+    expect(await screen.findByRole('alert')).toHaveTextContent('Chọn tệp PDF đúng định dạng.')
     expect(adminRepository.createUploadIntent).not.toHaveBeenCalled()
   })
 })

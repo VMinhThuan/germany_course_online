@@ -11,13 +11,15 @@ CLOUDINARY_API_KEY=
 CLOUDINARY_API_SECRET=
 CLOUDINARY_PDF_FOLDER=lesson-pdf
 CLOUDINARY_AUDIO_FOLDER=quiz-audio
+CLOUDINARY_COURSE_BANNER_FOLDER=course-banner
+CLOUDINARY_LESSON_AUDIO_FOLDER=lesson-audio
 CLOUDINARY_FOLDER_MODE=dynamic
 MEDIA_SIGNED_URL_TTL_SECONDS=300
 ```
 
 All three Cloudinary account values are required together. `MEDIA_PROVIDER=CLOUDINARY` requires them. `MEDIA_PROVIDER=S3_COMPATIBLE` continues to require the complete `MEDIA_S3_*` group. Both adapters may be configured so older rows can still be resolved, but only one provider accepts new uploads.
 
-Folders accept slash-separated ASCII letters, digits, `_`, and `-`, and PDF/audio folder paths must not overlap. The application defaults to `dynamic`, which is the default for newly created Cloudinary product environments; set `fixed` only when the account's folder mode is fixed. In Dynamic Folders, `asset_folder` is separate from the stable `public_id`. Confirm the account's mode in Cloudinary before the first upload.
+Folders accept slash-separated ASCII letters, digits, `_`, and `-`, and configured media folder paths must not overlap. The application defaults to `dynamic`, which is the default for newly created Cloudinary product environments; set `fixed` only when the account's folder mode is fixed. In Dynamic Folders, `asset_folder` is separate from the stable `public_id`. Confirm the account's mode in Cloudinary before the first upload.
 
 ## Migration-only target account
 

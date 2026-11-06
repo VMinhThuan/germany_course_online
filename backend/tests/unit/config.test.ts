@@ -208,6 +208,8 @@ describe("parseEnvironment", () => {
         cloudName: "cloud-test-123",
         pdfFolder: "lesson-pdf",
         audioFolder: "quiz-audio",
+        courseBannerFolder: "course-banner",
+        lessonAudioFolder: "lesson-audio",
         folderMode: "dynamic",
       },
     });
@@ -238,6 +240,20 @@ describe("parseEnvironment", () => {
         ...baseEnv,
         ...cloudinary,
         CLOUDINARY_AUDIO_FOLDER: "lesson-pdf/audio",
+      }),
+    ).toThrow(/folders must be different/);
+    expect(() =>
+      parseEnvironment({
+        ...baseEnv,
+        ...cloudinary,
+        CLOUDINARY_COURSE_BANNER_FOLDER: "lesson-pdf",
+      }),
+    ).toThrow(/folders must be different/);
+    expect(() =>
+      parseEnvironment({
+        ...baseEnv,
+        ...cloudinary,
+        CLOUDINARY_LESSON_AUDIO_FOLDER: "quiz-audio/lesson",
       }),
     ).toThrow(/folders must be different/);
   });

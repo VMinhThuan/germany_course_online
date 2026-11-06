@@ -196,7 +196,12 @@ describe('course content management', () => {
     vi.mocked(adminRepository.createExercise).mockResolvedValue(exercise)
     vi.mocked(adminRepository.getMediaCapabilities).mockResolvedValue({
       activeProvider: 'CLOUDINARY',
-      supportedMediaTypes: ['PDF'],
+      supportedMediaTypes: ['IMAGE', 'PDF', 'AUDIO'],
+      uploadFoldersByMediaType: {
+        IMAGE: ['course-banner'],
+        PDF: ['lesson-pdf'],
+        AUDIO: ['quiz-audio', 'lesson-audio'],
+      },
     })
     vi.mocked(adminRepository.listMedia).mockResolvedValue(page([pdf]))
     vi.mocked(adminRepository.createUploadIntent).mockResolvedValue({
@@ -330,18 +335,19 @@ describe('course content management', () => {
     await user.type(screen.getByLabelText('Tên bài tập'), 'Arbeitsblatt mới')
     await user.type(screen.getByLabelText('Hướng dẫn cho học viên'), 'Mở PDF và làm bài.')
     const file = new File(['%PDF-1.4'], 'neu.pdf', { type: 'application/pdf' })
-    await user.upload(screen.getByLabelText('Tệp PDF (tối đa 40 MB)'), file)
+    await user.upload(screen.getByLabelText('Tệp bài tập'), file)
     await user.click(screen.getByRole('button', { name: 'Tạo bài tập' }))
 
     await waitFor(() =>
       expect(adminRepository.createUploadIntent).toHaveBeenCalledWith(
-        {
+        expect.objectContaining({
           originalName: 'neu.pdf',
           mediaType: 'PDF',
           mimeType: 'application/pdf',
           fileSize: file.size,
           visibility: 'ENROLLED',
-        },
+          assetFolder: 'lesson-pdf',
+        }),
         expect.any(AbortSignal),
       ),
     )
@@ -360,7 +366,7 @@ describe('course content management', () => {
 
     await user.type(screen.getByLabelText('Tên bài tập'), 'Arbeitsblatt mới')
     await user.type(screen.getByLabelText('Hướng dẫn cho học viên'), 'Mở PDF và làm bài.')
-    await user.click(screen.getByRole('button', { name: 'Chọn PDF có sẵn' }))
+    await user.click(screen.getByRole('button', { name: 'Chọn tệp có sẵn' }))
     await user.click(await screen.findByRole('button', { name: /arbeitsblatt\.pdf/ }))
     await user.click(screen.getByRole('button', { name: 'Tạo bài tập' }))
 

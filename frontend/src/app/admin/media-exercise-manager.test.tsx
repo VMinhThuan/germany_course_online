@@ -6,7 +6,7 @@ import { adminRepository } from '@/data/api/admin-repository'
 import type { ApiAdminExercise, ApiAdminMediaAsset, ApiAssetAssociation } from '@/lib/api/types'
 import { DialogProvider } from '@/shared/ui/dialogs'
 import { NotificationProvider } from '@/shared/ui/notifications'
-import { AdminExercisePdfManager } from './media-exercise-manager'
+import { AdminExerciseMediaManager } from './exercise-media-manager'
 
 vi.mock('@/data/api/admin-repository', () => ({
   adminRepository: {
@@ -72,19 +72,24 @@ function renderManager(exercises: readonly ApiAdminExercise[] = [exercise]) {
     <NotificationProvider>
       <DialogProvider>
         <QueryClientProvider client={queryClient}>
-          <AdminExercisePdfManager exercises={exercises} />
+          <AdminExerciseMediaManager exercises={exercises} />
         </QueryClientProvider>
       </DialogProvider>
     </NotificationProvider>,
   )
 }
 
-describe('AdminExercisePdfManager', () => {
+describe('AdminExerciseMediaManager', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(adminRepository.getMediaCapabilities).mockResolvedValue({
       activeProvider: 'CLOUDINARY',
-      supportedMediaTypes: ['PDF'],
+      supportedMediaTypes: ['IMAGE', 'PDF', 'AUDIO'],
+      uploadFoldersByMediaType: {
+        IMAGE: ['course-banner'],
+        PDF: ['lesson-pdf'],
+        AUDIO: ['quiz-audio', 'lesson-audio'],
+      },
     })
     vi.mocked(adminRepository.listMedia).mockResolvedValue({
       items: [pdf],
@@ -126,37 +131,19 @@ describe('AdminExercisePdfManager', () => {
     })
   })
 
-  it('explains where to add a PDF when no file exercise exists yet', async () => {
-    const user = userEvent.setup()
+  it('asks the admin to create an exercise before attaching files', async () => {
     renderManager([])
 
-    expect(await screen.findByText('Chưa có bài tập PDF')).toBeVisible()
-    expect(screen.getByText(/Bạn vẫn có thể tải PDF vào thư viện/)).toBeVisible()
-    await user.click(screen.getByRole('button', { name: 'Tải PDF lên thư viện' }))
-    expect(screen.getByLabelText('Tệp PDF')).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Tải PDF lên thư viện tệp' })).toBeVisible()
-    expect(screen.queryByRole('button', { name: 'Tạo bài tập FILE_BASED' })).not.toBeInTheDocument()
-  })
-
-  it('stores a PDF in the media library before an exercise exists', async () => {
-    const user = userEvent.setup()
-    renderManager([])
-    const file = new File(['%PDF'], 'neu.pdf', { type: 'application/pdf' })
-
-    await user.click(await screen.findByRole('button', { name: 'Tải PDF lên thư viện' }))
-    await user.upload(screen.getByLabelText('Tệp PDF'), file)
-    await user.click(screen.getByRole('button', { name: 'Tải PDF lên thư viện tệp' }))
-
-    expect(await screen.findByText('Đã tải PDF lên thư viện tệp.')).toBeVisible()
-    expect(adminRepository.completeUpload).toHaveBeenCalledWith('upload-1')
-    expect(adminRepository.linkExerciseAsset).not.toHaveBeenCalled()
+    expect(await screen.findByText('Chưa có bài tập')).toBeVisible()
+    expect(screen.getByText('Tạo bài tập trước để thêm tệp đính kèm.')).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Thêm tệp' })).not.toBeInTheDocument()
   })
 
   it('attaches an existing Cloudinary PDF to the selected file exercise', async () => {
     const user = userEvent.setup()
     renderManager()
 
-    await user.click(await screen.findByRole('button', { name: 'Thay đổi tệp' }))
+    await user.click(await screen.findByRole('button', { name: 'Thêm tệp' }))
     await user.click(screen.getByRole('button', { name: 'Chọn tệp có sẵn' }))
     await user.click(await screen.findByRole('button', { name: 'Gắn' }))
 
@@ -169,32 +156,95 @@ describe('AdminExercisePdfManager', () => {
     )
   })
 
-  it('uploads a local PDF through the verified media flow and attaches it to the exercise', async () => {
+  it('uploads and attaches multiple PDFs without replacing existing exercise media', async () => {
     const user = userEvent.setup()
     renderManager()
-    const file = new File(['%PDF'], 'neu.pdf', { type: 'application/pdf' })
+    const firstFile = new File(['%PDF first'], 'neu.pdf', { type: 'application/pdf' })
+    const secondFile = new File(['%PDF second'], 'noch-eins.pdf', { type: 'application/pdf' })
+    vi.mocked(adminRepository.createUploadIntent)
+      .mockResolvedValueOnce({
+        assetId: 'upload-1',
+        provider: 'CLOUDINARY',
+        uploadUrl: 'https://api.cloudinary.com/v1_1/test/image/upload',
+        uploadMethod: 'POST',
+        uploadHeaders: {},
+        uploadFields: { api_key: 'local-test-key', signature: 'local-test-signature' },
+        expiresAt: '2026-11-05T01:00:00.000Z',
+      })
+      .mockResolvedValueOnce({
+        assetId: 'upload-2',
+        provider: 'CLOUDINARY',
+        uploadUrl: 'https://api.cloudinary.com/v1_1/test/image/upload',
+        uploadMethod: 'POST',
+        uploadHeaders: {},
+        uploadFields: { api_key: 'local-test-key', signature: 'local-test-signature' },
+        expiresAt: '2026-11-05T01:00:00.000Z',
+      })
 
-    await user.click(await screen.findByRole('button', { name: 'Thay đổi tệp' }))
-    await user.upload(screen.getByLabelText('Tệp PDF'), file)
-    await user.click(screen.getByRole('button', { name: 'Tải lên và gắn PDF' }))
+    await user.click(await screen.findByRole('button', { name: 'Thêm tệp' }))
+    await user.upload(screen.getByLabelText('Tệp tải lên'), [firstFile, secondFile])
+    await user.click(screen.getByRole('button', { name: 'Tải lên và gắn 2 tệp' }))
+
+    await waitFor(() => expect(adminRepository.linkExerciseAsset).toHaveBeenCalledTimes(2))
+    expect(adminRepository.createUploadIntent).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        originalName: 'neu.pdf',
+        mediaType: 'PDF',
+        mimeType: 'application/pdf',
+        fileSize: firstFile.size,
+        visibility: 'ENROLLED',
+        assetFolder: 'lesson-pdf',
+      }),
+      expect.any(AbortSignal),
+    )
+    expect(adminRepository.createUploadIntent).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        originalName: 'noch-eins.pdf',
+        mediaType: 'PDF',
+        assetFolder: 'lesson-pdf',
+      }),
+      expect.any(AbortSignal),
+    )
+    expect(adminRepository.completeUpload).toHaveBeenNthCalledWith(1, 'upload-1')
+    expect(adminRepository.completeUpload).toHaveBeenNthCalledWith(2, 'upload-2')
+    expect(adminRepository.linkExerciseAsset).toHaveBeenNthCalledWith(1, 'exercise-1', 'upload-1', {
+      assetRole: 'QUESTION_PDF',
+      title: 'neu.pdf',
+      sortOrder: 0,
+    })
+    expect(adminRepository.linkExerciseAsset).toHaveBeenNthCalledWith(2, 'exercise-1', 'upload-2', {
+      assetRole: 'QUESTION_PDF',
+      title: 'noch-eins.pdf',
+      sortOrder: 1,
+    })
+  })
+
+  it('stores exercise audio in the lesson-audio folder', async () => {
+    const user = userEvent.setup()
+    renderManager()
+    const file = new File(['mock audio'], 'dialog.mp3', { type: 'audio/mpeg' })
+
+    await user.click(await screen.findByRole('button', { name: 'Thêm tệp' }))
+    await user.selectOptions(screen.getByLabelText('Loại tệp'), 'QUESTION_AUDIO')
+    await user.upload(screen.getByLabelText('Tệp tải lên'), file)
+    await user.click(screen.getByRole('button', { name: 'Tải lên và gắn 1 tệp' }))
 
     await waitFor(() =>
       expect(adminRepository.createUploadIntent).toHaveBeenCalledWith(
-        {
-          originalName: 'neu.pdf',
-          mediaType: 'PDF',
-          mimeType: 'application/pdf',
-          fileSize: file.size,
-          visibility: 'ENROLLED',
-        },
+        expect.objectContaining({
+          originalName: 'dialog.mp3',
+          mediaType: 'AUDIO',
+          mimeType: 'audio/mpeg',
+          assetFolder: 'lesson-audio',
+        }),
         expect.any(AbortSignal),
       ),
     )
-    expect(adminRepository.uploadFile).toHaveBeenCalled()
-    expect(adminRepository.completeUpload).toHaveBeenCalledWith('upload-1')
     expect(adminRepository.linkExerciseAsset).toHaveBeenCalledWith('exercise-1', 'upload-1', {
-      assetRole: 'QUESTION_PDF',
-      title: 'neu.pdf',
+      assetRole: 'QUESTION_AUDIO',
+      title: 'dialog.mp3',
       sortOrder: 0,
     })
   })
@@ -214,19 +264,17 @@ describe('AdminExercisePdfManager', () => {
 
     expect(await screen.findByText('arbeitsblatt.pdf')).toBeVisible()
     await user.click(screen.getByRole('button', { name: 'Xem trước' }))
-    const previewDialog = await screen.findByRole('dialog', { name: 'Xem trước PDF' })
-    expect(previewDialog).toBeVisible()
-    expect(previewDialog).toHaveClass('md:max-w-[min(96vw,88rem)]')
     expect(adminRepository.createMediaPreviewAccess).toHaveBeenCalledWith(pdf.id)
+    expect(await screen.findByRole('dialog', { name: 'Xem trước tệp' })).toBeVisible()
 
     await user.click(screen.getByRole('button', { name: 'Đóng hộp thoại' }))
-    await user.click(screen.getByRole('button', { name: 'Thay đổi tệp' }))
+    await user.click(screen.getByRole('button', { name: 'Thêm tệp' }))
     await user.click(screen.getByRole('button', { name: 'Chọn tệp có sẵn' }))
     expect(await screen.findByText('Đang gắn')).toBeVisible()
     expect(screen.getByRole('button', { name: 'Gắn' })).toBeVisible()
   })
 
-  it('replaces the currently attached PDF when another library file is chosen', async () => {
+  it('keeps the current attachment when another library file is added', async () => {
     const user = userEvent.setup()
     const secondPdf = { ...pdf, id: 'media-2', originalName: 'anderes.pdf' }
     vi.mocked(adminRepository.listExerciseAssets).mockResolvedValue({ items: [attachedPdf] })
@@ -239,7 +287,7 @@ describe('AdminExercisePdfManager', () => {
     })
     renderManager()
 
-    await user.click(await screen.findByRole('button', { name: 'Thay đổi tệp' }))
+    await user.click(await screen.findByRole('button', { name: 'Thêm tệp' }))
     await user.click(screen.getByRole('button', { name: 'Chọn tệp có sẵn' }))
     await screen.findByText('anderes.pdf')
     await user.click(screen.getByRole('button', { name: 'Gắn' }))
@@ -248,13 +296,9 @@ describe('AdminExercisePdfManager', () => {
       expect(adminRepository.linkExerciseAsset).toHaveBeenCalledWith('exercise-1', 'media-2', {
         assetRole: 'QUESTION_PDF',
         title: 'anderes.pdf',
-        sortOrder: 0,
+        sortOrder: 1,
       }),
     )
-    expect(adminRepository.unlinkExerciseAsset).toHaveBeenCalledWith(
-      'exercise-1',
-      'media-1',
-      'QUESTION_PDF',
-    )
+    expect(adminRepository.unlinkExerciseAsset).not.toHaveBeenCalled()
   })
 })

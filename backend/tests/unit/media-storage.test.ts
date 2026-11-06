@@ -14,6 +14,8 @@ const cloudinaryTestConfig = {
   apiSecret: "test-only-cloudinary-secret",
   pdfFolder: "lesson-pdf",
   audioFolder: "quiz-audio",
+  courseBannerFolder: "course-banner",
+  lessonAudioFolder: "lesson-audio",
   folderMode: "dynamic" as const,
   signedUrlTtlSeconds: 180,
 };
@@ -184,6 +186,65 @@ describe("learning media storage adapters", () => {
           resourceType: "image",
           deliveryType: "authenticated",
           assetFolder: "outside-folder",
+        }),
+      ).rejects.toMatchObject({ code: "MEDIA_TYPE_UNSUPPORTED" });
+    } finally {
+      folders.mockRestore();
+    }
+  });
+
+  it("supports the banner image folder and the separate lesson audio folder", async () => {
+    const storage = new CloudinaryMediaStorage(cloudinaryTestConfig);
+    const folders = vi.spyOn(cloudinary.api, "sub_folders").mockResolvedValue({
+      folders: [
+        { path: "lesson-audio/unit-1" },
+        { path: "course-banner/featured" },
+        { path: "outside-folder" },
+      ],
+    } as never);
+    try {
+      await expect(storage.listUploadFolders("IMAGE")).resolves.toContain(
+        "course-banner/featured",
+      );
+      await expect(storage.listUploadFolders("AUDIO")).resolves.toEqual(
+        expect.arrayContaining([
+          "quiz-audio",
+          "lesson-audio",
+          "lesson-audio/unit-1",
+        ]),
+      );
+      expect(
+        storage.createStorageKey("AUDIO", "audio-id", "lesson-audio/unit-1"),
+      ).toBe("lesson-audio/unit-1/audio-id");
+      expect(() =>
+        storage.createStorageKey("AUDIO", "audio-id", "course-banner"),
+      ).toThrow();
+
+      const imageIntent = await storage.createUpload({
+        storageKey: "course-banner/featured/banner-id",
+        mimeType: "image/webp",
+        fileSize: 2048,
+        expiresInSeconds: 600,
+        mediaType: "IMAGE",
+        resourceType: "image",
+        deliveryType: "authenticated",
+        assetFolder: "course-banner/featured",
+      });
+      expect(imageIntent.url).toContain("/image/upload");
+      expect(imageIntent.fields).toMatchObject({
+        public_id: "course-banner/featured/banner-id",
+        asset_folder: "course-banner/featured",
+      });
+      await expect(
+        storage.createUpload({
+          storageKey: "course-banner/banner-id",
+          mimeType: "image/png",
+          fileSize: 2048,
+          expiresInSeconds: 600,
+          mediaType: "IMAGE",
+          resourceType: "image",
+          deliveryType: "authenticated",
+          assetFolder: "lesson-audio",
         }),
       ).rejects.toMatchObject({ code: "MEDIA_TYPE_UNSUPPORTED" });
     } finally {

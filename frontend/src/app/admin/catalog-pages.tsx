@@ -23,7 +23,8 @@ import {
   useAdminMutation,
   useStableIdempotencyKey,
 } from './shared'
-import { AdminExercisePdfManager } from './media-exercise-manager'
+import { AdminExerciseMediaManager } from './exercise-media-manager'
+import { CourseBannerField, uploadCourseBanner } from './course-banner-field'
 
 function splitLines(value: string) {
   return value
@@ -101,6 +102,8 @@ export function AdminCoursesPage() {
   const [price, setPrice] = useState('')
   const [duration, setDuration] = useState('12')
   const [createOpen, setCreateOpen] = useState(false)
+  const [bannerFile, setBannerFile] = useState<File | null>(null)
+  const [bannerProgress, setBannerProgress] = useState<number | null>(null)
 
   function updateTitle(value: string) {
     setTitle(value)
@@ -158,8 +161,11 @@ export function AdminCoursesPage() {
       accessDurationMonths: Number(duration),
       sortOrder: courses.data?.length ?? 0,
     }
+    let bannerAssetId: string | undefined
     try {
-      await create.mutateAsync({ input, key: idempotency.get(input) })
+      if (bannerFile) bannerAssetId = await uploadCourseBanner(bannerFile, setBannerProgress)
+      const createInput = { ...input, ...(bannerAssetId ? { bannerAssetId } : {}) }
+      await create.mutateAsync({ input: createInput, key: idempotency.get(createInput) })
       idempotency.clear()
       setCreateOpen(false)
       setCode('')
@@ -172,9 +178,13 @@ export function AdminCoursesPage() {
       setRequirements('')
       setPrice('')
       setDuration('12')
+      setBannerFile(null)
       notifications.success('Đã tạo khóa học nháp.')
     } catch {
+      if (bannerAssetId) await adminRepository.deleteMedia(bannerAssetId).catch(() => undefined)
       /* The API error is displayed below. */
+    } finally {
+      setBannerProgress(null)
     }
   }
 
@@ -315,13 +325,17 @@ export function AdminCoursesPage() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         title="Tạo khóa học mới"
-        description="Nhập thông tin cơ bản. Ảnh bìa sẽ được bổ sung sau khi chốt cách lưu ảnh."
+        description="Nhập thông tin khóa học và chọn ảnh bìa nếu đã có."
         footer={
           <>
             <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
               Hủy
             </Button>
-            <Button type="submit" form="admin-create-course" loading={create.isPending}>
+            <Button
+              type="submit"
+              form="admin-create-course"
+              loading={create.isPending || bannerProgress !== null}
+            >
               Tạo khóa học
             </Button>
           </>
@@ -385,9 +399,18 @@ export function AdminCoursesPage() {
             onChange={setRequirements}
             rows={3}
           />
-          <p className="rounded-xl bg-surface-muted p-3 text-xs leading-5 text-ink-secondary">
-            Khóa học mới ở trạng thái bản nháp. Ảnh bìa sẽ được thêm sau khi hoàn tất cách lưu ảnh.
-          </p>
+          <CourseBannerField
+            assetId={null}
+            file={bannerFile}
+            onFileChange={setBannerFile}
+            disabled={create.isPending || bannerProgress !== null}
+          />
+          {bannerProgress !== null && (
+            <div role="status" className="rounded-xl bg-surface-muted p-3 text-sm">
+              Đang tải ảnh bìa lên {bannerProgress}%
+              <progress className="mt-2 block w-full" value={bannerProgress} max={100} />
+            </div>
+          )}
           <AdminFeedback error={create.error} />
         </form>
       </BaseDialog>
@@ -542,7 +565,7 @@ export function AdminExerciseEditorPage({
           initialTitle={title || exercise.title}
         />
       ) : (
-        <AdminExercisePdfManager exercises={[exercise]} selectedExerciseId={exercise.id} />
+        <AdminExerciseMediaManager exercises={[exercise]} selectedExerciseId={exercise.id} />
       )}
     </div>
   )

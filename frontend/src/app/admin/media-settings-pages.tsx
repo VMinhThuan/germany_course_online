@@ -15,6 +15,15 @@ import { Button, EmptyState, Pagination } from '@/shared/ui'
 import { AudioPlayer, PDFViewer, VideoPlayer } from '@/domains/media/components'
 import type { MediaViewModel } from '@/domains/media'
 import {
+  folderRoots,
+  mediaAccept as mediaAcceptForType,
+  mediaAcceptForTypes,
+  mediaTypeForFile,
+  uploadFolders,
+  validateAdminMediaFile,
+  type AdminMediaType,
+} from './media-upload'
+import {
   AdminCard,
   AdminField,
   AdminFeedback,
@@ -26,15 +35,6 @@ import {
   type AdminTableColumn,
   useAdminMutation,
 } from './shared'
-
-function mediaTypeForFile(file: File | null) {
-  if (!file) return null
-  if (file.type.startsWith('image/')) return 'IMAGE'
-  if (file.type.startsWith('video/')) return 'VIDEO'
-  if (file.type.startsWith('audio/')) return 'AUDIO'
-  if (file.type === 'application/pdf') return 'PDF'
-  return null
-}
 
 function mediaTypeLabel(mediaType: ApiAdminMediaAsset['mediaType']) {
   return { IMAGE: 'Hình ảnh', VIDEO: 'Video', AUDIO: 'Âm thanh', PDF: 'PDF' }[mediaType]
@@ -48,10 +48,22 @@ function uploadStatusLabel(status?: ApiAdminMediaAsset['uploadStatus']) {
   return 'Đã sẵn sàng'
 }
 
-function folderLabel(folder: string, mediaType: 'PDF' | 'AUDIO') {
-  const subfolder = folder.split('/').slice(1).join(' / ')
-  const rootLabel = mediaType === 'PDF' ? 'PDF' : 'Âm thanh'
-  return subfolder ? `${rootLabel} / ${subfolder}` : `${rootLabel} (mặc định)`
+function folderLabel(folder: string, folders: readonly string[], mediaType: AdminMediaType) {
+  const root = folderRoots(folders).find(
+    (candidate) => folder === candidate || folder.startsWith(`${candidate}/`),
+  )
+  const ending = root?.split('/').at(-1)?.toLowerCase()
+  const rootLabel =
+    mediaType === 'IMAGE'
+      ? 'Ảnh khóa học'
+      : mediaType === 'PDF'
+        ? 'Tài liệu PDF'
+        : ending === 'lesson-audio'
+          ? 'Âm thanh bài tập'
+          : 'Âm thanh trắc nghiệm'
+  const subfolder =
+    root && folder !== root ? folder.slice(root.length + 1).replaceAll('/', ' / ') : ''
+  return subfolder ? `${rootLabel} · ${subfolder}` : rootLabel
 }
 
 function mediaRoleLabel(role: string) {
@@ -161,16 +173,15 @@ export function AdminMediaPage() {
   const [title, setTitle] = useState('')
   const [sortOrder, setSortOrder] = useState('0')
   const [associationNotice, setAssociationNotice] = useState('')
-  const selectedMediaType = mediaTypeForFile(file)
-  const folderMediaType =
-    selectedMediaType === 'PDF' || selectedMediaType === 'AUDIO' ? selectedMediaType : null
-  const availableFolders = folderMediaType
-    ? (capabilities.data?.uploadFoldersByMediaType?.[folderMediaType] ?? [])
-    : []
-  const canSelectFolder = folderMediaType !== null && availableFolders.length > 0
-  const selectedFolder = availableFolders.includes(assetFolder)
-    ? assetFolder
-    : (availableFolders[0] ?? '')
+  const folderOptions = (['IMAGE', 'PDF', 'AUDIO'] as const).flatMap((type) =>
+    uploadFolders(capabilities.data, type).map((folder) => ({ folder, mediaType: type })),
+  )
+  const folderSelectionRequired = capabilities.data?.activeProvider === 'CLOUDINARY'
+  const selectedFolderOption = folderOptions.find((option) => option.folder === assetFolder)
+  const folderMediaType = selectedFolderOption?.mediaType ?? null
+  const selectedMediaType = folderSelectionRequired ? folderMediaType : mediaTypeForFile(file)
+  const canSelectFolder = folderSelectionRequired && folderOptions.length > 0
+  const selectedFolder = selectedFolderOption?.folder ?? ''
   const associations = useQuery({
     queryKey: ['admin', 'asset-associations', ownerType, ownerId],
     queryFn: () =>
@@ -193,41 +204,21 @@ export function AdminMediaPage() {
       setUploadError(new Error('Tệp này chưa có nội dung. Hãy chọn một tệp khác.'))
       return
     }
-    const type = mediaTypeForFile(file)
-    const extension = file.name.split('.').at(-1)?.toLowerCase()
-    const acceptedExtensions: Record<string, string[]> = {
-      IMAGE: ['png', 'jpg', 'jpeg', 'webp'],
-      VIDEO: ['mp4'],
-      AUDIO: ['mp3', 'm4a', 'mp4', 'wav', 'ogg'],
-      PDF: ['pdf'],
-    }
-    const mimeByExtension: Record<string, string> = {
-      png: 'image/png',
-      jpg: 'image/jpeg',
-      jpeg: 'image/jpeg',
-      webp: 'image/webp',
-      mp4: type === 'AUDIO' ? 'audio/mp4' : 'video/mp4',
-      mp3: 'audio/mpeg',
-      m4a: 'audio/mp4',
-      wav: 'audio/wav',
-      ogg: 'audio/ogg',
-      pdf: 'application/pdf',
-    }
-    const maxBytes: Record<string, number> = {
-      IMAGE: 20 * 1024 * 1024,
-      VIDEO: 250 * 1024 * 1024,
-      AUDIO: 50 * 1024 * 1024,
-      PDF: 40 * 1024 * 1024,
-    }
+    const type = selectedMediaType
+    const fileError = type
+      ? validateAdminMediaFile(file, type)
+      : 'Chọn thư mục lưu trước khi chọn tệp.'
     if (
       !type ||
-      !(acceptedExtensions[type] ?? []).includes(extension ?? '') ||
-      mimeByExtension[extension ?? ''] !== file.type ||
+      fileError ||
       !capabilities.data?.supportedMediaTypes.includes(type) ||
-      file.size > maxBytes[type]!
+      (folderSelectionRequired && !selectedFolder)
     ) {
       setUploadError(
-        new Error('Tệp không đúng định dạng hoặc vượt quá dung lượng cho phép. Hãy chọn tệp khác.'),
+        new Error(
+          fileError ??
+            'Tệp không đúng định dạng hoặc vượt quá dung lượng cho phép. Hãy chọn tệp khác.',
+        ),
       )
       return
     }
@@ -472,7 +463,7 @@ export function AdminMediaPage() {
               ]}
             />
             <AdminSelect
-              label="Nơi lưu"
+              label="Dịch vụ lưu trữ"
               value={provider}
               onChange={(value) => {
                 setProvider(value)
@@ -645,7 +636,7 @@ export function AdminMediaPage() {
           setUploadOpen(open)
         }}
         title="Tải tệp lên thư viện"
-        description="Chọn tệp, thư mục lưu và người có thể xem. Tệp sẽ xuất hiện trong thư viện sau khi hoàn tất."
+        description="Chọn nơi lưu và tệp muốn thêm. Mỗi nơi nhận một loại tệp riêng."
         footer={
           <>
             <Button
@@ -664,6 +655,8 @@ export function AdminMediaPage() {
                 !file ||
                 capabilities.isPending ||
                 !capabilities.data?.activeProvider ||
+                (folderSelectionRequired && !selectedFolder) ||
+                !selectedMediaType ||
                 progress !== null
               }
               startIcon={<FileUp aria-hidden="true" className="size-4" />}
@@ -690,6 +683,30 @@ export function AdminMediaPage() {
             className="grid gap-3"
             onSubmit={(event) => void upload(event)}
           >
+            {canSelectFolder && (
+              <AdminSelect
+                label="Thư mục lưu"
+                value={selectedFolder}
+                onChange={(folder) => {
+                  setAssetFolder(folder)
+                  setFile(null)
+                  setFileInputKey((key) => key + 1)
+                  setUploadError(undefined)
+                }}
+                disabled={progress !== null}
+                options={[
+                  { value: '', label: 'Chọn nơi lưu' },
+                  ...folderOptions.map((option) => ({
+                    value: option.folder,
+                    label: folderLabel(
+                      option.folder,
+                      uploadFolders(capabilities.data, option.mediaType),
+                      option.mediaType,
+                    ),
+                  })),
+                ]}
+              />
+            )}
             <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed border-border-subtle bg-white p-4 transition-colors hover:border-action-primary hover:bg-surface-muted focus-within:ring-2 focus-within:ring-action-primary">
               <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-surface-blue text-action-primary">
                 <FolderOpen aria-hidden="true" className="size-5" />
@@ -702,10 +719,12 @@ export function AdminMediaPage() {
                   {file
                     ? (file.size / 1024 / 1024).toFixed(2) +
                       ' MB · ' +
-                      (mediaTypeForFile(file)
-                        ? mediaTypeLabel(mediaTypeForFile(file)!)
+                      (selectedMediaType
+                        ? mediaTypeLabel(selectedMediaType)
                         : 'Chưa nhận diện được loại tệp')
-                    : 'PDF, âm thanh hoặc loại tệp được hỗ trợ'}
+                    : folderSelectionRequired && !selectedFolder
+                      ? 'Chọn nơi lưu trước khi chọn tệp'
+                      : 'Chọn tệp theo loại được hỗ trợ'}
                 </span>
               </span>
               <span className="shrink-0 rounded-lg border border-border-subtle px-3 py-2 text-sm font-semibold text-ink-primary">
@@ -716,37 +735,47 @@ export function AdminMediaPage() {
                 aria-label="Tệp"
                 className="sr-only"
                 type="file"
-                accept={mediaAccept(capabilities.data?.supportedMediaTypes ?? [])}
+                accept={
+                  selectedMediaType
+                    ? mediaAcceptForType(selectedMediaType)
+                    : mediaAcceptForTypes(
+                        (capabilities.data?.supportedMediaTypes ?? []) as AdminMediaType[],
+                      )
+                }
                 onChange={(event) => {
                   const nextFile = event.target.files?.[0] ?? null
-                  setFile(nextFile)
                   setUploadError(undefined)
                   setUploadSuccess('')
-                  const nextType = mediaTypeForFile(nextFile)
-                  const nextFolders =
-                    nextType === 'PDF' || nextType === 'AUDIO'
-                      ? (capabilities.data?.uploadFoldersByMediaType?.[nextType] ?? [])
-                      : []
-                  if (nextFolders.length && !nextFolders.includes(assetFolder))
-                    setAssetFolder(nextFolders[0]!)
+                  if (nextFile) {
+                    const type = selectedMediaType ?? mediaTypeForFile(nextFile)
+                    const invalid = type
+                      ? validateAdminMediaFile(nextFile, type)
+                      : 'Chọn nơi lưu trước khi chọn tệp.'
+                    if (
+                      !type ||
+                      invalid ||
+                      !capabilities.data?.supportedMediaTypes.includes(type)
+                    ) {
+                      setUploadError(
+                        new Error(
+                          invalid ?? 'Tệp này không đúng với nơi lưu đã chọn. Hãy chọn tệp khác.',
+                        ),
+                      )
+                      setFile(null)
+                      event.currentTarget.value = ''
+                      return
+                    }
+                  }
+                  setFile(nextFile)
                 }}
                 disabled={
-                  progress !== null || capabilities.isPending || !capabilities.data?.activeProvider
+                  progress !== null ||
+                  capabilities.isPending ||
+                  !capabilities.data?.activeProvider ||
+                  (folderSelectionRequired && !selectedFolder)
                 }
               />
             </label>
-            {canSelectFolder && folderMediaType && (
-              <AdminSelect
-                label="Thư mục lưu"
-                value={selectedFolder}
-                onChange={setAssetFolder}
-                disabled={progress !== null}
-                options={availableFolders.map((folder) => ({
-                  value: folder,
-                  label: folderLabel(folder, folderMediaType),
-                }))}
-              />
-            )}
             <AdminSelect
               label="Ai có thể xem tệp"
               value={visibility}
@@ -787,10 +816,6 @@ export function AdminMediaPage() {
             )}
           </form>
           <AdminFeedback success={uploadSuccess} />
-          <p className="text-xs leading-5 text-ink-secondary">
-            Chọn đúng thư mục để tìm lại tệp dễ hơn. Sau khi tải thành công, tệp đã chọn sẽ được xóa
-            khỏi ô chọn.
-          </p>
         </div>
       </BaseDialog>
       <AdminCard
@@ -907,15 +932,6 @@ export function AdminMediaPage() {
       </AdminCard>
     </div>
   )
-}
-
-function mediaAccept(types: readonly string[]): string {
-  const accepted = new Set<string>()
-  if (types.includes('IMAGE')) accepted.add('.jpg,.jpeg,.png,.webp')
-  if (types.includes('VIDEO')) accepted.add('.mp4')
-  if (types.includes('AUDIO')) accepted.add('.mp3,.m4a,.wav,.ogg')
-  if (types.includes('PDF')) accepted.add('.pdf')
-  return [...accepted].join(',')
 }
 
 function MediaAssetPreview({ access, title }: { access: ApiMediaPreviewAccess; title: string }) {

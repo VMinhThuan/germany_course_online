@@ -316,6 +316,27 @@ export const uploadIntentSchema = z
         path: ["mimeType"],
         message: "MIME type is not allowed for this media type.",
       });
+    const extension = value.originalName.split(".").at(-1)?.toLowerCase();
+    const extensionMime: Record<string, string> = {
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      png: "image/png",
+      webp: "image/webp",
+      mp4: value.mediaType === "AUDIO" ? "audio/mp4" : "video/mp4",
+      mp3: "audio/mpeg",
+      m4a: "audio/mp4",
+      wav: "audio/wav",
+      wave: "audio/wav",
+      ogg: "audio/ogg",
+      oga: "audio/ogg",
+      pdf: "application/pdf",
+    };
+    if (!extension || extensionMime[extension] !== value.mimeType)
+      ctx.addIssue({
+        code: "custom",
+        path: ["originalName"],
+        message: "File extension does not match its media type.",
+      });
     const maxBytes: Record<string, number> = {
       IMAGE: 20 * 1024 * 1024,
       VIDEO: 250 * 1024 * 1024,

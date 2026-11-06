@@ -1847,13 +1847,14 @@ export class AdminService {
     const provider = this.storage.provider ?? null;
     const supportedMediaTypes =
       provider === "CLOUDINARY"
-        ? (["PDF", "AUDIO"] as const)
+        ? (["IMAGE", "PDF", "AUDIO"] as const)
         : provider === "S3_COMPATIBLE"
           ? (["IMAGE", "VIDEO", "PDF", "AUDIO"] as const)
           : ([] as const);
     const uploadFoldersByMediaType =
       provider === "CLOUDINARY"
         ? {
+            IMAGE: await this.storage.listUploadFolders?.("IMAGE"),
             PDF: await this.storage.listUploadFolders?.("PDF"),
             AUDIO: await this.storage.listUploadFolders?.("AUDIO"),
           }
@@ -1864,6 +1865,7 @@ export class AdminService {
       ...(uploadFoldersByMediaType
         ? {
             uploadFoldersByMediaType: {
+              IMAGE: uploadFoldersByMediaType.IMAGE ?? [],
               PDF: uploadFoldersByMediaType.PDF ?? [],
               AUDIO: uploadFoldersByMediaType.AUDIO ?? [],
             },
@@ -3256,7 +3258,7 @@ function cloudinaryResourceType(
   mediaType: string,
 ): MediaResourceType | null {
   if (provider !== "CLOUDINARY") return null;
-  if (mediaType === "PDF") return "image";
+  if (mediaType === "IMAGE" || mediaType === "PDF") return "image";
   if (mediaType === "AUDIO") return "video";
   return null;
 }
