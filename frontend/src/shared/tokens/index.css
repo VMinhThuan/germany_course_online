@@ -6,6 +6,8 @@
   --ink-primary: #203039;
   --ink-secondary: #4a5b63;
   --ink-muted: #63747c;
+  --font-heading: 'Anton', 'Arial Narrow', sans-serif;
+  --font-body-base: 'Be Vietnam Pro', 'Segoe UI', sans-serif;
   --action-primary: #006b70;
   --action-primary-hover: #0b5960;
   --action-focus: #006b70;
@@ -64,8 +66,8 @@
   --color-info-foreground: var(--info-foreground);
   --color-info-surface: var(--info-surface);
   --color-overlay: var(--overlay);
-  --font-display: 'Manrope Variable', 'Segoe UI', sans-serif;
-  --font-body: 'Source Sans 3 Variable', 'Segoe UI', sans-serif;
+  --font-display: var(--font-heading);
+  --font-body: var(--font-body-base);
   --font-mono: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
   --radius-card: var(--radius-card-value);
   --radius-control: var(--radius-control-value);
