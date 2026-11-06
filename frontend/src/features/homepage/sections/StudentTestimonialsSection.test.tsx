@@ -1,18 +1,24 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { StudentTestimonialsSection } from './StudentTestimonialsSection'
 
 describe('StudentTestimonialsSection', () => {
-  it('shows ten clearly labeled sample reviews with accessible carousel controls', () => {
-    render(<StudentTestimonialsSection />)
+  it('shows ten sample reviews with avatars in a continuously looping carousel without controls', () => {
+    const { container } = render(<StudentTestimonialsSection />)
 
-    expect(screen.getByText('Đánh giá minh họa · sẽ thay bằng chia sẻ đã xác nhận')).toBeVisible()
     expect(screen.getAllByRole('article')).toHaveLength(10)
     expect(
-      screen.getByRole('region', { name: 'Các đánh giá minh họa của học viên' }),
+      screen.getByRole('region', { name: 'Chia sẻ về hành trình học tiếng Đức' }),
     ).toHaveAttribute('aria-roledescription', 'carousel')
-    expect(screen.getByRole('button', { name: 'Tạm dừng tự chạy đánh giá' })).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Đánh giá trước' })).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Đánh giá tiếp theo' })).toBeVisible()
+    const originalReviews = container.querySelector(
+      '.homepage-testimonial-group:not([aria-hidden])',
+    )
+    expect(originalReviews).not.toBeNull()
+    expect(within(originalReviews as HTMLElement).getAllByText('Nội dung mẫu')).toHaveLength(10)
+    expect(container.querySelectorAll('.lucide-circle-user-round')).toHaveLength(20)
+    expect(container.querySelectorAll('.homepage-testimonial-card')).toHaveLength(20)
+    expect(container.querySelector('.homepage-testimonials-track')).toBeInTheDocument()
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+    expect(screen.queryByText(/đánh giá minh họa/i)).not.toBeInTheDocument()
   })
 })

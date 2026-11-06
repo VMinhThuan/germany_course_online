@@ -44,15 +44,21 @@ function PublicMenu({
   items = publicItems,
   onNavigate,
   desktop = false,
+  spread = false,
 }: {
   items?: readonly PublicNavItem[]
   onNavigate?: () => void
   desktop?: boolean
+  spread?: boolean
 }) {
   return (
     <nav
       aria-label="Điều hướng chính"
-      className={cn('grid gap-1', desktop && 'flex items-center justify-center gap-7')}
+      className={cn(
+        'grid gap-1',
+        desktop && 'flex items-center justify-center gap-7',
+        desktop && spread && 'w-full justify-between gap-2 xl:gap-5',
+      )}
     >
       {items.map((item) => (
         <Link
@@ -62,6 +68,7 @@ function PublicMenu({
           className={cn(
             'flex min-h-11 items-center rounded-lg px-3 text-base font-semibold text-ink-secondary underline-offset-4 hover:bg-surface-muted hover:text-ink-primary hover:underline',
             desktop && 'justify-center px-0 hover:bg-transparent',
+            desktop && spread && 'min-w-0 flex-1 px-1 text-center text-lg xl:text-xl',
           )}
         >
           {item.label}
@@ -86,6 +93,7 @@ export function PublicShell({
   footerCopyright,
   footerContent,
   wideNavigation = false,
+  fullWidthHeader = false,
   menuDescription = 'Khám phá lộ trình học tiếng Đức',
   authState,
 }: ShellProps & {
@@ -101,6 +109,7 @@ export function PublicShell({
   footerCopyright?: string
   footerContent?: ReactNode
   wideNavigation?: boolean
+  fullWidthHeader?: boolean
   menuDescription?: string
   authState?: {
     displayName: string
@@ -115,7 +124,13 @@ export function PublicShell({
       <SkipLink />
       <header className="sticky top-0 z-header border-b border-border-subtle/80 bg-card-surface/95 backdrop-blur-sm">
         {showPreviewNotice && <PreviewNotice text={previewNotice} />}
-        <Container className="grid h-[4.25rem] grid-cols-[minmax(max-content,1fr)_auto_minmax(max-content,1fr)] items-center gap-4">
+        <Container
+          className={cn(
+            'grid h-[4.25rem] grid-cols-[minmax(max-content,1fr)_auto_minmax(max-content,1fr)] items-center gap-4',
+            fullWidthHeader &&
+              'max-w-none grid-cols-[auto_minmax(0,1fr)_auto] px-5 sm:px-8 lg:px-10 xl:px-12',
+          )}
+        >
           <Link
             to={brandHref}
             aria-label={brandConfig.name}
@@ -123,8 +138,14 @@ export function PublicShell({
           >
             {brandConfig.name}
           </Link>
-          <div className={`hidden justify-self-center ${wideNavigation ? 'xl:block' : 'lg:block'}`}>
-            <PublicMenu items={navItems} desktop />
+          <div
+            className={cn(
+              'hidden justify-self-center',
+              fullWidthHeader && 'w-full min-w-0 justify-self-stretch',
+              wideNavigation ? 'xl:block' : 'lg:block',
+            )}
+          >
+            <PublicMenu items={navItems} desktop spread={fullWidthHeader} />
           </div>
           <div
             className={`hidden items-center justify-self-end gap-4 ${wideNavigation ? 'xl:flex' : 'lg:flex'}`}

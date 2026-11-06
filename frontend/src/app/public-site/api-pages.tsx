@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { useAuthSession } from '@/app/auth/auth-session'
@@ -42,6 +42,7 @@ function PublicLayout({ children, homepage = false }: { children: ReactNode; hom
       ]}
       menuDescription="Khám phá lộ trình học tiếng Đức"
       primaryAction={{ label: homepage ? 'Xem khóa học' : 'Chọn khóa học', href: '/courses' }}
+      fullWidthHeader={homepage}
       showRegister
       {...(session
         ? {
@@ -79,7 +80,7 @@ export function ApiPublicLandingPage() {
   const homepageRef = useRef<HTMLDivElement>(null)
   usePageTitle(settings.data?.siteName || 'Học tiếng Đức')
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const homepage = homepageRef.current
     const root = document.documentElement
     root.classList.add('homepage-scroll-guard')
@@ -89,15 +90,10 @@ export function ApiPublicLandingPage() {
     if (!('IntersectionObserver' in window)) return cleanup
 
     const sections = Array.from(homepage.querySelectorAll<HTMLElement>('[data-homepage-reveal]'))
-    let initialized = false
+    sections.forEach((section) => section.setAttribute('data-homepage-revealed', 'false'))
+    homepage.setAttribute('data-homepage-reveal-ready', 'true')
     const observer = new IntersectionObserver(
       (entries) => {
-        if (!initialized) {
-          sections.forEach((section) => section.setAttribute('data-homepage-revealed', 'false'))
-          initialized = true
-          homepage.setAttribute('data-homepage-reveal-ready', 'true')
-        }
-
         entries.forEach((entry) => {
           ;(entry.target as HTMLElement).setAttribute(
             'data-homepage-revealed',

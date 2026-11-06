@@ -29,7 +29,10 @@ export function BilingualSectionHeading({
     >
       <p
         lang="de"
-        className="inline-flex rounded-full bg-brand-pink px-3.5 py-1.5 text-xs font-extrabold uppercase tracking-[0.16em] text-ink-primary sm:text-sm"
+        className={cn(
+          'inline-flex rounded-full bg-brand-pink px-3.5 py-1.5 text-xs font-extrabold uppercase tracking-[0.16em] text-ink-primary sm:text-sm',
+          align === 'center' ? 'self-center' : 'self-start',
+        )}
       >
         {german}
       </p>
