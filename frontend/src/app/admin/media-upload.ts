@@ -63,8 +63,7 @@ export function validateAdminMediaFile(file: File, mediaType: AdminMediaType) {
     return `Chọn tệp ${mediaTypeLabel(mediaType)} đúng định dạng.`
   if (file.size <= 0) return 'Tệp chưa có nội dung. Hãy chọn tệp khác.'
   if (file.size > maxBytes[mediaType]) {
-    const maxSizeMb =
-      mediaType === 'FILE' ? '100' : String(maxBytes[mediaType] / 1024 / 1024)
+    const maxSizeMb = mediaType === 'FILE' ? '100' : String(maxBytes[mediaType] / 1024 / 1024)
     return `Tệp ${mediaTypeLabel(mediaType)} vượt quá ${maxSizeMb} MB.`
   }
   return null

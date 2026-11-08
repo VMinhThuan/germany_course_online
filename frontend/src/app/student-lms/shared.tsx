@@ -32,13 +32,13 @@ export function ProductPage({
       >
         <div className="flex flex-wrap items-start justify-between gap-4">
           <PageHeader
-            {...(heading ? { className: 'min-w-0 flex-1' } : {})}
+            {...(heading ? { className: 'min-w-0 flex-1 basis-full sm:basis-auto' } : {})}
             eyebrow={eyebrow}
             title={title}
             {...(heading ? { heading } : {})}
             {...(description ? { description } : {})}
           />
-          <LinkButton to={backTo} variant="outline" className="shrink-0">
+          <LinkButton to={backTo} variant="outline" className="ml-auto shrink-0">
             <ArrowLeft aria-hidden="true" className="size-4" />
             Quay lại
           </LinkButton>

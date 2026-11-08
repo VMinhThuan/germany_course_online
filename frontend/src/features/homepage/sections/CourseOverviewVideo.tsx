@@ -3,11 +3,7 @@ import { BilingualSectionHeading } from '../components/BilingualSectionHeading'
 import { HomepageVideoPlayer } from '../components/HomepageVideoPlayer'
 import { homepageContent } from '../content/homepage-content'
 
-export function CourseOverviewVideo({
-  videoUrl,
-}: {
-  videoUrl: string | null
-}) {
+export function CourseOverviewVideo({ videoUrl }: { videoUrl: string | null }) {
   const { courseOverview } = homepageContent
 
   return (
