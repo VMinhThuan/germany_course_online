@@ -17,7 +17,7 @@ export const COVERAGE_SAMPLES = Object.freeze([
 
 export const LETTERING_STYLE = Object.freeze({
   bodyExpansion: 12,
-  outlineExpansion: 16,
+  outlineExpansion: 32,
   tracking: 14,
   spaceTracking: 10,
   shadowX: 12,

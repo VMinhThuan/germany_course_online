@@ -140,7 +140,7 @@ export function ApiCourseCatalogPage() {
   usePageTitle('Khóa học')
   return (
     <PublicLayout>
-      <Container className="space-y-10 py-10 sm:py-14">
+      <Container className="space-y-10 pt-5 pb-10 sm:pt-6 sm:pb-14">
         <header className="max-w-3xl space-y-4">
           <p
             lang="de"
@@ -232,7 +232,7 @@ export function ApiCourseDetailPage() {
 
   return (
     <PublicLayout>
-      <Container className="space-y-8 py-8 sm:py-12">
+      <Container className="space-y-8 pt-5 pb-8 sm:pt-6 sm:pb-12">
         <Link
           to="/courses"
           className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-action-primary underline-offset-4 hover:underline"

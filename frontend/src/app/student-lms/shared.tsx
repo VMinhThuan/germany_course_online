@@ -28,7 +28,7 @@ export function ProductPage({
   return (
     <ProductStudentLayout>
       <Container
-        className={`grid min-w-0 gap-7 py-6 sm:py-9 ${wide ? 'max-w-none px-0 sm:px-0 lg:px-0' : ''}`}
+        className={`grid min-w-0 gap-7 pt-2 pb-6 sm:pt-3 sm:pb-9 ${wide ? 'max-w-none px-0 sm:px-0 lg:px-0' : ''}`}
       >
         <div className="flex flex-wrap items-start justify-between gap-4">
           <PageHeader

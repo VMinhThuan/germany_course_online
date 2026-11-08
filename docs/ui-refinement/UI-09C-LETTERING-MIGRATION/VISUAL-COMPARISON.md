@@ -18,4 +18,4 @@ The Canva wordmark image supplied in the request was viewed only as a style refe
 
 ![Lesson heading, mobile](screenshots/lesson-heading-mobile-390x844.png)
 
-Desktop/tablet/mobile full-page screenshots are included in the `screenshots` folder. The body fill is visibly heavier and rounder than UI-09B; the blue outline remains distinct without closing counters. Cream-on-pale-blue contrast is decorative rather than body text and does not replace the heading's dark accessible text.
+Desktop/tablet/mobile full-page screenshots are included in the `screenshots` folder and capture the initial UI-09C rendering. The current follow-up increases the blue contour and adds a pink raised card; screenshots have not been regenerated for this adjustment. The body fill is visibly heavier and rounder than UI-09B, and the expanded contour preserves the pilot glyph counters. The cream lettering is decorative and does not replace the heading's dark accessible text.

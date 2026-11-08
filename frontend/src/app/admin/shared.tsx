@@ -81,7 +81,7 @@ export function AdminLayout({
           </div>
         </div>
       </header>
-      <div className="mx-auto grid max-w-[1600px] gap-5 px-4 py-5 sm:px-6 lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-8 lg:py-8">
+      <div className="mx-auto grid max-w-[1600px] gap-5 px-4 pt-3 pb-5 sm:px-6 sm:pt-4 lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-8 lg:pt-5 lg:pb-8">
         <aside className="min-w-0 lg:sticky lg:top-24 lg:h-[calc(100vh-7rem)]">
           <nav
             aria-label="Điều hướng quản trị"

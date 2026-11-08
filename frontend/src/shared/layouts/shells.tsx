@@ -595,7 +595,7 @@ export function StudentShell({
               tabIndex={-1}
               data-layout-route={currentRoute}
               className={cn(
-                'mx-auto w-full max-w-[88rem] px-4 py-8 outline-none sm:px-6 sm:py-10 lg:px-8',
+                'mx-auto w-full max-w-[88rem] px-4 pt-3 pb-8 outline-none sm:px-6 sm:pt-4 sm:pb-10 lg:px-8 lg:pt-5 lg:pb-12',
                 isLessonWorkspace && 'max-w-none lg:px-5',
                 className,
               )}

@@ -61,7 +61,7 @@ export function PublicHelpPage() {
   usePageTitle('Trợ giúp')
   return (
     <HelpLayout>
-      <Container className="grid gap-8 py-8 sm:py-12">
+      <Container className="grid gap-8 pt-5 pb-8 sm:pt-6 sm:pb-12">
         <header className="max-w-3xl space-y-3">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-action-primary">
             HỖ TRỢ

@@ -175,7 +175,7 @@ export function StudentDashboardPage() {
   const dashboard = useStudentDashboard(session?.id ?? '')
   return (
     <ProductStudentLayout>
-      <Container className="grid gap-8 py-6 sm:py-9">
+      <Container className="grid gap-8 pt-2 pb-6 sm:pt-3 sm:pb-9">
         {dashboard.isPending ? (
           <Loading />
         ) : dashboard.isError ? (
@@ -221,7 +221,7 @@ export function StudentCoursesPage() {
   const courses = useStudentCourses(session?.id ?? '', page)
   return (
     <ProductStudentLayout>
-      <Container className="grid gap-8 py-6 sm:py-9">
+      <Container className="grid gap-8 pt-2 pb-6 sm:pt-3 sm:pb-9">
         <PageHeader
           eyebrow=""
           title="Khóa học của tôi"
