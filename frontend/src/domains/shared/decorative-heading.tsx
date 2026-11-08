@@ -5,7 +5,7 @@ import type { HeadingLevel } from './heading'
 const TONE_MARKS = {
   '\u0300': (x: number, raised: boolean) => {
     const y = raised ? 0 : 7
-    return `M${x + 8} ${y + 14} Q${x + 19} ${y + 3} ${x + 31} ${y} L${x + 37} ${y + 7} Q${x + 25} ${y + 12} ${x + 15} ${y + 21} Z`
+    return `M${x + 8} ${y} Q${x + 19} ${y + 3} ${x + 31} ${y + 14} L${x + 37} ${y + 21} Q${x + 25} ${y + 12} ${x + 15} ${y + 7} Z`
   },
   '\u0301': (x: number, raised: boolean) => {
     const y = raised ? 0 : 7
@@ -58,6 +58,7 @@ function LetteringSvg({ text, title }: { text: string; title: string }) {
               stroke="var(--lettering-outline)"
               strokeLinecap="round"
               strokeLinejoin="round"
+              paintOrder="stroke fill"
               strokeWidth="8"
               transform={`translate(${glyph.x} 0)`}
             />
@@ -72,6 +73,7 @@ function LetteringSvg({ text, title }: { text: string; title: string }) {
                   stroke="var(--lettering-outline)"
                   strokeLinecap="round"
                   strokeLinejoin="round"
+                  paintOrder="stroke fill"
                   strokeWidth="5"
                 >
                   {shape}

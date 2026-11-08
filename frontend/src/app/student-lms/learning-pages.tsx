@@ -240,7 +240,7 @@ export function LearningLessonPage() {
               label="Bài học đã hoàn thành"
             />
           </div>
-          <div className="grid min-w-0 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_19rem]">
+          <div className="grid min-w-0 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_23rem]">
             <div className="grid min-w-0 gap-6">
               <section
                 id="lesson-video"
