@@ -1,9 +1,10 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
-import { Eye, EyeOff, Plus, Search, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Eye, EyeOff, FileUp, Plus, Search, Trash2 } from 'lucide-react'
 import { adminRepository } from '@/data/api/admin-repository'
 import type { ApiAdminCourse, ApiAdminQuiz } from '@/lib/api/types'
+import { parseQuizWorkbook, type QuizWorkbookImportPreview } from '@/domains/quizzes'
 import { ApiError } from '@/lib/api/client'
 import { formatVnd } from '@/shared/lib/format'
 import { BaseDialog, useDialogs } from '@/shared/ui/dialogs'
@@ -635,6 +636,10 @@ function AdminQuizEditor({
   const [questions, setQuestions] = useState<QuizQuestionDraft[]>([blankQuestion()])
   const [validation, setValidation] = useState('')
   const [success, setSuccess] = useState('')
+  const [importPreview, setImportPreview] = useState<QuizWorkbookImportPreview>()
+  const [importError, setImportError] = useState('')
+  const [previewEnabled, setPreviewEnabled] = useState(false)
+  const [previewSelections, setPreviewSelections] = useState<Record<number, number>>({})
 
   useEffect(() => {
     if (quiz.data) {
@@ -687,20 +692,103 @@ function AdminQuizEditor({
     }))
   }
 
+  function moveQuestion(index: number, offset: -1 | 1) {
+    setQuestions((current) => {
+      const target = index + offset
+      if (target < 0 || target >= current.length) return current
+      const next = [...current]
+      const [moved] = next.splice(index, 1)
+      next.splice(target, 0, moved!)
+      return next
+    })
+  }
+
+  async function readWorkbook(event: ChangeEvent<HTMLInputElement>) {
+    const input = event.currentTarget
+    const file = input.files?.[0]
+    if (!file) return
+    setImportError('')
+    setSuccess('')
+    try {
+      setImportPreview(await parseQuizWorkbook(file))
+    } catch (error) {
+      setImportPreview(undefined)
+      setImportError(error instanceof Error ? error.message : 'Không đọc được tệp Excel.')
+    } finally {
+      input.value = ''
+    }
+  }
+
+  function appendImportedQuestions() {
+    if (!importPreview?.questions.length) return
+    const hasOnlyStarter =
+      questions.length === 1 &&
+      !questions[0]!.id &&
+      !questions[0]!.questionText.trim() &&
+      questions[0]!.options.every((option) => !option.optionText.trim())
+    const remaining = 100 - (hasOnlyStarter ? 0 : questions.length)
+    if (importPreview.questions.length > remaining) {
+      setValidation(`Chỉ có thể thêm tối đa ${remaining} câu để không vượt giới hạn 100 câu.`)
+      return
+    }
+    setQuestions((current) => {
+      const additions = importPreview.questions.map((question) => ({
+        questionText: question.questionText,
+        explanation: question.explanation,
+        points: question.points,
+        options: question.options.map((option) => ({ ...option })),
+      }))
+      return hasOnlyStarter ? additions : [...current, ...additions]
+    })
+    setSuccess(
+      `Đã thêm ${importPreview.questions.length} câu hợp lệ vào bản nháp. Hãy kiểm tra rồi lưu.`,
+    )
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault()
     setValidation('')
     setSuccess('')
-    if (!questions.length) {
-      setValidation('Thêm ít nhất một câu hỏi trước khi lưu.')
+    if (!title.trim()) {
+      setValidation('Nhập tên bài trắc nghiệm trước khi lưu.')
+      return
+    }
+    if (title.trim().length > 180) {
+      setValidation('Tên bài trắc nghiệm không được vượt quá 180 ký tự.')
+      return
+    }
+    if (!questions.length || questions.length > 100) {
+      setValidation('Quiz cần có từ 1 đến 100 câu hỏi.')
+      return
+    }
+    if (description.length > 4_000) {
+      setValidation('Mô tả không được vượt quá 4.000 ký tự.')
+      return
+    }
+    const seenQuestions = new Set<string>()
+    const duplicateQuestion = questions.findIndex((question) => {
+      const normalized = question.questionText.trim().replace(/\s+/gu, ' ').toLocaleLowerCase('de')
+      if (!normalized) return false
+      if (seenQuestions.has(normalized)) return true
+      seenQuestions.add(normalized)
+      return false
+    })
+    if (duplicateQuestion >= 0) {
+      setValidation(`Câu ${duplicateQuestion + 1} bị trùng nội dung với một câu khác.`)
       return
     }
     const invalidQuestion = questions.findIndex(
       (question) =>
         !question.questionText.trim() ||
+        question.questionText.length > 4_000 ||
+        question.explanation.length > 4_000 ||
         question.options.length < 2 ||
-        question.options.some((option) => !option.optionText.trim()) ||
-        question.options.filter((option) => option.isCorrect).length !== 1,
+        question.options.length > 20 ||
+        question.options.some(
+          (option) => !option.optionText.trim() || option.optionText.length > 1_000,
+        ) ||
+        question.options.filter((option) => option.isCorrect).length !== 1 ||
+        !/^(0|[1-9]\d{0,5})(\.\d{1,2})?$/.test(question.points),
     )
     if (invalidQuestion >= 0) {
       setValidation(
@@ -708,7 +796,14 @@ function AdminQuizEditor({
       )
       return
     }
-    if (passScore && (Number(passScore) < 0 || Number(passScore) > 100)) {
+    if (!questions.some((question) => Number(question.points) > 0)) {
+      setValidation('Tổng điểm của bài trắc nghiệm phải lớn hơn 0.')
+      return
+    }
+    if (
+      passScore &&
+      (!Number.isFinite(Number(passScore)) || Number(passScore) < 0 || Number(passScore) > 100)
+    ) {
       setValidation('Điểm đạt cần nằm trong khoảng từ 0 đến 100%.')
       return
     }
@@ -731,6 +826,10 @@ function AdminQuizEditor({
           sortOrder: optionIndex,
         })),
       })),
+    }
+    if (JSON.stringify(input).length > 200_000) {
+      setValidation('Nội dung Quiz vượt giới hạn 200 KiB của hệ thống.')
+      return
     }
     try {
       await save.mutateAsync(input)
@@ -786,12 +885,127 @@ function AdminQuizEditor({
             <Button
               type="button"
               variant="outline"
+              disabled={questions.length >= 100}
               onClick={() => setQuestions((current) => [...current, blankQuestion()])}
               startIcon={<Plus aria-hidden="true" className="size-4" />}
             >
               Thêm câu hỏi
             </Button>
           </div>
+          {quiz.data?.attemptCount ? (
+            <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm leading-6 text-amber-950">
+              Quiz này đã có {quiz.data.attemptCount} lượt làm. Thay đổi chỉ áp dụng cho lượt mới;
+              các lượt cũ giữ nguyên bản chụp chấm điểm.
+            </p>
+          ) : null}
+          <div className="grid gap-2 rounded-xl border border-border-subtle bg-white p-3">
+            <label className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+              <FileUp aria-hidden="true" className="size-4 text-action-primary" />
+              Nhập câu hỏi từ Excel (.xlsx)
+              <input
+                className="block w-full text-sm font-normal file:mr-3 file:min-h-10 file:rounded-lg file:border file:border-border-subtle file:bg-surface-blue file:px-3 file:font-semibold"
+                type="file"
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                onChange={(event) => void readWorkbook(event)}
+                aria-label="Chọn tệp Excel để xem trước câu hỏi"
+              />
+            </label>
+            {importError && (
+              <p role="alert" className="text-sm text-danger-foreground">
+                {importError}
+              </p>
+            )}
+            {importPreview && (
+              <div className="grid gap-3" aria-live="polite">
+                <p className="text-sm text-ink-secondary">
+                  Sheet “{importPreview.sheetName}”: {importPreview.questions.length} câu hợp lệ,{' '}
+                  {importPreview.sourceRows - importPreview.questions.length} dòng cần kiểm tra.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={
+                    !importPreview.questions.length ||
+                    importPreview.questions.length >
+                      100 -
+                        (questions.length === 1 &&
+                        !questions[0]!.id &&
+                        !questions[0]!.questionText.trim() &&
+                        questions[0]!.options.every((option) => !option.optionText.trim())
+                          ? 0
+                          : questions.length)
+                  }
+                  onClick={appendImportedQuestions}
+                >
+                  Thêm câu hợp lệ vào bản nháp
+                </Button>
+                {importPreview.errors.length > 0 && (
+                  <ul
+                    className="grid max-h-40 gap-1 overflow-auto rounded-lg bg-surface-muted p-3 text-sm"
+                    aria-label="Lỗi nhập Excel"
+                  >
+                    {importPreview.errors.map((error, index) => (
+                      <li key={`${error.row}-${error.column}-${index}`}>
+                        Dòng {error.row}, cột {error.column}: {error.message}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-semibold">
+              Tổng điểm:{' '}
+              {questions.reduce((sum, question) => sum + (Number(question.points) || 0), 0)}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setPreviewEnabled((open) => !open)}
+            >
+              {previewEnabled ? 'Đóng xem trước' : 'Xem trước như học viên'}
+            </Button>
+          </div>
+          {previewEnabled && (
+            <div
+              className="grid gap-3 rounded-xl border border-brand-pink bg-brand-pink/20 p-4"
+              aria-label="Bản xem trước bài kiểm tra"
+            >
+              <p className="font-semibold">
+                {title || 'Bài kiểm tra'} · {questions.length} câu
+              </p>
+              {questions.map((question, questionIndex) => (
+                <fieldset
+                  key={question.id ?? `preview-${questionIndex}`}
+                  className="grid gap-2 rounded-lg bg-white p-3"
+                >
+                  <legend className="px-1 text-sm font-semibold">
+                    {questionIndex + 1}. {question.questionText || 'Nội dung câu hỏi'}
+                  </legend>
+                  {question.options.map((option, optionIndex) => (
+                    <label
+                      key={option.id ?? `preview-option-${questionIndex}-${optionIndex}`}
+                      className="flex min-h-11 items-center gap-3 rounded-lg border border-border-subtle px-3 text-sm"
+                    >
+                      <input
+                        type="radio"
+                        name={`preview-question-${questionIndex}`}
+                        checked={previewSelections[questionIndex] === optionIndex}
+                        onChange={() =>
+                          setPreviewSelections((current) => ({
+                            ...current,
+                            [questionIndex]: optionIndex,
+                          }))
+                        }
+                      />
+                      {option.optionText || `Lựa chọn ${optionIndex + 1}`}
+                    </label>
+                  ))}
+                </fieldset>
+              ))}
+            </div>
+          )}
           {questions.map((question, questionIndex) => (
             <section
               key={question.id ?? `new-question-${questionIndex}`}
@@ -799,17 +1013,41 @@ function AdminQuizEditor({
             >
               <div className="flex items-center justify-between gap-3">
                 <h4 className="font-semibold">Câu {questionIndex + 1}</h4>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={questions.length === 1}
-                  onClick={() =>
-                    setQuestions((current) => current.filter((_, index) => index !== questionIndex))
-                  }
-                >
-                  Xóa câu
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    aria-label={`Đưa câu ${questionIndex + 1} lên`}
+                    disabled={questionIndex === 0}
+                    onClick={() => moveQuestion(questionIndex, -1)}
+                  >
+                    <ArrowUp aria-hidden="true" className="size-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    aria-label={`Đưa câu ${questionIndex + 1} xuống`}
+                    disabled={questionIndex === questions.length - 1}
+                    onClick={() => moveQuestion(questionIndex, 1)}
+                  >
+                    <ArrowDown aria-hidden="true" className="size-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={questions.length === 1}
+                    onClick={() =>
+                      setQuestions((current) =>
+                        current.filter((_, index) => index !== questionIndex),
+                      )
+                    }
+                  >
+                    Xóa câu
+                  </Button>
+                </div>
               </div>
               <AdminTextArea
                 label="Nội dung câu hỏi"
@@ -888,6 +1126,7 @@ function AdminQuizEditor({
                   size="sm"
                   variant="outline"
                   className="justify-self-start"
+                  disabled={question.options.length >= 20}
                   onClick={() =>
                     changeQuestion(questionIndex, (current) => ({
                       ...current,

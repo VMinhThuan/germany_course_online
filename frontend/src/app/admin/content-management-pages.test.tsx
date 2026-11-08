@@ -286,8 +286,10 @@ describe('course content management', () => {
         expect.any(String),
       ),
     )
-    expect(await screen.findByLabelText('Đường dẫn hiện tại')).toHaveTextContent(
-      `/admin/courses/${course.id}/sections/${section.id}/lessons/${lesson.id}`,
+    await waitFor(() =>
+      expect(screen.getByLabelText('Đường dẫn hiện tại')).toHaveTextContent(
+        `/admin/courses/${course.id}/sections/${section.id}/lessons/${lesson.id}`,
+      ),
     )
   })
 

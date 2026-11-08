@@ -201,6 +201,8 @@ export interface ApiExercise {
     completedAt: string | null
   } | null
   capabilities: { canMarkComplete: boolean; canViewSolutions: boolean }
+  quiz?: { title: string; description: string | null; questionCount: number }
+  latestAttempt?: { id: string; status: 'IN_PROGRESS' | 'SUBMITTED' } | null
 }
 
 export interface ApiLessonWorkspace {
@@ -438,6 +440,7 @@ export interface ApiAdminQuiz {
   description: string | null
   passScorePercent: number | null
   showCorrectAnswers: boolean
+  attemptCount: number
   questions: Array<{
     id: string
     questionText: string

@@ -15,29 +15,42 @@ export function QuizIntro({
   title,
   description,
   questionCount,
+  maxScore,
+  status = 'NOT_STARTED',
   onStart,
   headingLevel = 1,
 }: {
   title: string
   description: string
   questionCount?: number
+  maxScore?: string
+  status?: 'NOT_STARTED' | 'IN_PROGRESS' | 'SUBMITTED'
   onStart?: () => void
   headingLevel?: HeadingLevel
 }) {
   return (
     <Card className="grid gap-4 p-5 sm:p-7">
       <div>
-        {questionCount !== undefined && (
-          <p className="text-sm font-semibold text-action-primary">
-            Bài kiểm tra · {questionCount} câu
-          </p>
-        )}
+        <div className="flex flex-wrap gap-2 text-sm font-semibold text-action-primary">
+          {questionCount !== undefined && <span>{questionCount} câu hỏi</span>}
+          {maxScore !== undefined && <span>· {maxScore} điểm</span>}
+          {status === 'IN_PROGRESS' && <span>· Đang làm</span>}
+          {status === 'SUBMITTED' && <span>· Đã nộp</span>}
+        </div>
         <SemanticHeading level={headingLevel} className="mt-1 font-display text-2xl font-bold">
           {title}
         </SemanticHeading>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-secondary">{description}</p>
       </div>
-      {onStart && <Button onClick={onStart}>Bắt đầu làm bài</Button>}
+      {onStart && (
+        <Button onClick={onStart}>
+          {status === 'IN_PROGRESS'
+            ? 'Tiếp tục làm bài'
+            : status === 'SUBMITTED'
+              ? 'Xem kết quả'
+              : 'Bắt đầu làm bài'}
+        </Button>
+      )}
     </Card>
   )
 }
@@ -169,6 +182,7 @@ export function QuizRunner({
   onSubmit,
   onRetry,
   confirmBeforeSubmit = false,
+  answerSaving = false,
 }: {
   attempt: QuizAttemptViewModel
   currentQuestionIndex: number
@@ -177,6 +191,7 @@ export function QuizRunner({
   onSubmit: () => Promise<QuizResultViewModel>
   onRetry?: () => void
   confirmBeforeSubmit?: boolean
+  answerSaving?: boolean
 }) {
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string>()
@@ -232,8 +247,13 @@ export function QuizRunner({
             question={question}
             {...(selectedOptionId ? { selectedOptionId } : {})}
             onSelect={onAnswer}
-            disabled={pending || attempt.status === 'SUBMITTED'}
+            disabled={pending || answerSaving || attempt.status === 'SUBMITTED'}
           />
+        )}
+        {answerSaving && (
+          <p role="status" aria-live="polite" className="text-sm text-ink-secondary">
+            Đang lưu lựa chọn…
+          </p>
         )}
         <div className="flex justify-between gap-3">
           <Button
@@ -261,6 +281,7 @@ export function QuizRunner({
         {attempt.capabilities.canSubmit && attempt.status === 'IN_PROGRESS' && (
           <QuizSubmissionPanel
             loading={pending}
+            disabled={answerSaving}
             onSubmit={() => (confirmBeforeSubmit ? setConfirmOpen(true) : void submit())}
           />
         )}
@@ -284,14 +305,28 @@ export function QuizResult({
       <p className="text-sm font-semibold text-success-foreground">Đã nhận kết quả</p>
       <h2 className="font-display text-2xl font-bold">Kết quả bài làm</h2>
       {result.score !== undefined && (
-        <p className="text-lg tabular-nums">
-          Điểm: {result.score}
-          {result.maxScore !== undefined ? ` / ${result.maxScore}` : ''}
-        </p>
+        <div className="grid gap-1">
+          <p className="text-lg tabular-nums">
+            Điểm: {result.score}
+            {result.maxScore !== undefined ? ` / ${result.maxScore}` : ''}
+          </p>
+          {result.maxScore && Number(result.maxScore) > 0 && (
+            <p className="text-sm text-ink-secondary">
+              Tỷ lệ: {((Number(result.score) / Number(result.maxScore)) * 100).toFixed(1)}%
+            </p>
+          )}
+        </div>
       )}
       {result.correctCount !== undefined && (
         <p className="text-sm text-ink-secondary">
           {result.correctCount} / {result.totalQuestions} câu đúng
+        </p>
+      )}
+      {result.passed !== undefined && result.passed !== null && (
+        <p
+          className={`w-fit rounded-full px-3 py-1 text-sm font-semibold ${result.passed ? 'bg-pastel-lime text-pastel-lime-ink' : 'bg-surface-pink text-ink-primary'}`}
+        >
+          {result.passed ? 'Đạt yêu cầu' : 'Chưa đạt yêu cầu'}
         </p>
       )}
       <QuizReview result={result} />
@@ -313,7 +348,14 @@ export function QuizReview({ result }: { result: QuizResultViewModel }) {
     <ol aria-label="Đáp án bài kiểm tra" className="grid gap-3">
       {result.review.map((item, index) => (
         <li key={item.questionId} className="rounded-xl border border-border-subtle p-4">
-          <p className="font-semibold">Câu {index + 1}</p>
+          <p className="font-semibold">
+            Câu {index + 1}. {item.prompt}
+          </p>
+          <p
+            className={`mt-2 text-sm font-semibold ${item.isCorrect ? 'text-success-foreground' : 'text-danger-foreground'}`}
+          >
+            {item.isCorrect ? 'Bạn đã trả lời đúng.' : 'Bạn chưa trả lời đúng câu này.'}
+          </p>
           {(item.correctOption || item.correctOptionId) && (
             <p className="mt-2 text-sm text-success-foreground">
               Đáp án được hệ thống trả về: {item.correctOption ?? item.correctOptionId}

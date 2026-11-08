@@ -1137,6 +1137,7 @@ describe("Express foundation, auth, and public APIs", () => {
         zaloUrl: null,
         footerDescription: "",
         heroMedia: null,
+        introVideo: null,
       });
       expect(await SiteSettings.countDocuments()).toBe(0);
     });

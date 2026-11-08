@@ -821,6 +821,8 @@ export function createStudentProductRepositories(
         if (attempt.status !== 'IN_PROGRESS') apiFailure(409, 'Lượt làm bài này đã được nộp.')
         const review = MOCK_QUIZ_ATTEMPT.questions.map((question) => ({
           questionId: question.id,
+          prompt: question.prompt,
+          isCorrect: attempt.selectedAnswers[question.id] === quizAnswerKey[question.id],
           ...(attempt.selectedAnswers[question.id]
             ? { selectedOptionId: attempt.selectedAnswers[question.id]! }
             : {}),

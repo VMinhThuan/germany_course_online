@@ -22,6 +22,7 @@
     "db:bootstrap-admin": "tsx scripts/bootstrap-admin.ts",
     "media:migrate": "tsx scripts/media-migration/cli.ts",
     "db:course-import": "tsx scripts/course-import/cli.ts",
+    "db:seed-a11-quizzes": "tsx scripts/seed-a11-quizzes.ts",
     "typecheck:course-import": "tsc --noEmit -p scripts/course-import/tsconfig.json",
     "check": "node scripts/check.mjs"
   },
@@ -33,6 +34,7 @@
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "dotenv": "^18.0.9",
+    "exceljs": "^4.4.0",
     "express": "^5.3.0",
     "express-rate-limit": "^8.7.3",
     "helmet": "^8.3.0",

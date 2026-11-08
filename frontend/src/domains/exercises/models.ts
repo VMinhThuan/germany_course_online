@@ -33,4 +33,6 @@ export interface ExerciseViewModel {
     canMarkComplete: boolean
     canViewSolutions: boolean
   }
+  quiz?: { title: string; description?: string; questionCount: number }
+  latestAttempt?: { id: string; status: 'IN_PROGRESS' | 'SUBMITTED' }
 }

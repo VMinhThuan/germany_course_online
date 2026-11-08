@@ -23,6 +23,8 @@ export interface QuizAttemptViewModel {
 
 export interface QuizReviewItemViewModel {
   questionId: string
+  prompt: string
+  isCorrect: boolean
   selectedOptionId?: string
   selectedOption?: string
   correctOptionId?: string
@@ -36,6 +38,7 @@ export interface QuizResultViewModel {
   maxScore?: string
   correctCount?: number
   totalQuestions: number
+  passed?: boolean | null
   review?: readonly QuizReviewItemViewModel[]
   capabilities: { canReviewAnswers: boolean; canRetry: boolean }
 }

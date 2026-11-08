@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { CouponField, EnrollmentStatusCard, PaymentStatusPanel } from '@/domains/commerce'
 import { LessonNotesEditor, NoteSaveStatus, ProgressRing } from '@/domains/progress'
-import { QuizOption, QuizResult, QuizRunner } from '@/domains/quizzes'
+import { QuizIntro, QuizOption, QuizResult, QuizRunner } from '@/domains/quizzes'
 import { MOCK_QUIZ_ATTEMPT, MOCK_QUIZ_RESULT } from '@/data/mock'
 
 function deferred<T>() {
@@ -65,6 +65,34 @@ describe('quiz components', () => {
     submission.reject(new Error('Network unavailable'))
     expect(await screen.findByRole('alert')).toHaveTextContent('Không gửi được bài kiểm tra')
     await waitFor(() => expect(screen.getByRole('button', { name: 'Nộp bài' })).toBeEnabled())
+  })
+
+  it('shows a persisted attempt status and disables answer controls while saving', () => {
+    const onStart = vi.fn()
+    const { rerender } = render(
+      <QuizIntro
+        title="Verbkonjugation"
+        description="Chọn một đáp án."
+        questionCount={20}
+        status="IN_PROGRESS"
+        onStart={onStart}
+      />,
+    )
+    expect(screen.getByText('· Đang làm')).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Tiếp tục làm bài' })).toBeVisible()
+
+    rerender(
+      <QuizRunner
+        attempt={MOCK_QUIZ_ATTEMPT}
+        currentQuestionIndex={0}
+        onNavigate={() => undefined}
+        onAnswer={() => undefined}
+        onSubmit={async () => MOCK_QUIZ_RESULT}
+        answerSaving
+      />,
+    )
+    expect(screen.getByRole('status')).toHaveTextContent('Đang lưu lựa chọn')
+    expect(screen.getByRole('radio', { name: 'Guten Morgen!' })).toBeDisabled()
   })
 })
 

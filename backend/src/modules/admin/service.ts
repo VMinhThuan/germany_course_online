@@ -17,6 +17,7 @@ import {
   Order,
   RenewalPlan,
   Quiz,
+  QuizAttempt,
   SiteSettings,
   User,
   UserSession,
@@ -587,7 +588,11 @@ export class AdminService {
     );
   }
 
-  async createExercise(lessonId: string, input: ExerciseWrite, actor: Actor) {
+  async createExercise(
+    lessonId: string,
+    input: ExerciseWrite,
+    actor: AuditActor,
+  ) {
     const parentId = objectId(lessonId);
     return withTransaction(async (session) => {
       const parent = await Lesson.findOne({
@@ -634,7 +639,11 @@ export class AdminService {
     });
   }
 
-  async updateExercise(exerciseId: string, patch: ExercisePatch, actor: Actor) {
+  async updateExercise(
+    exerciseId: string,
+    patch: ExercisePatch,
+    actor: AuditActor,
+  ) {
     const oid = objectId(exerciseId);
     return withTransaction(async (session) => {
       const exercise = await Exercise.findOne({
@@ -707,10 +716,11 @@ export class AdminService {
     const exercise = await this.getQuizExercise(exerciseId);
     const quiz = await Quiz.findOne({ exerciseId: exercise._id }).lean();
     if (!quiz) throw notFound("Quiz definition not found.");
-    return quizDto(quiz as unknown as Doc);
+    const attemptCount = await QuizAttempt.countDocuments({ quizId: quiz._id });
+    return { ...quizDto(quiz as unknown as Doc), attemptCount };
   }
 
-  async replaceQuiz(exerciseId: string, input: QuizWrite, actor: Actor) {
+  async replaceQuiz(exerciseId: string, input: QuizWrite, actor: AuditActor) {
     const exerciseObjectId = objectId(exerciseId);
     validateQuizInput(input);
     return withTransaction(async (session) => {

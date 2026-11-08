@@ -610,6 +610,20 @@ describe("BE-02 student learning APIs", () => {
   });
 
   it("grades from an immutable snapshot, withholds keys before submission, and supports safe retries", async () => {
+    const intro = await request(app)
+      .get(`/api/v1/learn/exercises/${quizExerciseId}`)
+      .set("Authorization", student.authorization);
+    expect(intro.status).toBe(200);
+    expect(intro.body.data.quiz).toEqual({
+      title: "Greetings",
+      description: null,
+      questionCount: 1,
+    });
+    expect(intro.body.data.latestAttempt).toBeNull();
+    expect(JSON.stringify(intro.body)).not.toMatch(
+      /isCorrect|correctOption|explanation|answerKey/i,
+    );
+
     const owner = await request(app)
       .post(`/api/v1/learn/exercises/${quizExerciseId}/quiz-attempts`)
       .set("Authorization", student.authorization)
@@ -623,6 +637,13 @@ describe("BE-02 student learning APIs", () => {
     expect(await QuizAttempt.countDocuments({ userId: student.userId })).toBe(
       1,
     );
+    const resumedIntro = await request(app)
+      .get(`/api/v1/learn/exercises/${quizExerciseId}`)
+      .set("Authorization", student.authorization);
+    expect(resumedIntro.body.data.latestAttempt).toEqual({
+      id: attemptId,
+      status: "IN_PROGRESS",
+    });
 
     const replay = await request(app)
       .post(`/api/v1/learn/exercises/${quizExerciseId}/quiz-attempts`)

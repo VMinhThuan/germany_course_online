@@ -508,6 +508,16 @@ const learning: StudentLearningRepository = {
           : {}),
       })),
       capabilities: exercise.capabilities,
+      ...(exercise.quiz
+        ? {
+            quiz: {
+              title: exercise.quiz.title,
+              ...(exercise.quiz.description ? { description: exercise.quiz.description } : {}),
+              questionCount: exercise.quiz.questionCount,
+            },
+          }
+        : {}),
+      ...(exercise.latestAttempt ? { latestAttempt: exercise.latestAttempt } : {}),
     }
   },
   async completeExercise(_sessionId, exerciseId) {
@@ -638,8 +648,11 @@ function mapQuizResult(result: ApiQuizResult): QuizResultViewModel {
     maxScore: result.maxScore,
     correctCount: result.correctCount,
     totalQuestions: result.totalQuestions,
+    passed: result.passed,
     review: result.review.map((item) => ({
       questionId: item.questionId,
+      prompt: item.prompt,
+      isCorrect: item.isCorrect,
       ...(item.selectedOptionId ? { selectedOptionId: item.selectedOptionId } : {}),
       ...(item.selectedOption ? { selectedOption: item.selectedOption } : {}),
       ...(item.correctOptionId ? { correctOptionId: item.correctOptionId } : {}),

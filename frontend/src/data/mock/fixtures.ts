@@ -260,12 +260,16 @@ export const MOCK_QUIZ_RESULT: QuizResultViewModel = {
   review: [
     {
       questionId: 'question-greeting-01',
+      prompt: 'Bạn gặp người đối diện vào buổi sáng. Câu chào nào phù hợp?',
+      isCorrect: true,
       selectedOptionId: 'option-guten-morgen',
       correctOptionId: 'option-guten-morgen',
       explanation: '“Guten Morgen” là lời chào buổi sáng.',
     },
     {
       questionId: 'question-name-01',
+      prompt: 'Câu nào dùng để giới thiệu tên?',
+      isCorrect: false,
       selectedOptionId: 'option-ich-wohne',
       correctOptionId: 'option-ich-heisse',
       explanation: '“Ich heiße” dùng để giới thiệu tên.',

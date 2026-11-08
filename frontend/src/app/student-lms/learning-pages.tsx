@@ -472,12 +472,21 @@ export function LearningExercisePage() {
   const navigate = useNavigate()
 
   async function beginQuiz() {
+    const existingAttempt = exercise.data?.latestAttempt
+    const params = new URLSearchParams({
+      exerciseId,
+      ...(exercise.data?.lessonId ? { lessonId: exercise.data.lessonId } : {}),
+    })
+    if (existingAttempt) {
+      const destination =
+        existingAttempt.status === 'SUBMITTED'
+          ? `/learn/quizzes/${existingAttempt.id}/result`
+          : `/learn/quizzes/${existingAttempt.id}`
+      navigate(`${destination}?${params.toString()}`)
+      return
+    }
     try {
       const attempt = await startQuiz.mutateAsync(exerciseId)
-      const params = new URLSearchParams({
-        exerciseId,
-        ...(exercise.data?.lessonId ? { lessonId: exercise.data.lessonId } : {}),
-      })
       navigate(`/learn/quizzes/${attempt.id}?${params.toString()}`)
     } catch {
       // The mutation error is presented inline.
@@ -544,8 +553,14 @@ export function LearningExercisePage() {
               <ExerciseStatusBadge status={exercise.data.status} />
             </div>
             <QuizIntro
-              title={exercise.data.title}
-              description={`${exercise.data.description ? `${exercise.data.description} ` : ''}Câu hỏi được tải từ máy chủ; đáp án chỉ hiển thị nếu cấu hình bài kiểm tra cho phép.`}
+              title={exercise.data.quiz?.title ?? exercise.data.title}
+              description={
+                exercise.data.quiz?.description ??
+                exercise.data.description ??
+                'Chọn một đáp án cho mỗi câu hỏi. Kết quả sẽ được chấm sau khi nộp bài.'
+              }
+              {...(exercise.data.quiz ? { questionCount: exercise.data.quiz.questionCount } : {})}
+              status={exercise.data.latestAttempt?.status ?? 'NOT_STARTED'}
               onStart={() => void beginQuiz()}
               headingLevel={2}
             />
@@ -586,6 +601,7 @@ export function LearningQuizPage() {
   const navigate = useNavigate()
   const [optimisticAnswers, setOptimisticAnswers] = useState<Record<string, string>>({})
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
+  const [answerSaved, setAnswerSaved] = useState(false)
 
   return (
     <ProductPage
@@ -623,10 +639,27 @@ export function LearningQuizPage() {
               },
             }}
             currentQuestionIndex={currentQuestionIndex}
+            answerSaving={selectAnswer.isPending}
             onNavigate={setCurrentQuestionIndex}
             onAnswer={(questionId, optionId) => {
+              if (selectAnswer.isPending || !attempt.data) return
+              const previous = attempt.data.selectedAnswers[questionId]
+              setAnswerSaved(false)
               setOptimisticAnswers((previous) => ({ ...previous, [questionId]: optionId }))
-              selectAnswer.mutate({ questionId, optionId })
+              selectAnswer.mutate(
+                { questionId, optionId },
+                {
+                  onSuccess: () => setAnswerSaved(true),
+                  onError: () => {
+                    setOptimisticAnswers((current) => {
+                      const next = { ...current }
+                      if (previous) next[questionId] = previous
+                      else delete next[questionId]
+                      return next
+                    })
+                  },
+                },
+              )
             }}
             onSubmit={async () => {
               const result = await submitQuiz.mutateAsync()
@@ -645,6 +678,15 @@ export function LearningQuizPage() {
               : {})}
             confirmBeforeSubmit
           />
+          {answerSaved && !selectAnswer.isPending && !selectAnswer.isError && (
+            <p
+              role="status"
+              aria-live="polite"
+              className="mx-auto w-full max-w-3xl text-sm text-success-foreground"
+            >
+              Đã lưu đáp án.
+            </p>
+          )}
           {selectAnswer.isError && (
             <ErrorState
               title="Chưa lưu lựa chọn"

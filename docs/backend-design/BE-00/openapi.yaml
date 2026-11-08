@@ -10490,6 +10490,40 @@ components:
           required:
             - canMarkComplete
             - canViewSolutions
+        quiz:
+          type: object
+          properties:
+            title:
+              type: string
+            description:
+              oneOf:
+                - type: string
+                - type: "null"
+            questionCount:
+              type: integer
+              minimum: 0
+          additionalProperties: false
+          required:
+            - title
+            - description
+            - questionCount
+        latestAttempt:
+          oneOf:
+            - type: object
+              properties:
+                id:
+                  type: string
+                  pattern: ^[a-fA-F0-9]{24}$
+                status:
+                  type: string
+                  enum:
+                    - IN_PROGRESS
+                    - SUBMITTED
+              additionalProperties: false
+              required:
+                - id
+                - status
+            - type: "null"
       additionalProperties: false
       required:
         - id
@@ -11972,6 +12006,9 @@ components:
             - "null"
         showCorrectAnswers:
           type: boolean
+        attemptCount:
+          type: integer
+          minimum: 0
         questions:
           type: array
           items:
@@ -11982,6 +12019,7 @@ components:
         - description
         - passScorePercent
         - showCorrectAnswers
+        - attemptCount
         - questions
       additionalProperties: false
     RegisterRequest:

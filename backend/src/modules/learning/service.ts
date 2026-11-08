@@ -11,6 +11,8 @@ import {
   LessonNote,
   LessonProgress,
   MediaAsset,
+  Quiz,
+  QuizAttempt,
   User,
 } from "../../db/models/index.js";
 import { AppError, notFound } from "../../shared/errors.js";
@@ -498,14 +500,42 @@ export class LearningService {
       exerciseId,
     );
     await this.touchExerciseProgress(userId, exercise._id);
-    const [assets, progress] = await Promise.all([
+    const [assets, progress, quizSummary, latestAttempt] = await Promise.all([
       this.exerciseAssetDtos([exercise._id]),
       ExerciseProgress.findOne({
         userId: new Types.ObjectId(userId),
         exerciseId: exercise._id,
       }).lean(),
+      exercise.exerciseType === "QUIZ"
+        ? Quiz.findOne({ exerciseId: exercise._id })
+            .select("title description questions")
+            .lean()
+        : null,
+      exercise.exerciseType === "QUIZ"
+        ? QuizAttempt.findOne({
+            userId: new Types.ObjectId(userId),
+            exerciseId: exercise._id,
+          })
+            .sort({ createdAt: -1, _id: -1 })
+            .select("_id status")
+            .lean()
+        : null,
     ]);
-    return this.exerciseDto(exercise, assets, progress ?? undefined);
+    return {
+      ...this.exerciseDto(exercise, assets, progress ?? undefined),
+      ...(quizSummary
+        ? {
+            quiz: {
+              title: quizSummary.title,
+              description: quizSummary.description ?? null,
+              questionCount: quizSummary.questions.length,
+            },
+          }
+        : {}),
+      latestAttempt: latestAttempt
+        ? { id: latestAttempt._id.toString(), status: latestAttempt.status }
+        : null,
+    };
   }
 
   async completeExercise(userId: string, exerciseId: string) {
