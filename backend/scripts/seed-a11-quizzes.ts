@@ -181,7 +181,14 @@ async function main() {
         course: { id: plan.courseId, title: plan.courseTitle },
         section: { id: plan.sectionId, title: plan.sectionTitle },
         lesson: plan.lesson
-          ? { id: plan.lesson._id.toString(), title: PRACTICE_LESSON_TITLE }
+          ? {
+              id: plan.lesson._id.toString(),
+              title: PRACTICE_LESSON_TITLE,
+              lessonType: plan.lesson.lessonType,
+              countsTowardProgress: plan.lesson.countsTowardProgress,
+              status: plan.lesson.status,
+              sortOrder: plan.lesson.sortOrder,
+            }
           : null,
         quizzes: plan.quizzes.map((quiz) => ({
           title: quiz.source.title,
@@ -568,7 +575,7 @@ function summarize(plan: Plan) {
       title: PRACTICE_LESSON_TITLE,
       action: plan.lessonAction,
       countsTowardProgress: false,
-      sortOrder: plan.lessonSortOrder,
+      sortOrder: plan.lesson?.sortOrder ?? plan.lessonSortOrder,
     },
     quizzes: plan.quizzes.map((quiz) => ({
       title: quiz.source.title,

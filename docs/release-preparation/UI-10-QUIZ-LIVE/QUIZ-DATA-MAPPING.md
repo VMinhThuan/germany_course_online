@@ -1,9 +1,9 @@
 # Quiz source mapping
 
-| Workbook | Quiz title | Lesson | Exercise type | Completion | Required | Questions | Points |
-| --- | --- | --- | --- | --- | --- | ---: | ---: |
-| `Quiz Verbkonjugation.xlsx` | `Verbkonjugation` | `Luyện tập chia động từ` | `QUIZ` | `QUIZ_SUBMISSION` | No | 20 | 20 |
-| `Quiz unregelmäßig Verb.xlsx` | `Unregelmäßige Verben` | `Luyện tập chia động từ` | `QUIZ` | `QUIZ_SUBMISSION` | No | 20 | 20 |
+| Workbook                      | Quiz title             | Lesson                   | Exercise type | Completion        | Required | Questions | Points |
+| ----------------------------- | ---------------------- | ------------------------ | ------------- | ----------------- | -------- | --------: | -----: |
+| `Quiz Verbkonjugation.xlsx`   | `Verbkonjugation`      | `Luyện tập chia động từ` | `QUIZ`        | `QUIZ_SUBMISSION` | No       |        20 |     20 |
+| `Quiz unregelmäßig Verb.xlsx` | `Unregelmäßige Verben` | `Luyện tập chia động từ` | `QUIZ`        | `QUIZ_SUBMISSION` | No       |        20 |     20 |
 
 The practice lesson is attached to the existing published A1.1 `Lektion 1` section, uses lesson type `PRACTICE`, and has `countsTowardProgress=false`. No course, section, enrollment, price, access-duration, or existing progress records are rewritten.
 
