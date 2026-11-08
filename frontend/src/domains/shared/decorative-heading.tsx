@@ -61,12 +61,10 @@ export function DecorativeHeading({
 }) {
   const layout = safeCreateLetteringLayout(text)
   const semanticText: ReactNode = layout ? <span className="sr-only">{text}</span> : text
-  const scale = size === 'lg' ? 'max-w-xl' : size === 'md' ? 'max-w-lg' : 'max-w-md'
+  const scale = size === 'lg' ? 'w-[36rem]' : size === 'md' ? 'w-[32rem]' : 'w-[28rem]'
   const headingClass = [
     'w-full text-3xl font-bold tracking-tight sm:text-4xl',
-    layout
-      ? 'decorative-lettering-heading rounded-3xl border border-brand-pink bg-brand-pink/45 px-4 py-3 shadow-raised sm:px-6 sm:py-4'
-      : 'font-display',
+    layout ? 'decorative-lettering-heading' : 'font-display',
     className,
   ]
     .filter(Boolean)
@@ -77,8 +75,13 @@ export function DecorativeHeading({
     { className: headingClass },
     semanticText,
     layout ? (
-      <span aria-hidden="true" className={`block w-full ${scale}`}>
-        <LetteringSvg layout={layout} />
+      <span
+        aria-hidden="true"
+        className="mt-1 inline-block max-w-full rounded-3xl border border-brand-pink bg-brand-pink/45 px-4 py-3 shadow-raised sm:px-6 sm:py-4"
+      >
+        <span className={`block max-w-full ${scale}`}>
+          <LetteringSvg layout={layout} />
+        </span>
       </span>
     ) : null,
   )

@@ -12,7 +12,7 @@ Coiny Regular (OFL 1.1) → opentype.js metrics and glyph contours
 
 `DecorativeHeading` keeps its `text`, `level`, `size`, and `className` API. It still renders semantic headings and provides a regular-text fallback when a requested character has no generated geometry. Only the existing “Không gian bài học” and “Không gian khóa học” headings use custom lettering. Dynamic course names and other headings remain normal text.
 
-The cream fill, blue outline, and blue shadow remain separate vector layers; the follow-up UI refinement increases the outline expansion and places each rendered title in a pink, raised card. Lesson controls, course tree, and learning API behavior remain unchanged. On mobile, the two custom headings take a full row and the Back link moves below it, aligned right, so the lettering does not shrink beside the control. The cream body is a separate expanded path; a second path creates the outer blue contour. There is no SVG stroke expansion or runtime Canvas rendering.
+The cream fill, blue outline, and blue shadow remain separate vector layers; the follow-up UI refinement increases the outline expansion and places each rendered title in a pink, raised card sized to the lettering rather than the full title column. Lesson controls, course tree, and learning API behavior remain unchanged. On mobile, the two custom headings take a full row and the Back link moves below it, aligned right, so the lettering does not shrink beside the control. The cream body is a separate expanded path; a second path creates the outer blue contour. There is no SVG stroke expansion or runtime Canvas rendering.
 
 ## Evidence
 
