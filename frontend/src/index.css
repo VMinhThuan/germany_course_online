@@ -92,6 +92,11 @@
   font-family: var(--font-body-base);
 }
 
+.decorative-lettering-heading {
+  font-size: 0;
+  line-height: 1;
+}
+
 h2.font-extrabold,
 h3.font-extrabold,
 h4.font-extrabold,

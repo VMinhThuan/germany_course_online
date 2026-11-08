@@ -1,3 +1,4 @@
 export * from './models'
 export * from './components'
+export * from './lesson-outline-accordion'
 export * from './youtube-lesson-player'

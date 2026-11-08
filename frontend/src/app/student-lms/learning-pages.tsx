@@ -27,7 +27,7 @@ import { useStudentDashboard } from '@/data/student-demo/queries'
 import {
   ChapterItem,
   CourseProgressCard,
-  CourseTree,
+  DecorativeHeading,
   ExerciseStatusBadge,
   FileExercisePanel,
   LearningCourseHeader,
@@ -37,6 +37,7 @@ import {
   LessonNotesEditor,
   LessonProgressList,
   YouTubeLessonPlayer,
+  LessonOutlineAccordion,
   QuizIntro,
   QuizResult,
   QuizRunner,
@@ -76,6 +77,16 @@ export function LearningCoursePage() {
       title={
         course.data ? `Không gian khóa học: ${course.data.course.title}` : 'Không gian khóa học'
       }
+      heading={
+        <div className="grid gap-2">
+          <DecorativeHeading text="Không gian khóa học" level={1} size="lg" />
+          {course.data && (
+            <p className="text-base font-semibold text-ink-secondary sm:text-lg">
+              {course.data.course.title}
+            </p>
+          )}
+        </div>
+      }
       eyebrow=""
       backTo="/student/courses"
     >
@@ -88,11 +99,14 @@ export function LearningCoursePage() {
       ) : (
         <div className="grid min-w-0 gap-4">
           <SectionHeader title="Lộ trình khóa học" />
-          <Progress
-            value={progressPercent}
-            label={`${completedLessons}/${trackedLessons.length} bài học hoàn thành`}
-          />
-          <CourseTree
+          <div className="rounded-2xl border border-brand-blue/70 bg-surface-blue p-4 sm:p-5">
+            <Progress
+              value={progressPercent}
+              label={`${completedLessons}/${trackedLessons.length} bài học hoàn thành`}
+              indicatorClassName="bg-brand-lime"
+            />
+          </div>
+          <LessonOutlineAccordion
             tree={course.data.tree}
             onSelectLesson={(lessonId) => navigate(`/learn/lessons/${lessonId}`)}
             onSelectSection={(sectionId) =>
@@ -161,59 +175,12 @@ function LessonOutlineTree({
   onSelectLesson: (lessonId: string) => void
 }) {
   return (
-    <nav aria-label={`Lộ trình ${course.course.title}`} className="grid gap-2">
-      {course.tree.sections.map((section, sectionIndex) => (
-        <details key={section.id} open={section.id === lesson.sectionId}>
-          <summary className="cursor-pointer rounded-lg px-2 py-2 text-sm font-semibold text-ink-primary hover:bg-surface-muted">
-            <span className="mr-2 text-xs font-bold text-action-primary">
-              Chương {sectionIndex + 1}
-            </span>
-            {section.title}
-          </summary>
-          <ol className="ml-2 grid gap-1 border-l border-border-subtle pl-2">
-            {section.lessons.map((item, lessonIndex) => {
-              const active = item.id === lesson.lesson.id
-              const status = item.progressStatus
-              return (
-                <li key={item.id} className="grid gap-1">
-                  <button
-                    type="button"
-                    aria-current={active ? 'page' : undefined}
-                    onClick={() => onSelectLesson(item.id)}
-                    className={`grid min-h-10 grid-cols-[1.5rem_minmax(0,1fr)_auto] items-center gap-2 rounded-lg px-2 text-left text-sm transition-colors hover:bg-surface-muted ${active ? 'bg-surface-blue font-semibold text-ink-primary' : 'text-ink-secondary'}`}
-                  >
-                    <span className="text-xs tabular-nums text-ink-muted">{lessonIndex + 1}.</span>
-                    <span className="min-w-0 truncate">{item.title}</span>
-                    <span className="text-[0.68rem] text-ink-muted">
-                      {status === 'COMPLETED' ? 'Xong' : status === 'IN_PROGRESS' ? 'Đang học' : ''}
-                    </span>
-                  </button>
-                  {active && lesson.exercises.length > 0 && (
-                    <details className="ml-6 rounded-lg bg-surface-muted/70 px-2">
-                      <summary className="cursor-pointer py-2 text-xs font-semibold text-ink-secondary">
-                        Bài tập ({lesson.exercises.length})
-                      </summary>
-                      <ul className="grid gap-1 pb-2">
-                        {lesson.exercises.map((exercise) => (
-                          <li key={exercise.id}>
-                            <Link
-                              to={exercise.href}
-                              className="block truncate rounded-md px-2 py-1.5 text-xs text-action-primary hover:bg-card-surface"
-                            >
-                              {exercise.title}
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
-                    </details>
-                  )}
-                </li>
-              )
-            })}
-          </ol>
-        </details>
-      ))}
-    </nav>
+    <LessonOutlineAccordion
+      tree={course.tree}
+      currentLessonId={lesson.lesson.id}
+      compact
+      onSelectLesson={onSelectLesson}
+    />
   )
 }
 
@@ -246,6 +213,7 @@ export function LearningLessonPage() {
   return (
     <ProductPage
       title="Không gian bài học"
+      heading={<DecorativeHeading text="Không gian bài học" level={1} size="lg" />}
       eyebrow=""
       backTo={lesson.data ? `/learn/courses/${lesson.data.courseId}` : '/student/courses'}
       wide
@@ -274,7 +242,11 @@ export function LearningLessonPage() {
           </div>
           <div className="grid min-w-0 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_19rem]">
             <div className="grid min-w-0 gap-6">
-              <section aria-label="Bài giảng của bài học" className="grid min-w-0 gap-3">
+              <section
+                id="lesson-video"
+                aria-label="Bài giảng của bài học"
+                className="grid min-w-0 gap-3 rounded-2xl border border-brand-blue/60 bg-surface-blue/30 p-3 sm:p-5"
+              >
                 <SectionHeader title="Bài giảng" />
                 <LessonContent
                   content={{ ...lesson.data, media: [] }}
@@ -301,7 +273,10 @@ export function LearningLessonPage() {
                 )}
               </section>
               {lesson.data.exercises.length > 0 && (
-                <section aria-label="Bài tập của bài học" className="grid gap-3">
+                <section
+                  aria-label="Bài tập của bài học"
+                  className="grid gap-3 rounded-2xl border border-brand-pink bg-brand-pink/20 p-3 sm:p-5"
+                >
                   <SectionHeader title="Bài tập" />
                   <div className="grid min-w-0 gap-3">
                     {lesson.data.exercises.map((exercise) =>

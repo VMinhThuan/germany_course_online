@@ -596,6 +596,15 @@ describe("BE-02 student learning APIs", () => {
     expect(overview.status).toBe(200);
     expect(overview.body.data.sections).toHaveLength(1);
     expect(overview.body.data.sections[0].lessons).toHaveLength(1);
+    const outlineLesson = overview.body.data.sections[0].lessons[0];
+    expect(outlineLesson.hasVideo).toBe(true);
+    expect(outlineLesson.exercises).toEqual([
+      { id: manualExerciseId, title: "Greeting practice", sortOrder: 1 },
+      { id: quizExerciseId, title: "Greeting quiz", sortOrder: 2 },
+    ]);
+    expect(JSON.stringify(outlineLesson)).not.toMatch(
+      /instructions|assets|videoId|answer|passwordHash|content/i,
+    );
     expect(JSON.stringify(overview.body)).not.toContain("not visible");
     expect(JSON.stringify(overview.body)).not.toContain("deleted content");
   });

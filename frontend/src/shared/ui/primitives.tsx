@@ -397,10 +397,12 @@ export function Progress({
   value,
   label,
   className,
+  indicatorClassName,
 }: {
   value: number
   label: string
   className?: string
+  indicatorClassName?: string
 }) {
   const normalized = Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : 0
 
@@ -416,7 +418,10 @@ export function Progress({
         className="relative h-2.5 w-full overflow-hidden rounded-full bg-surface-muted"
       >
         <ProgressPrimitive.Indicator
-          className="h-full rounded-full bg-action-primary transition-[width] duration-300 ease-out motion-reduce:transition-none"
+          className={cn(
+            'h-full rounded-full bg-action-primary transition-[width] duration-300 ease-out motion-reduce:transition-none',
+            indicatorClassName,
+          )}
           style={{ width: `${normalized}%` }}
         />
       </ProgressPrimitive.Root>
@@ -546,12 +551,14 @@ export function Container({ className, ...props }: HTMLAttributes<HTMLDivElement
 export function PageHeader({
   eyebrow,
   title,
+  heading,
   description,
   actions,
   className,
 }: {
   eyebrow?: string
   title: string
+  heading?: ReactNode
   description?: string
   actions?: ReactNode
   className?: string
@@ -560,13 +567,15 @@ export function PageHeader({
     <header
       className={cn('flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between', className)}
     >
-      <div className="max-w-3xl space-y-2">
+      <div className={cn('max-w-3xl space-y-2', heading && 'w-full')}>
         {eyebrow && (
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-action-primary">
             {eyebrow}
           </p>
         )}
-        <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">{title}</h1>
+        {heading ?? (
+          <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">{title}</h1>
+        )}
         {description && (
           <p className="max-w-2xl text-base leading-7 text-ink-secondary sm:text-lg">
             {description}

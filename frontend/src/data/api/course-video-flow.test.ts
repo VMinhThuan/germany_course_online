@@ -12,6 +12,60 @@ import { apiRequest } from '@/lib/api/client'
 const requestMock = vi.mocked(apiRequest)
 
 describe('A1.1 real API data mapping', () => {
+  it('maps actual lesson video and exercise outline metadata from the protected course API', async () => {
+    requestMock.mockResolvedValueOnce({
+      course: { id: 'course-id', slug: 'niveau-a1-1', title: 'Niveau A1.1', level: 'A1.1' },
+      sections: [
+        {
+          id: 'section-id',
+          title: 'Lektion 1',
+          description: '',
+          sectionType: 'CHAPTER',
+          sortOrder: 1,
+          lessons: [
+            {
+              id: 'lesson-id',
+              title: 'Begrüßung und Abschied',
+              description: '',
+              lessonType: 'LECTURE',
+              estimatedMinutes: null,
+              countsTowardProgress: true,
+              sortOrder: 1,
+              hasVideo: true,
+              exercises: [{ id: 'exercise-id', title: 'Arbeitsblatt', sortOrder: 2 }],
+              progress: {
+                lessonId: 'lesson-id',
+                status: 'IN_PROGRESS',
+                completedAt: null,
+              },
+            },
+          ],
+        },
+      ],
+      access: 'ACTIVE',
+      progress: {
+        courseId: 'course-id',
+        percent: 0,
+        completedLessons: 0,
+        totalLessons: 1,
+      },
+    })
+
+    const course = await apiStudentRepositories.learning.getCourseOverview(
+      'session-id',
+      'course-id',
+    )
+    const lesson = course.tree.sections[0]?.lessons[0]
+
+    expect(lesson).toMatchObject({
+      id: 'lesson-id',
+      hasVideo: true,
+      progressStatus: 'IN_PROGRESS',
+      exercises: [{ id: 'exercise-id', title: 'Arbeitsblatt', sortOrder: 2 }],
+    })
+    expect(requestMock).toHaveBeenCalledWith('/me/courses/course-id')
+  })
+
   it('maps the public course API outline into catalog view models', async () => {
     requestMock.mockResolvedValueOnce({
       id: 'course-id',

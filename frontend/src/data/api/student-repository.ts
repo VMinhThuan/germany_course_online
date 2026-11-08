@@ -104,6 +104,7 @@ function toLessonSummary(lesson: {
   lessonType: 'LECTURE' | 'PRACTICE'
   estimatedMinutes: number | null
   countsTowardProgress: boolean
+  hasVideo?: boolean
   progress?: { status: string }
   exercises?: readonly { id: string; title: string; sortOrder: number }[]
 }): LessonSummaryModel {
@@ -115,6 +116,7 @@ function toLessonSummary(lesson: {
     ...(lesson.estimatedMinutes !== null ? { estimatedMinutes: lesson.estimatedMinutes } : {}),
     countsTowardProgress: lesson.countsTowardProgress,
     progressStatus: lessonStatus(lesson.progress?.status),
+    ...(lesson.hasVideo !== undefined ? { hasVideo: lesson.hasVideo } : {}),
     ...(lesson.exercises ? { exercises: lesson.exercises } : {}),
   }
 }

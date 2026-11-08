@@ -3,9 +3,10 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NotificationProvider } from '@/shared/ui/notifications'
-import { LearningLessonPage } from './learning-pages'
+import { LearningCoursePage, LearningLessonPage } from './learning-pages'
 
 const mocks = vi.hoisted(() => ({
+  useProductCourse: vi.fn(),
   useProductLesson: vi.fn(),
   useProductLessonNote: vi.fn(),
   useSaveLessonNote: vi.fn(),
@@ -20,6 +21,7 @@ vi.mock('@/app/auth/auth-session', () => ({
 }))
 
 vi.mock('@/data/student-demo/product-queries', () => ({
+  useProductCourse: mocks.useProductCourse,
   useProductLesson: mocks.useProductLesson,
   useProductLessonNote: mocks.useProductLessonNote,
   useSaveLessonNote: mocks.useSaveLessonNote,
@@ -28,9 +30,17 @@ vi.mock('@/data/student-demo/product-queries', () => ({
 }))
 
 vi.mock('./shared', () => ({
-  ProductPage: ({ title, children }: { title: string; children: React.ReactNode }) => (
+  ProductPage: ({
+    title,
+    heading,
+    children,
+  }: {
+    title: string
+    heading?: React.ReactNode
+    children: React.ReactNode
+  }) => (
     <main>
-      <h1>{title}</h1>
+      {heading ?? <h1>{title}</h1>}
       {children}
     </main>
   ),
@@ -96,6 +106,49 @@ const lessonData = {
   nextLessonId: 'lesson-3',
 }
 
+const courseData = {
+  course: { id: 'course-1', slug: 'niveau-a1-1', title: 'Niveau A1.1', level: 'A1.1' },
+  tree: {
+    courseId: 'course-1',
+    courseTitle: 'Niveau A1.1',
+    currentLessonId: 'lesson-2',
+    sections: [
+      {
+        id: 'section-1',
+        courseId: 'course-1',
+        title: 'Lektion 1',
+        sectionType: 'CHAPTER' as const,
+        contentStatus: 'PUBLISHED' as const,
+        sortOrder: 1,
+        lessons: [
+          {
+            id: 'lesson-1',
+            title: 'Begrüßung und Abschied',
+            lessonType: 'LECTURE' as const,
+            contentStatus: 'PUBLISHED' as const,
+            countsTowardProgress: true,
+            progressStatus: 'COMPLETED' as const,
+            hasVideo: true,
+            exercises: [{ id: 'exercise-1', title: 'Arbeitsblatt', sortOrder: 1 }],
+          },
+          {
+            id: 'lesson-2',
+            title: 'Sich vorstellen',
+            lessonType: 'LECTURE' as const,
+            contentStatus: 'PUBLISHED' as const,
+            countsTowardProgress: true,
+            progressStatus: 'IN_PROGRESS' as const,
+            hasVideo: true,
+            exercises: [],
+          },
+        ],
+      },
+    ],
+  },
+  access: { kind: 'available' as const, label: 'Quyền học đang hoạt động' },
+  progress: { courseId: 'course-1', percent: 50, completedLessons: 1, totalLessons: 2 },
+}
+
 function LocationProbe() {
   const location = useLocation()
   return <output data-testid="current-path">{location.pathname}</output>
@@ -117,6 +170,7 @@ function renderLesson() {
 describe('LearningLessonPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.useProductCourse.mockReturnValue({ data: courseData, isPending: false, isError: false })
     mocks.useProductLesson.mockReturnValue({ data: lessonData, isPending: false, isError: false })
     mocks.useProductLessonNote.mockReturnValue({ data: '', isPending: false, isError: false })
     mocks.useSaveLessonNote.mockReturnValue({ mutateAsync: vi.fn() })
@@ -134,14 +188,24 @@ describe('LearningLessonPage', () => {
     })
   })
 
-  it('shows the chapter and lesson number, full-width lesson content, and the answer empty state', () => {
+  it('renders the custom lesson heading and the current lesson children only in the sidebar', async () => {
     renderLesson()
 
-    expect(screen.getByText('Lektion 1 · Bài 2')).toBeVisible()
-    expect(screen.getByRole('heading', { name: 'Bài giảng của bài học' })).toBeVisible()
-    expect(screen.getByRole('heading', { name: 'Bài tập của bài học' })).toBeVisible()
-    expect(screen.getByRole('heading', { name: 'Đáp án bài tập' })).toBeVisible()
-    expect(screen.getByText('Bài này chưa có đáp án.')).toBeVisible()
+    expect(screen.getByRole('heading', { level: 1, name: 'Không gian bài học' })).toBeVisible()
+    expect(screen.getByRole('link', { name: /Video bài giảng/ })).toHaveAttribute(
+      'href',
+      '/learn/lessons/lesson-2',
+    )
+    expect(screen.queryByRole('link', { name: /Arbeitsblatt/ })).not.toBeInTheDocument()
+  })
+
+  it('shows the full-width lesson content without inventing empty exercise or answer sections', () => {
+    renderLesson()
+
+    expect(screen.getByRole('heading', { name: 'Sich vorstellen' })).toBeVisible()
+    expect(screen.getByRole('heading', { name: 'Bài giảng' })).toBeVisible()
+    expect(screen.queryByRole('heading', { name: 'Bài tập' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Đáp án' })).not.toBeInTheDocument()
     expect(
       screen.queryByRole('complementary', { name: 'Điều hướng bài học' }),
     ).not.toBeInTheDocument()
@@ -262,5 +326,46 @@ describe('LearningLessonPage', () => {
 
     expect(mocks.completeLesson).toHaveBeenCalledWith('lesson-2')
     expect(await screen.findByText('Bài học đã hoàn thành')).toBeVisible()
+  })
+})
+
+describe('LearningCoursePage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.useProductCourse.mockReturnValue({ data: courseData, isPending: false, isError: false })
+  })
+
+  it('separates the decorative heading from the dynamic course title and opens real child items', async () => {
+    const user = userEvent.setup()
+    render(
+      <MemoryRouter initialEntries={['/learn/courses/course-1']}>
+        <LocationProbe />
+        <Routes>
+          <Route path="/learn/courses/:courseId" element={<LearningCoursePage />} />
+          <Route path="/learn/exercises/:exerciseId" element={<div>Exercise destination</div>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Không gian khóa học' })).toBeVisible()
+    expect(screen.getByText('Niveau A1.1')).toBeVisible()
+    expect(screen.getByRole('button', { name: /Begrüßung und Abschied.*Xong/ })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    )
+
+    await user.click(screen.getByRole('button', { name: /Begrüßung und Abschied.*Xong/ }))
+    expect(screen.getByRole('link', { name: /Video bài giảng/ })).toHaveAttribute(
+      'href',
+      '/learn/lessons/lesson-1',
+    )
+    expect(screen.getByRole('link', { name: /Arbeitsblatt/ })).toHaveAttribute(
+      'href',
+      '/learn/exercises/exercise-1',
+    )
+    expect(screen.queryByText(/Chưa có video hoặc bài tập được công bố/)).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('link', { name: /Arbeitsblatt/ }))
+    expect(screen.getByTestId('current-path')).toHaveTextContent('/learn/exercises/exercise-1')
   })
 })

@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: /be04-live-api\.spec\.ts$/,
+  testMatch: /(be04-live-api|learning-ui-09b)\.spec\.ts$/,
   outputDir: './test-results/be04-isolated',
   timeout: 120_000,
   expect: { timeout: 15_000 },

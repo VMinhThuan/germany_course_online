@@ -272,6 +272,39 @@ export class LearningService {
     })
       .sort({ sortOrder: 1, _id: 1 })
       .lean();
+    const [outlineExercises, lectureVideoAssets] = await Promise.all([
+      Exercise.find({
+        lessonId: { $in: lessons.map((lesson) => lesson._id) },
+        status: "PUBLISHED",
+        deletedAt: null,
+      })
+        .select("lessonId title sortOrder")
+        .sort({ sortOrder: 1, _id: 1 })
+        .lean(),
+      LessonAsset.find({
+        lessonId: { $in: lessons.map((lesson) => lesson._id) },
+        assetRole: "LECTURE_VIDEO",
+      })
+        .select("lessonId")
+        .lean(),
+    ]);
+    const exercisesByLesson = new Map<
+      string,
+      Array<{ id: string; title: string; sortOrder: number }>
+    >();
+    for (const exercise of outlineExercises) {
+      const lessonKey = exercise.lessonId.toString();
+      const rows = exercisesByLesson.get(lessonKey) ?? [];
+      rows.push({
+        id: exercise._id.toString(),
+        title: exercise.title,
+        sortOrder: exercise.sortOrder,
+      });
+      exercisesByLesson.set(lessonKey, rows);
+    }
+    const lessonsWithVideoAsset = new Set(
+      lectureVideoAssets.map((asset) => asset.lessonId.toString()),
+    );
     const lessonProgress = await LessonProgress.find({
       userId: new Types.ObjectId(userId),
       lessonId: { $in: lessons.map((lesson) => lesson._id) },
@@ -306,6 +339,10 @@ export class LearningService {
           estimatedMinutes: lesson.estimatedMinutes,
           countsTowardProgress: lesson.countsTowardProgress,
           sortOrder: lesson.sortOrder,
+          hasVideo:
+            Boolean(lesson.video) ||
+            lessonsWithVideoAsset.has(lesson._id.toString()),
+          exercises: exercisesByLesson.get(lesson._id.toString()) ?? [],
           progress: progressByLesson.has(lesson._id.toString())
             ? lessonProgressDto(progressByLesson.get(lesson._id.toString())!)
             : {

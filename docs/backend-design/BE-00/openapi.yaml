@@ -10176,6 +10176,8 @@ components:
           type: boolean
         sortOrder:
           type: integer
+        hasVideo:
+          type: boolean
         exercises:
           type: array
           items:
@@ -10191,6 +10193,8 @@ components:
         - estimatedMinutes
         - countsTowardProgress
         - sortOrder
+        - hasVideo
+        - exercises
         - progress
     StudentCourseExercise:
       type: object

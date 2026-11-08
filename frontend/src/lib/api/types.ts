@@ -131,8 +131,9 @@ export interface ApiStudentCourseLesson {
   estimatedMinutes: number | null
   countsTowardProgress: boolean
   sortOrder: number
+  hasVideo: boolean
   progress: ApiLessonProgress
-  exercises?: { id: string; title: string; sortOrder: number }[]
+  exercises: { id: string; title: string; sortOrder: number }[]
 }
 
 export interface ApiStudentCourseSection {

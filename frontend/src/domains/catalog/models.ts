@@ -32,6 +32,7 @@ export interface LessonSummaryModel {
   estimatedMinutes?: number
   countsTowardProgress: boolean
   progressStatus: ProgressStatus
+  hasVideo?: boolean
   exercises?: readonly { id: string; title: string; sortOrder: number }[]
 }
 

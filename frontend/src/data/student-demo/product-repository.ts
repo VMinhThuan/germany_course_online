@@ -455,6 +455,12 @@ export function createStudentProductRepositories(
         ...clone(section),
         lessons: section.lessons.map((lesson) => ({
           ...clone(lesson),
+          hasVideo: false,
+          exercises: exerciseDefinitions(lesson.id).map((exercise, index) => ({
+            id: exercise.id,
+            title: exercise.title,
+            sortOrder: index + 1,
+          })),
           progressStatus: state.lessonProgress[lesson.id] ?? 'NOT_STARTED',
         })),
       })),
