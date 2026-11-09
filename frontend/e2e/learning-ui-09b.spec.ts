@@ -62,7 +62,7 @@ test('UI-09B learning pages render responsively and export review screenshots', 
   await expect
     .poll(() =>
       courseHeading
-        .locator('.decorative-heading-desktop')
+        .locator('.decorative-heading-art svg')
         .evaluate((element) => element.getBoundingClientRect().width),
     )
     .toBeGreaterThan(0)

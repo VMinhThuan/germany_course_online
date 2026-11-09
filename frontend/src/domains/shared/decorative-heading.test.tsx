@@ -55,10 +55,8 @@ describe('OpenType and Paper.js decorative lettering', () => {
     expect(container.querySelector('svg')).toHaveAttribute('viewBox')
     expect(container.querySelectorAll('svg text')).toHaveLength(0)
     expect(container.querySelector('.decorative-heading-card')).toHaveClass('w-fit', 'max-w-full')
-    expect(container.querySelector('.decorative-heading-card > span')).toHaveAttribute(
-      'style',
-      'width: 36rem; max-width: calc(100vw - 6rem);',
-    )
+    const artwork = container.querySelector('.decorative-heading-art') as HTMLElement
+    expect(artwork.style.width).toMatch(/^min\(\d+px, calc\(100vw - 6rem\)\)$/)
 
     rerender(<DecorativeHeading text="Không gian khóa học" level={2} />)
     expect(screen.getByRole('heading', { level: 2, name: 'Không gian khóa học' })).toBeVisible()

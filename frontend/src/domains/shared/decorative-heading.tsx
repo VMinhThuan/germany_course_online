@@ -62,7 +62,8 @@ export function DecorativeHeading({
 } & Omit<HTMLAttributes<HTMLHeadingElement>, 'children'>) {
   const layout = safeCreateLetteringLayout(text)
   const semanticText: ReactNode = <span className="sr-only">{text}</span>
-  const width = size === 'lg' ? '36rem' : size === 'md' ? '32rem' : '28rem'
+  const artworkHeight = size === 'lg' ? 58 : size === 'md' ? 50 : 42
+  const artworkWidth = layout ? Math.ceil((layout.width / layout.height) * artworkHeight) : 0
   const headingClass = [
     'min-w-0 max-w-full',
     layout ? 'decorative-lettering-heading' : 'font-display decorative-heading-fallback',
@@ -80,17 +81,12 @@ export function DecorativeHeading({
       className="decorative-heading-card mt-1 inline-flex w-fit max-w-full items-center rounded-3xl border border-brand-pink bg-brand-pink/45 px-2 py-2 shadow-raised sm:px-5 sm:py-3"
     >
       {layout ? (
-        <>
-          <span
-            className="decorative-heading-mobile block max-w-full"
-            style={{ width, maxWidth: 'calc(100vw - 6rem)' }}
-          >
-            <LetteringSvg layout={layout} />
-          </span>
-          <span className="decorative-heading-desktop" data-size={size}>
-            {text}
-          </span>
-        </>
+        <span
+          className="decorative-heading-art block max-w-full"
+          style={{ width: `min(${artworkWidth}px, calc(100vw - 6rem))` }}
+        >
+          <LetteringSvg layout={layout} />
+        </span>
       ) : (
         <span className="block max-w-full">{text}</span>
       )}
