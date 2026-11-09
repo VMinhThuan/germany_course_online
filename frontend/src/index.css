@@ -102,10 +102,45 @@
   white-space: nowrap;
 }
 
+.decorative-heading-desktop {
+  display: none;
+  color: var(--ink-primary);
+  font-family: var(--font-heading);
+  font-weight: 400;
+  line-height: 1.1;
+  white-space: normal;
+}
+
+.decorative-heading-desktop[data-size='sm'] {
+  font-size: clamp(1.375rem, 2vw, 2rem);
+}
+
+.decorative-heading-desktop[data-size='md'] {
+  font-size: clamp(2rem, 2.5vw, 2.5rem);
+}
+
+.decorative-heading-desktop[data-size='lg'] {
+  font-size: clamp(2.5rem, 2.8vw, 3rem);
+}
+
 .decorative-heading-fallback {
   font-size: clamp(0.85rem, 4.5vw, 2.5rem);
   line-height: 1.1;
   white-space: nowrap;
+}
+
+@media (min-width: 40rem) {
+  .decorative-heading-mobile {
+    display: none;
+  }
+
+  .decorative-heading-desktop {
+    display: inline;
+  }
+
+  .decorative-heading-card {
+    white-space: normal;
+  }
 }
 
 body.app-theme-pink {

@@ -26,36 +26,59 @@ export function transformGlyph(font, character, scope) {
     .getPath(0, font.ascender, font.unitsPerEm)
     .toPathData(LETTERING_STYLE.pathPrecision)
   const source = new scope.CompoundPath(sourceData)
-  let body
-  let outline
-
   try {
-    body = source.offset(LETTERING_STYLE.bodyExpansion, { join: 'round', insert: false })
-    outline = body.offset(LETTERING_STYLE.outlineExpansion, { join: 'round', insert: false })
-    validateCounters(source, body, outline, character)
+    const expansionOptions = [
+      [LETTERING_STYLE.bodyExpansion, LETTERING_STYLE.outlineExpansion],
+      [LETTERING_STYLE.bodyExpansion, 24],
+      [LETTERING_STYLE.bodyExpansion, 16],
+      [8, 16],
+      [8, 12],
+      [6, 10],
+      [4, 8],
+    ]
 
-    const bounds = outline.bounds
-    assertFiniteBounds(bounds, character)
-    const bodyPath = body.getPathData(null, LETTERING_STYLE.pathPrecision)
-    const outlinePath = outline.getPathData(null, LETTERING_STYLE.pathPrecision)
-    if (!bodyPath || !outlinePath || /NaN|Infinity/.test(`${bodyPath}${outlinePath}`)) {
-      throw new Error(`Invalid SVG path data for glyph ${JSON.stringify(character)}`)
+    for (const [bodyExpansion, outlineExpansion] of expansionOptions) {
+      let body
+      let outline
+      try {
+        body = source.offset(bodyExpansion, { join: 'round', insert: false })
+        outline = body.offset(outlineExpansion, { join: 'round', insert: false })
+        validateCounters(source, body, outline, character)
+
+        const bounds = outline.bounds
+        assertFiniteBounds(bounds, character)
+        const bodyPath = body.getPathData(null, LETTERING_STYLE.pathPrecision)
+        const outlinePath = outline.getPathData(null, LETTERING_STYLE.pathPrecision)
+        if (!bodyPath || !outlinePath || /NaN|Infinity/.test(`${bodyPath}${outlinePath}`)) {
+          throw new Error(`Invalid SVG path data for glyph ${JSON.stringify(character)}`)
+        }
+
+        return {
+          bodyPath,
+          outlinePath,
+          advance: glyph.advanceWidth,
+          bounds: {
+            xMin: bounds.left,
+            yMin: bounds.top,
+            xMax: bounds.right,
+            yMax: bounds.bottom,
+          },
+        }
+      } catch (error) {
+        if (
+          !(error instanceof Error) ||
+          !error.message.startsWith('Contour expansion closed a counter')
+        ) {
+          throw error
+        }
+      } finally {
+        outline?.remove()
+        body?.remove()
+      }
     }
 
-    return {
-      bodyPath,
-      outlinePath,
-      advance: glyph.advanceWidth,
-      bounds: {
-        xMin: bounds.left,
-        yMin: bounds.top,
-        xMax: bounds.right,
-        yMax: bounds.bottom,
-      },
-    }
+    throw new Error(`Could not preserve counters in glyph ${JSON.stringify(character)}`)
   } finally {
-    outline?.remove()
-    body?.remove()
     source.remove()
   }
 }

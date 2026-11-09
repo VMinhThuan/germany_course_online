@@ -1,4 +1,4 @@
-import { LETTERING_STYLE, PILOT_HEADINGS } from './source-font.mjs'
+import { LETTERING_CHARACTERS, LETTERING_STYLE, PILOT_HEADINGS } from './source-font.mjs'
 
 function sortByCodePoint(left, right) {
   return left.codePointAt(0) - right.codePointAt(0)
@@ -9,7 +9,9 @@ function json(value) {
 }
 
 export function createGeneratedSource(font, transformedGlyphs) {
-  const characters = [...new Set(PILOT_HEADINGS.flatMap((heading) => [...heading]))]
+  const characters = [
+    ...new Set([...LETTERING_CHARACTERS, ...PILOT_HEADINGS.flatMap((heading) => [...heading])]),
+  ]
     .filter((character) => character !== ' ')
     .sort(sortByCodePoint)
   const glyphEntries = characters.map((character) => {
@@ -26,12 +28,8 @@ export function createGeneratedSource(font, transformedGlyphs) {
   })
 
   const kerningPairs = []
-  for (const heading of PILOT_HEADINGS) {
-    const chars = [...heading]
-    for (let index = 0; index < chars.length - 1; index += 1) {
-      const left = chars[index]
-      const right = chars[index + 1]
-      if (left === ' ' || right === ' ') continue
+  for (const left of characters) {
+    for (const right of characters) {
       const value = font.getKerningValue(font.charToGlyph(left), font.charToGlyph(right))
       if (value !== 0) kerningPairs.push([`${left.codePointAt(0)},${right.codePointAt(0)}`, value])
     }

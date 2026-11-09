@@ -80,9 +80,17 @@ export function DecorativeHeading({
       className="decorative-heading-card mt-1 inline-flex w-fit max-w-full items-center rounded-3xl border border-brand-pink bg-brand-pink/45 px-2 py-2 shadow-raised sm:px-5 sm:py-3"
     >
       {layout ? (
-        <span className="block max-w-full" style={{ width, maxWidth: 'calc(100vw - 6rem)' }}>
-          <LetteringSvg layout={layout} />
-        </span>
+        <>
+          <span
+            className="decorative-heading-mobile block max-w-full"
+            style={{ width, maxWidth: 'calc(100vw - 6rem)' }}
+          >
+            <LetteringSvg layout={layout} />
+          </span>
+          <span className="decorative-heading-desktop" data-size={size}>
+            {text}
+          </span>
+        </>
       ) : (
         <span className="block max-w-full">{text}</span>
       )}

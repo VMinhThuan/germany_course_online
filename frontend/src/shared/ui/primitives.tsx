@@ -19,6 +19,7 @@ import {
 } from 'react'
 import { Link, type LinkProps } from 'react-router'
 import { cn } from './cn'
+import { DecorativeHeading } from '@/domains/shared/decorative-heading'
 
 const buttonStyles = cva(
   'inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-control font-semibold transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-focus disabled:pointer-events-none disabled:opacity-55 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
@@ -573,9 +574,7 @@ export function PageHeader({
             {eyebrow}
           </p>
         )}
-        {heading ?? (
-          <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">{title}</h1>
-        )}
+        {heading ?? <DecorativeHeading text={title} level={1} size="md" />}
         {description && (
           <p className="max-w-2xl text-base leading-7 text-ink-secondary sm:text-lg">
             {description}

@@ -215,12 +215,7 @@ export function AdminWorkspacePage() {
   else if (segment === 'audit-logs' && parts.length === 2) content = <AdminAuditLogsPage />
 
   return (
-    <AdminLayout
-      title={title}
-      {...(['courses', 'sections', 'lessons', 'exercises'].includes(segment ?? '')
-        ? { description: 'Quản lý nội dung theo thứ tự khóa học → chương → bài học → bài tập.' }
-        : {})}
-    >
+    <AdminLayout title={title}>
       {content ?? (
         <AdminCard title="Không tìm thấy trang quản trị">
           <p className="text-sm text-ink-secondary">Đường dẫn Admin này chưa được hỗ trợ.</p>

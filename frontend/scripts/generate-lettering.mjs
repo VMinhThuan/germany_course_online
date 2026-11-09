@@ -6,7 +6,7 @@ import opentype from 'opentype.js'
 import paper from 'paper'
 import prettier from 'prettier'
 import { createGeneratedSource } from './lettering/export-paths.mjs'
-import { FONT_PATH, PILOT_HEADINGS } from './lettering/source-font.mjs'
+import { FONT_PATH, LETTERING_CHARACTERS, PILOT_HEADINGS } from './lettering/source-font.mjs'
 import { transformGlyph } from './lettering/transform-glyph.mjs'
 import { validateFont } from './lettering/validate-glyphs.mjs'
 
@@ -25,7 +25,9 @@ async function generate() {
   const scope = new paper.PaperScope()
   scope.setup(new scope.Size(1, 1))
   try {
-    const characters = [...new Set(PILOT_HEADINGS.flatMap((heading) => [...heading]))]
+    const characters = [
+      ...new Set([...LETTERING_CHARACTERS, ...PILOT_HEADINGS.flatMap((heading) => [...heading])]),
+    ]
       .filter((character) => character !== ' ')
       .sort((left, right) => left.codePointAt(0) - right.codePointAt(0))
     const transformedGlyphs = new Map()
