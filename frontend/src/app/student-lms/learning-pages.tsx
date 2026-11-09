@@ -609,9 +609,6 @@ export function LearningQuizPage() {
         </Card>
       ) : (
         <div className="grid gap-4">
-          <Card className="mx-auto w-full max-w-3xl bg-surface-blue p-4 text-sm leading-6 text-ink-secondary">
-            Lựa chọn và trạng thái bài làm được lưu trực tiếp trên máy chủ.
-          </Card>
           <QuizRunner
             attempt={{
               ...attempt.data,
@@ -725,9 +722,6 @@ export function LearningQuizResultPage() {
         <ProductNotFound message="Không tìm thấy kết quả cho lượt làm này." />
       ) : (
         <div className="mx-auto grid w-full max-w-3xl gap-4">
-          <Card className="bg-surface-lime p-4 text-sm leading-6 text-pastel-lime-ink">
-            Kết quả và quyền xem đáp án do cấu hình bài kiểm tra trên máy chủ quyết định.
-          </Card>
           <QuizResult
             result={result.data}
             onRetry={() =>
