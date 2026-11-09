@@ -443,10 +443,11 @@ describe("BE-03B Admin CMS, media, account security, enrollment and audit APIs",
     expect(invalidVideo.status).toBe(400);
   });
 
-  it("rejects impossible exercise modes and publishes valid required quizzes", async () => {
+  it("rejects impossible exercise modes, reassigns a quiz, and publishes it", async () => {
     const course = await makeCourse();
     const section = await makeSection(course._id);
     const lesson = await makeLesson(section._id);
+    const targetLesson = await makeLesson(section._id);
     const invalid = await as(
       admin,
       "post",
@@ -495,6 +496,19 @@ describe("BE-03B Admin CMS, media, account security, enrollment and audit APIs",
       ],
     });
     expect(quiz.status).toBe(200);
+    const reassigned = await as(
+      admin,
+      "patch",
+      `/api/v1/admin/exercises/${exerciseId}`,
+    ).send({ lessonId: targetLesson.id });
+    expect(reassigned.status).toBe(200);
+    expect(reassigned.body.data.lessonId).toBe(targetLesson.id);
+    const missingLesson = await as(
+      admin,
+      "patch",
+      `/api/v1/admin/exercises/${exerciseId}`,
+    ).send({ lessonId: "660000000000000000000099" });
+    expect(missingLesson.status).toBe(404);
     const published = await as(
       admin,
       "patch",

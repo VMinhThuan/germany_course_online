@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -327,6 +327,31 @@ describe('course content management', () => {
     expect(statusHeader).toHaveAttribute('aria-sort', 'none')
     await user.click(screen.getByRole('button', { name: /Trạng thái/ }))
     expect(statusHeader).toHaveAttribute('aria-sort', 'ascending')
+  })
+
+  it('lets an admin choose the lesson that contains an existing quiz', async () => {
+    const user = userEvent.setup()
+    const quizExercise: ApiAdminExercise = {
+      ...exercise,
+      id: 'quiz-exercise-1',
+      title: 'Quiz ngữ pháp',
+      exerciseType: 'QUIZ',
+      completionMode: 'QUIZ_SUBMISSION',
+    }
+    vi.mocked(adminRepository.listExercises).mockResolvedValue(page([quizExercise]))
+    renderPage(<AdminExercisesPage />)
+
+    const row = await screen.findByRole('row', { name: /Quiz ngữ pháp/ })
+    await user.click(within(row).getByRole('button', { name: 'Chọn bài học' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Gắn quiz vào bài học' })
+    expect(within(dialog).getByRole('combobox', { name: 'Bài học' })).toHaveValue(lesson.id)
+    await user.click(within(dialog).getByRole('button', { name: 'Lưu vị trí' }))
+
+    await waitFor(() =>
+      expect(adminRepository.updateExercise).toHaveBeenCalledWith(quizExercise.id, {
+        lessonId: lesson.id,
+      }),
+    )
   })
 
   it('uploads and attaches a selected PDF when creating an exercise in the dialog', async () => {

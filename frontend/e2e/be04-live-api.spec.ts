@@ -52,7 +52,7 @@ test('guest, student purchase, admin reconciliation and learning use isolated Ex
   )
   await page.goto('/student')
   expect((await dashboardResponse).ok()).toBe(true)
-  await expect(page.getByRole('heading', { name: /Chào Học viên BE-04 kiểm thử/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Tổng quan học tập' })).toBeVisible()
   await page.goto(`/checkout/${courseId}`)
   await expect(page.getByRole('heading', { name: 'Khóa học E2E tiếng Đức A1' })).toBeVisible()
   await page.getByLabel('Mã coupon').fill('BE04E2E10')
@@ -90,15 +90,16 @@ test('guest, student purchase, admin reconciliation and learning use isolated Ex
   await adminPage.goto(`/admin/orders/${orderId}`)
   await expect(adminPage.getByRole('heading', { name: /Đơn / })).toBeVisible()
   await expect(adminPage.getByText('Đã báo chuyển khoản', { exact: false }).first()).toBeVisible()
-  adminPage.once('dialog', (dialog) => void dialog.accept())
   await adminPage.getByRole('button', { name: 'Duyệt đã nhận tiền' }).click()
+  const approveDialog = adminPage.getByRole('alertdialog', { name: 'Duyệt đơn đã nhận tiền?' })
+  await approveDialog.getByRole('button', { name: 'Duyệt đơn và cấp quyền học' }).click()
   await expect(
     adminPage.getByText('Backend đã duyệt đơn và cập nhật quyền học.').first(),
   ).toBeVisible()
 
   await page.goto(`/learn/lessons/${lessonId}`)
   await expect(page.getByRole('heading', { name: 'Guten Tag · bài học E2E' })).toBeVisible()
-  await expect(page.getByText('Tài liệu bài tập E2E')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Tài liệu bài tập E2E' })).toBeVisible()
   const unavailableMedia = page.waitForResponse(
     (response) =>
       response.request().method() === 'POST' &&
@@ -126,8 +127,8 @@ test('guest, student purchase, admin reconciliation and learning use isolated Ex
   await page.getByRole('alertdialog').getByRole('button', { name: 'Nộp bài' }).click()
   await expect(page).toHaveURL(/\/learn\/quizzes\/[^/]+\/result/)
   await expect(page.getByText('0 / 1 câu đúng')).toBeVisible()
-  await expect(page.getByText('Đáp án được hệ thống trả về: Auf Wiedersehen')).toBeVisible()
-  await expect(page.getByText('Bạn đã chọn: Guten Tag')).toBeVisible()
+  await expect(page.getByText('Đáp án đúng: Auf Wiedersehen')).toBeVisible()
+  await expect(page.getByText('Bạn chưa trả lời đúng câu này.')).toBeVisible()
 
   await page.goto(`/learn/lessons/${lessonId}`)
   await expect(page.getByRole('button', { name: 'Hoàn thành bài học' })).toBeEnabled()
@@ -137,7 +138,7 @@ test('guest, student purchase, admin reconciliation and learning use isolated Ex
   await page.reload()
   await expect(page.getByLabel('Nội dung ghi chú')).toHaveValue('Ghi chú lưu từ E2E BE-04.')
   await page.getByRole('button', { name: 'Hoàn thành bài học' }).click()
-  await expect(page.getByRole('button', { name: 'Đã hoàn thành' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Đã hoàn thành bài học' })).toBeVisible()
 
   await expect
     .poll(() => apiOperations.some((operation) => operation.includes('/checkout/quote')))
@@ -148,7 +149,7 @@ test('guest, student purchase, admin reconciliation and learning use isolated Ex
   expect(apiOperations.some((operation) => operation.includes('/quiz-attempts/'))).toBe(true)
   expect(adminOperations).toContain(`POST /api/v1/admin/orders/${orderId}/approve`)
   await adminPage.close()
-  await page.getByRole('button', { name: 'Học viên BE-04 kiểm thử' }).click()
+  await page.getByRole('button', { name: 'Tài khoản' }).click()
   await page.getByRole('menuitem', { name: 'Đăng xuất' }).click()
   await expect(page).toHaveURL(/\/login\?returnTo=/)
   expect(apiOperations).toContain('POST /api/v1/auth/logout')

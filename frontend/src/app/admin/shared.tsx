@@ -95,7 +95,7 @@ export function AdminLayout({
                     key={item.label}
                     className="min-w-[13rem] rounded-xl bg-surface-muted p-2 lg:min-w-0"
                   >
-                    <p className="px-2 pb-1 pt-0.5 text-[0.65rem] font-bold uppercase tracking-[0.12em] text-ink-muted">
+                    <p className="px-2 pb-1 pt-0.5 text-[0.65rem] font-bold uppercase tracking-[0.12em] text-ink-secondary">
                       {item.label}
                     </p>
                     <div className="grid grid-cols-2 gap-1 lg:grid-cols-1">

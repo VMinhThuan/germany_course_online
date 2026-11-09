@@ -7,6 +7,7 @@ import {
   Eye,
   EyeOff,
   ExternalLink,
+  Link2,
   Plus,
   Search,
   Trash2,
@@ -703,6 +704,10 @@ export function AdminExercisesPage() {
   const [mediaProgress, setMediaProgress] = useState<number | null>(null)
   const [isSavingExercise, setIsSavingExercise] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
+  const [assignmentExercise, setAssignmentExercise] = useState<ExerciseManagementRow | null>(null)
+  const [assignmentCourseId, setAssignmentCourseId] = useState('')
+  const [assignmentSectionId, setAssignmentSectionId] = useState('')
+  const [assignmentLessonId, setAssignmentLessonId] = useState('')
   const [validation, setValidation] = useState('')
   const sections = useSectionOptions(courseId)
   const lessons = useLessonOptions(sectionId)
@@ -718,6 +723,16 @@ export function AdminExercisesPage() {
       adminRepository.updateExercise(id, { status }),
   )
   const remove = useAdminMutation((id: string) => adminRepository.deleteExercise(id))
+  const assignLesson = useAdminMutation(
+    ({ exerciseId, lessonId }: { exerciseId: string; lessonId: string }) =>
+      adminRepository.updateExercise(exerciseId, { lessonId }),
+  )
+  const assignmentSections = (allSections.data ?? []).filter(
+    ({ course }) => course.id === assignmentCourseId,
+  )
+  const assignmentLessons = (allLessons.data ?? []).filter(
+    ({ section }) => section.id === assignmentSectionId,
+  )
   const filtered = (exercises.data ?? []).filter((row) =>
     normalizeSearch(
       `${row.exercise.title} ${row.exercise.instructions} ${row.lesson.title} ${row.section.title} ${row.course.title} ${row.course.code}`,
@@ -806,6 +821,29 @@ export function AdminExercisesPage() {
     })
   }
 
+  function chooseLesson(row: ExerciseManagementRow) {
+    setAssignmentExercise(row)
+    setAssignmentCourseId(row.course.id)
+    setAssignmentSectionId(row.section.id)
+    setAssignmentLessonId(row.lesson.id)
+    assignLesson.reset()
+  }
+
+  async function saveLessonAssignment(event: FormEvent) {
+    event.preventDefault()
+    if (!assignmentExercise || !assignmentLessonId) return
+    try {
+      await assignLesson.mutateAsync({
+        exerciseId: assignmentExercise.exercise.id,
+        lessonId: assignmentLessonId,
+      })
+      notifications.success('Đã cập nhật bài học của quiz.')
+      setAssignmentExercise(null)
+    } catch {
+      /* Error is shown in the dialog. */
+    }
+  }
+
   const columns: AdminTableColumn<ExerciseManagementRow>[] = [
     {
       key: 'title',
@@ -856,7 +894,18 @@ export function AdminExercisesPage() {
       label: 'Thao tác',
       className: 'text-right',
       render: (row) => (
-        <div className="flex justify-end gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
+          {row.exercise.exerciseType === 'QUIZ' && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => chooseLesson(row)}
+              startIcon={<Link2 aria-hidden="true" className="size-4" />}
+            >
+              Chọn bài học
+            </Button>
+          )}
           <VisibilityButton
             status={row.exercise.status}
             onClick={() => toggle(row.exercise)}
@@ -1064,6 +1113,81 @@ export function AdminExercisesPage() {
             </p>
           )}
           <AdminFeedback error={create.error} />
+        </form>
+      </BaseDialog>
+      <BaseDialog
+        open={assignmentExercise !== null}
+        onOpenChange={(open) => !open && setAssignmentExercise(null)}
+        title="Gắn quiz vào bài học"
+        description={
+          assignmentExercise
+            ? `Chọn vị trí cho “${assignmentExercise.exercise.title}”. Quiz sẽ xuất hiện dưới bài học này.`
+            : ''
+        }
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={() => setAssignmentExercise(null)}>
+              Hủy
+            </Button>
+            <Button
+              type="submit"
+              form="admin-assign-quiz-lesson"
+              loading={assignLesson.isPending}
+              disabled={!assignmentLessonId}
+            >
+              Lưu vị trí
+            </Button>
+          </>
+        }
+      >
+        <form
+          id="admin-assign-quiz-lesson"
+          className="grid gap-3"
+          onSubmit={(event) => void saveLessonAssignment(event)}
+        >
+          <AdminSelect
+            label="Khóa học"
+            value={assignmentCourseId}
+            onChange={(value) => {
+              setAssignmentCourseId(value)
+              setAssignmentSectionId('')
+              setAssignmentLessonId('')
+            }}
+            options={[
+              { value: '', label: 'Chọn khóa học' },
+              ...(courses.data ?? []).map((course) => ({ value: course.id, label: course.title })),
+            ]}
+          />
+          <AdminSelect
+            label="Chương"
+            value={assignmentSectionId}
+            onChange={(value) => {
+              setAssignmentSectionId(value)
+              setAssignmentLessonId('')
+            }}
+            disabled={!assignmentCourseId}
+            options={[
+              { value: '', label: 'Chọn chương' },
+              ...assignmentSections.map(({ section }) => ({
+                value: section.id,
+                label: section.title,
+              })),
+            ]}
+          />
+          <AdminSelect
+            label="Bài học"
+            value={assignmentLessonId}
+            onChange={setAssignmentLessonId}
+            disabled={!assignmentSectionId}
+            options={[
+              { value: '', label: 'Chọn bài học' },
+              ...assignmentLessons.map(({ lesson }) => ({
+                value: lesson.id,
+                label: lesson.title,
+              })),
+            ]}
+          />
+          <AdminFeedback error={assignLesson.error} />
         </form>
       </BaseDialog>
     </div>
@@ -1644,7 +1768,7 @@ export function AdminLessonDetailPage({
       completionMode: exerciseType === 'QUIZ' ? 'QUIZ_SUBMISSION' : 'MANUAL',
       isRequired: true,
       sortOrder: exercises.data?.length ?? 0,
-      status: 'PUBLISHED',
+      status: exerciseType === 'QUIZ' ? 'DRAFT' : 'PUBLISHED',
     }
     setIsAddingExercise(true)
     try {

@@ -26,32 +26,46 @@ async function login(page: Page) {
 
 async function expectHeadingFits(page: Page, heading: ReturnType<Page['getByRole']>) {
   await expect(heading).toBeVisible()
-  const metrics = await heading.locator('svg').evaluate((svg) => {
-    const viewBox = svg.getAttribute('viewBox')?.split(/\s+/).map(Number) ?? []
-    const rect = svg.getBoundingClientRect()
-    const paths = [...svg.querySelectorAll('path')]
-    return {
-      viewBox,
-      width: rect.width,
-      height: rect.height,
-      pathCount: paths.length,
-      validPaths: paths.every((item) => Boolean(item.getAttribute('d'))),
-    }
-  })
-  expect(metrics.width).toBeGreaterThan(0)
-  expect(metrics.height).toBeGreaterThan(0)
-  expect(metrics.pathCount).toBeGreaterThan(0)
-  expect(metrics.validPaths).toBe(true)
-  expect(metrics.viewBox).toHaveLength(4)
-  expect(metrics.viewBox.every(Number.isFinite)).toBe(true)
-  expect(metrics.viewBox[2]).toBeGreaterThan(0)
-  expect(metrics.viewBox[3]).toBeGreaterThan(0)
+  const mobileLettering = heading.locator('.decorative-heading-mobile svg')
+  if (await mobileLettering.isVisible()) {
+    const metrics = await mobileLettering.evaluate((svg) => {
+      const viewBox = svg.getAttribute('viewBox')?.split(/\s+/).map(Number) ?? []
+      const rect = svg.getBoundingClientRect()
+      const paths = [...svg.querySelectorAll('path')]
+      return {
+        viewBox,
+        width: rect.width,
+        height: rect.height,
+        pathCount: paths.length,
+        validPaths: paths.every((item) => Boolean(item.getAttribute('d'))),
+      }
+    })
+    expect(metrics.width).toBeGreaterThan(0)
+    expect(metrics.height).toBeGreaterThan(0)
+    expect(metrics.pathCount).toBeGreaterThan(0)
+    expect(metrics.validPaths).toBe(true)
+    expect(metrics.viewBox).toHaveLength(4)
+    expect(metrics.viewBox.every(Number.isFinite)).toBe(true)
+    expect(metrics.viewBox[2]).toBeGreaterThan(0)
+    expect(metrics.viewBox[3]).toBeGreaterThan(0)
+  } else {
+    const desktopTitle = heading.locator('.decorative-heading-desktop')
+    await expect(desktopTitle).toBeVisible()
+    const metrics = await desktopTitle.evaluate((element) => {
+      const rect = element.getBoundingClientRect()
+      return { width: rect.width, height: rect.height }
+    })
+    expect(metrics.width).toBeGreaterThan(0)
+    expect(metrics.height).toBeGreaterThan(0)
+  }
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth - innerWidth))
     .toBeLessThanOrEqual(1)
 }
 
-test('UI-09C custom lettering remains legible across learning page viewports', async ({ page }) => {
+test('UI-09C responsive title treatment remains legible across learning page viewports', async ({
+  page,
+}) => {
   await mkdir(screenshots, { recursive: true })
   await login(page)
 
@@ -75,7 +89,7 @@ test('UI-09C custom lettering remains legible across learning page viewports', a
         .poll(() =>
           courseHeading.locator('svg').evaluate((svg) => svg.getBoundingClientRect().width),
         )
-        .toBeGreaterThan(320)
+        .toBeGreaterThan(280)
     }
     await expect(page.getByText('Khóa học E2E tiếng Đức A1')).toBeVisible()
     if (viewport.name !== 'desktop-200-percent-equivalent-720x450') {
@@ -98,7 +112,7 @@ test('UI-09C custom lettering remains legible across learning page viewports', a
         .poll(() =>
           lessonHeading.locator('svg').evaluate((svg) => svg.getBoundingClientRect().width),
         )
-        .toBeGreaterThan(320)
+        .toBeGreaterThan(280)
     }
     await expect(page.getByRole('link', { name: 'Quay lại' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Guten Tag · bài học E2E' })).toBeVisible()

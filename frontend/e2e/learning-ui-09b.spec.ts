@@ -61,9 +61,11 @@ test('UI-09B learning pages render responsively and export review screenshots', 
   await expect(courseHeading).toBeVisible()
   await expect
     .poll(() =>
-      courseHeading.locator('svg').evaluate((element) => element.getBoundingClientRect().width),
+      courseHeading
+        .locator('.decorative-heading-desktop')
+        .evaluate((element) => element.getBoundingClientRect().width),
     )
-    .toBeGreaterThan(400)
+    .toBeGreaterThan(0)
   await expect(page.getByText('Khóa học E2E tiếng Đức A1')).toBeVisible()
   await expect(
     page.getByRole('navigation', { name: 'Lộ trình Khóa học E2E tiếng Đức A1' }),

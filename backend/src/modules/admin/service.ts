@@ -675,7 +675,29 @@ export class AdminService {
       const mergedMode =
         patch.completionMode ?? String(exercise.get("completionMode"));
       assertExerciseCompatibility(mergedType, mergedMode);
-      exercise.set(patch);
+      if (patch.lessonId) {
+        const destination = await Lesson.findOne({
+          _id: objectId(patch.lessonId),
+          deletedAt: null,
+        }).session(session);
+        if (!destination) throw notFound("Destination lesson not found.");
+        const destinationSection = await CourseSection.findOne({
+          _id: destination.get("sectionId"),
+          deletedAt: null,
+        }).session(session);
+        if (
+          !destinationSection ||
+          !(await Course.exists({
+            _id: destinationSection.get("courseId"),
+            deletedAt: null,
+          }).session(session))
+        )
+          throw notFound("Destination lesson parent not found.");
+      }
+      exercise.set({
+        ...patch,
+        ...(patch.lessonId ? { lessonId: objectId(patch.lessonId) } : {}),
+      });
       await exercise.save({ session, validateModifiedOnly: true });
       if (exercise.get("status") === "PUBLISHED")
         await this.assertExercisePublishable(oid, session);

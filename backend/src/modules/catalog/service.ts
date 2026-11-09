@@ -307,10 +307,7 @@ export class PublicCatalogService {
       mediaType: "FILE",
       resourceType: asset.resourceType as MediaResourceType | null,
       deliveryType: asset.deliveryType as
-        | "upload"
-        | "private"
-        | "authenticated"
-        | null,
+        "upload" | "private" | "authenticated" | null,
       format: asset.format ?? null,
     });
     return {

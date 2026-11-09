@@ -32,7 +32,7 @@ export function StudentTestimonialsSection() {
             </p>
             <span
               title="Nội dung đánh giá mẫu, chưa phải nhận xét thật của học viên."
-              className="mt-0.5 inline-flex rounded-full bg-surface-muted px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-[0.08em] text-ink-muted"
+              className="mt-0.5 inline-flex rounded-full bg-surface-muted px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-[0.08em] text-ink-primary"
             >
               Nội dung mẫu
             </span>

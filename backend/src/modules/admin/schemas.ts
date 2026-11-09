@@ -218,6 +218,7 @@ export const createExerciseSchema = z
   .superRefine(validateExercise);
 export const exercisePatchSchema = z
   .strictObject({
+    lessonId: objectId.optional(),
     title: exerciseFields.title.optional(),
     description: exerciseFields.description,
     instructions: exerciseFields.instructions.optional(),

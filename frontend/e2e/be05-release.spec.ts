@@ -167,9 +167,9 @@ test('purchase pricing, coupon reservation, cancellation and Admin reconciliatio
   await couponPagination.getByRole('button', { name: 'Trang trước' }).click()
   await expect(couponPagination.getByText('Trang 1 / 2')).toBeVisible()
 
-  page.once('dialog', (dialog) => void dialog.accept())
   await page.goto(`/orders/${firstOrderId}/pending`)
   await page.getByRole('button', { name: 'Hủy đơn' }).click()
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Hủy đơn', exact: true }).click()
   await expect(page).toHaveURL(`/orders/${firstOrderId}/result`)
   const repeatedCancellation = await apiPost(
     request,
@@ -207,8 +207,11 @@ test('purchase pricing, coupon reservation, cancellation and Admin reconciliatio
 
   await admin.goto(`/admin/orders/${paidOrderId}`)
   await expect(admin.getByRole('button', { name: 'Duyệt đã nhận tiền' })).toBeEnabled()
-  admin.once('dialog', (dialog) => void dialog.accept())
   await admin.getByRole('button', { name: 'Duyệt đã nhận tiền' }).click()
+  await admin
+    .getByRole('alertdialog')
+    .getByRole('button', { name: 'Duyệt đơn và cấp quyền học' })
+    .click()
   await expect(admin.getByText('Backend đã duyệt đơn và cập nhật quyền học.').first()).toBeVisible()
   const paidOrderCancellation = await apiPost(
     request,
@@ -285,8 +288,11 @@ test('purchase pricing, coupon reservation, cancellation and Admin reconciliatio
   await expect(adminCancel).toBeDisabled()
   await admin.getByLabel('Lý do bắt buộc').fill('Đối soát fixture xác nhận không có tiền vào.')
   await admin.getByLabel('Kết quả đối soát bên ngoài').selectOption('NO_FUNDS_RECEIVED')
-  admin.once('dialog', (dialog) => void dialog.accept())
   await adminCancel.click()
+  await admin
+    .getByRole('alertdialog')
+    .getByRole('button', { name: 'Xác nhận kết quả đối soát' })
+    .click()
   await expect(
     admin.getByText('Đã cập nhật hủy đơn theo kết quả đối soát bạn xác nhận.').first(),
   ).toBeVisible()
@@ -362,8 +368,11 @@ test('renewal supports active and expired enrollments, reuses the existing recor
 
   const admin = await adminPage(browser)
   await admin.goto(`/admin/orders/${orderId}`)
-  admin.once('dialog', (dialog) => void dialog.accept())
   await admin.getByRole('button', { name: 'Duyệt đã nhận tiền' }).click()
+  await admin
+    .getByRole('alertdialog')
+    .getByRole('button', { name: 'Duyệt đơn và cấp quyền học' })
+    .click()
   await expect(admin.getByText('Backend đã duyệt đơn và cập nhật quyền học.').first()).toBeVisible()
 
   const renewedEnrollmentResponse = await apiGet(request, '/me/courses?page=1&pageSize=100', token)
@@ -391,7 +400,7 @@ test('renewal supports active and expired enrollments, reuses the existing recor
   )
   await page.goto(`/learn/quizzes/${attemptId}/result`)
   await expect(page.getByText('0 / 1 câu đúng')).toBeVisible()
-  await expect(page.getByText('Đáp án được hệ thống trả về: Auf Wiedersehen')).toBeVisible()
+  await expect(page.getByText('Đáp án đúng: Auf Wiedersehen')).toBeVisible()
 
   const plan = renewalQuote.renewalPlanId as string
   const expiredPage = await browser.newPage()
@@ -477,16 +486,22 @@ test('Student resource isolation, server RBAC, account block and reactivation do
   const admin = await adminPage(browser)
   await admin.goto(`/admin/students/${ids.studentB}`)
   await expect(admin.getByRole('heading', { name: 'Học viên BE-05 thứ hai' })).toBeVisible()
-  admin.once('dialog', (dialog) => void dialog.accept())
   await admin.getByRole('button', { name: 'Khóa tài khoản' }).click()
+  await admin
+    .getByRole('alertdialog')
+    .getByRole('button', { name: 'Khóa tài khoản', exact: true })
+    .click()
   await expect(
     admin.getByText('Đã khóa tài khoản; backend đã áp dụng quy tắc thu hồi phiên.'),
   ).toBeVisible()
   const blockedAccess = await apiGet(request, '/me/courses', studentBToken)
   expect(blockedAccess.status()).toBe(401)
 
-  admin.once('dialog', (dialog) => void dialog.accept())
   await admin.getByRole('button', { name: 'Mở lại tài khoản' }).click()
+  await admin
+    .getByRole('alertdialog')
+    .getByRole('button', { name: 'Mở lại tài khoản', exact: true })
+    .click()
   await expect(admin.getByText('Đã mở lại tài khoản.')).toBeVisible()
   const staleSessionAfterReactivation = await apiGet(request, '/me/courses', studentBToken)
   expect(staleSessionAfterReactivation.status()).toBe(401)
@@ -532,13 +547,11 @@ test('Admin renewal plan, enrollment lifecycle and partial settings changes use 
       new URL(response.url()).pathname === `/api/v1/admin/renewal-plans/${planId}`,
     { timeout: 15_000 },
   )
-  const deactivationClick = updatedPlanCard
-    .getByRole('button', { name: 'Ngừng bán' })
-    .click({ timeout: 10_000 })
-  const confirmation = await admin.waitForEvent('dialog', { timeout: 10_000 })
-  expect(confirmation.type()).toBe('confirm')
-  await confirmation.accept()
-  await deactivationClick
+  await updatedPlanCard.getByRole('button', { name: 'Ngừng bán' }).click()
+  await admin
+    .getByRole('alertdialog')
+    .getByRole('button', { name: 'Ngừng bán gói', exact: true })
+    .click()
   const deactivationResponse = await deactivationPromise
   expect(deactivationResponse.status()).toBe(200)
   expect((await deactivationResponse.json()).data.status).toBe('INACTIVE')
@@ -560,10 +573,8 @@ test('Admin renewal plan, enrollment lifecycle and partial settings changes use 
   await expect(admin.getByRole('button', { name: 'Gia hạn' })).toBeDisabled()
   await expect(admin.getByRole('button', { name: 'Thu hồi' })).toBeDisabled()
   await admin.getByLabel('Lý do bắt buộc').fill('BE-05 kiểm thử gia hạn thủ công.')
-  admin.once('dialog', async (dialog) => {
-    await dialog.accept()
-  })
   await admin.getByRole('button', { name: 'Gia hạn' }).click()
+  await admin.getByRole('alertdialog').getByRole('button', { name: 'Gia hạn', exact: true }).click()
   await expect(admin.getByText('Đã gia hạn quyền học.')).toBeVisible()
   const afterExtend = await apiGet(request, `/admin/enrollments/${enrollmentId}`, adminToken)
   expect(Date.parse((await afterExtend.json()).data.enrollment.expiresAt)).toBeGreaterThan(
@@ -571,20 +582,22 @@ test('Admin renewal plan, enrollment lifecycle and partial settings changes use 
   )
 
   await admin.getByLabel('Lý do bắt buộc').fill('BE-05 kiểm thử thu hồi quyền học.')
-  admin.once('dialog', async (dialog) => {
-    await dialog.accept()
-  })
   await admin.getByRole('button', { name: 'Thu hồi' }).click()
+  await admin
+    .getByRole('alertdialog')
+    .getByRole('button', { name: 'Thu hồi quyền học', exact: true })
+    .click()
   await expect(admin.getByText('Đã thu hồi quyền học.')).toBeVisible()
   const deniedAfterRevoke = await apiGet(request, `/learn/lessons/${ids.lesson}`, studentToken)
   expect(deniedAfterRevoke.status()).toBe(404)
   await expect(admin.getByText('REVOKED', { exact: true })).toBeVisible()
 
   await admin.getByLabel('Lý do bắt buộc').fill('BE-05 kiểm thử khôi phục quyền học.')
-  admin.once('dialog', async (dialog) => {
-    await dialog.accept()
-  })
   await admin.getByRole('button', { name: 'Khôi phục' }).click()
+  await admin
+    .getByRole('alertdialog')
+    .getByRole('button', { name: 'Khôi phục quyền học', exact: true })
+    .click()
   await expect(admin.getByText('Đã khôi phục quyền học.')).toBeVisible()
   const restoredAccess = await apiGet(request, `/learn/lessons/${ids.lesson}`, studentToken)
   expect(restoredAccess.status()).toBe(200)
@@ -627,7 +640,7 @@ test('Admin creates and publishes a valid CMS tree; learner completion keeps its
   await courseDialog.getByLabel('Thời hạn truy cập (tháng)').fill('12')
   await courseDialog.getByLabel('Mô tả ngắn').fill('Course created by the actual Admin CMS form.')
   await courseDialog
-    .getByLabel('Mô tả', { exact: true })
+    .getByLabel('Mô tả khóa học', { exact: true })
     .fill('Nội dung tổng hợp dùng cho kiểm thử E2E BE-05.')
   await courseDialog.getByRole('button', { name: 'Tạo khóa học' }).click()
   await expect(page.getByText('Đã tạo khóa học nháp.')).toBeVisible()
@@ -778,7 +791,7 @@ test('Admin creates and publishes a valid CMS tree; learner completion keeps its
   const learner = await browser.newPage()
   const learnerToken = await login(learner, 'student-b.be05@example.test')
   await learner.goto(`/learn/exercises/${quizExerciseId}`)
-  await expect(learner.getByRole('heading', { name: 'Quiz bắt buộc BE-05' })).toBeVisible()
+  await expect(learner.getByRole('heading', { name: 'Quiz giao tiếp BE-05' })).toBeVisible()
   const quizRoute = `/admin/courses/${courseId}/sections/${sectionId}/lessons/${lessonId}/exercises/${quizExerciseId}`
   await learner.goto(`/learn/lessons/${lessonId}`)
   await expect(learner.getByRole('heading', { name: 'Bài học đầu tiên BE-05' })).toBeVisible()
@@ -799,7 +812,7 @@ test('Admin creates and publishes a valid CMS tree; learner completion keeps its
   const completeLessonButton = learner.getByRole('button', { name: 'Hoàn thành bài học' })
   await expect(completeLessonButton).toBeEnabled()
   await completeLessonButton.click()
-  await expect(learner.getByRole('button', { name: 'Đã hoàn thành', exact: true })).toBeVisible()
+  await expect(learner.getByRole('button', { name: 'Đã hoàn thành bài học' })).toBeVisible()
 
   await page.goto(quizRoute)
   await expect(page.getByLabel('Nội dung câu hỏi')).toHaveValue('Cách nói tạm biệt là gì?')
@@ -808,8 +821,8 @@ test('Admin creates and publishes a valid CMS tree; learner completion keeps its
   await expect(page.getByText('Đã lưu bài trắc nghiệm.')).toBeVisible()
   await learner.goto(`/learn/quizzes/${attemptId}/result`)
   await expect(learner.getByText('0 / 1 câu đúng')).toBeVisible()
-  await expect(learner.getByText('Đáp án được hệ thống trả về: Auf Wiedersehen')).toBeVisible()
-  await expect(learner.getByText('Bạn đã chọn: Guten Tag')).toBeVisible()
+  await expect(learner.getByText('Đáp án đúng: Auf Wiedersehen')).toBeVisible()
+  await expect(learner.getByText('Bạn chưa trả lời đúng câu này.')).toBeVisible()
 
   await page.goto(`/admin/courses/${courseId}`)
   await page.getByRole('button', { name: 'Xóa khóa học' }).click()
