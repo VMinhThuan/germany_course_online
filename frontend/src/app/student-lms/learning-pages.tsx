@@ -100,7 +100,7 @@ export function LearningCoursePage() {
       ) : (
         <div className="grid min-w-0 gap-4">
           <SectionHeader title="Lộ trình khóa học" />
-          <div className="rounded-2xl border border-brand-blue/70 bg-surface-blue p-4 sm:p-5">
+          <div className="rounded-2xl border border-brand-pink/60 bg-brand-pink/20 p-4 sm:p-5">
             <Progress
               value={progressPercent}
               label={`${completedLessons}/${trackedLessons.length} bài học hoàn thành`}

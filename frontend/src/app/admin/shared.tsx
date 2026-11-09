@@ -93,7 +93,7 @@ export function AdminLayout({
                 return (
                   <div
                     key={item.label}
-                    className="min-w-[13rem] rounded-xl bg-surface-muted p-2 lg:min-w-0"
+                    className="min-w-[13rem] rounded-xl border border-brand-pink/40 bg-brand-pink/15 p-2 lg:min-w-0"
                   >
                     <p className="px-2 pb-1 pt-0.5 text-[0.65rem] font-bold uppercase tracking-[0.12em] text-ink-secondary">
                       {item.label}
@@ -338,7 +338,7 @@ export function AdminSortableTable<T>({
   return (
     <div className="overflow-x-auto rounded-xl border border-border-subtle bg-white">
       <table className="w-full min-w-[44rem] border-collapse text-left text-sm">
-        <thead className="bg-surface-muted text-xs uppercase tracking-wide text-ink-secondary">
+        <thead className="bg-brand-pink/25 text-xs uppercase tracking-wide text-ink-secondary">
           <tr>
             {columns.map((column) => {
               const active = sortKey === column.key

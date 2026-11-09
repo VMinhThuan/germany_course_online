@@ -111,17 +111,6 @@
   white-space: nowrap;
 }
 
-body.app-theme-pink {
-  --page-surface: #fff3f6;
-  --brand-blue: #f5dfe7;
-  --surface-muted: #fbe5ec;
-  --surface-blue: #f8dce5;
-  --surface-pink: #f7cbd8;
-  --border-subtle: #eac8d4;
-  min-height: 100vh;
-  background: var(--page-surface);
-}
-
 h2.font-extrabold,
 h3.font-extrabold,
 h4.font-extrabold,
