@@ -81,7 +81,7 @@ export function transformGlyph(font, character, scope) {
     .toPathData(LETTERING_STYLE.pathPrecision)
   const source = new scope.CompoundPath(sourceData)
   try {
-    const bodyExpansions = [LETTERING_STYLE.bodyExpansion, 8, 6, 4]
+    const bodyExpansions = [LETTERING_STYLE.bodyExpansion, 6, 4, 2]
 
     for (const bodyExpansion of bodyExpansions) {
       let body

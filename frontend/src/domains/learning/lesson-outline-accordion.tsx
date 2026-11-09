@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ArrowUpRight, Check, ChevronDown, CirclePlay, FileText } from 'lucide-react'
 import { Link } from 'react-router'
 import type { LessonSummaryModel } from '@/domains/catalog/models'
@@ -36,6 +36,13 @@ export function LessonOutlineAccordion({
     currentLessonId ?? tree.currentLessonId ?? '',
   )
   const activeLessonId = currentLessonId ?? tree.currentLessonId
+  const activeLessonRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (compact && typeof activeLessonRef.current?.scrollIntoView === 'function') {
+      activeLessonRef.current.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    }
+  }, [activeLessonId, compact])
 
   return (
     <nav aria-label={`Lộ trình ${tree.courseTitle}`} className="grid gap-3">
@@ -45,7 +52,7 @@ export function LessonOutlineAccordion({
           aria-labelledby={`${section.id}-outline-heading`}
           className="overflow-hidden rounded-xl border border-border-subtle bg-card-surface"
         >
-          <div className="flex items-center gap-2 bg-brand-blue/30 px-3 py-2 sm:px-4">
+          <div className="flex items-center gap-2 bg-gradient-to-r from-brand-pink/30 via-brand-blue/25 to-brand-blue/10 px-3 py-2 sm:px-4">
             <h2
               id={`${section.id}-outline-heading`}
               className="min-h-11 min-w-0 flex-1 py-3 text-sm font-semibold text-ink-primary"
@@ -81,6 +88,7 @@ export function LessonOutlineAccordion({
                   {compact ? (
                     <button
                       type="button"
+                      ref={active ? activeLessonRef : undefined}
                       onClick={() => onSelectLesson?.(lesson.id)}
                       aria-current={active ? 'page' : undefined}
                       title={lesson.title}

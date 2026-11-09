@@ -7,11 +7,13 @@ export function BrandLogo({
   compact = false,
   variant = 'primary',
   className,
+  imageClassName,
 }: {
   to?: string
   compact?: boolean
   variant?: 'primary' | 'light' | 'dark'
   className?: string
+  imageClassName?: string
 }) {
   const src = compact ? brandConfig.logos.mark : brandConfig.logos[variant]
 
@@ -22,7 +24,11 @@ export function BrandLogo({
         alt={brandConfig.name}
         width={compact ? 40 : 236}
         height={compact ? 40 : 40}
-        className={cn('shrink-0 object-contain', compact ? 'size-10' : 'h-10 w-[14.75rem]')}
+        className={cn(
+          'shrink-0 object-contain',
+          compact ? 'size-10' : 'h-10 w-[14.75rem]',
+          imageClassName,
+        )}
       />
     </Link>
   )

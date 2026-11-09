@@ -373,34 +373,36 @@ export function QuizResult({
   onRetry?: () => void
 }) {
   return (
-    <Card className="mx-auto grid w-full max-w-3xl gap-4 p-5 sm:p-7">
-      <p className="text-sm font-semibold text-success-foreground">Đã nhận kết quả</p>
-      <h2 className="font-display text-2xl font-bold">Kết quả bài làm</h2>
-      {result.score !== undefined && (
-        <div className="grid gap-1">
-          <p className="text-lg tabular-nums">
-            Điểm: {result.score}
-            {result.maxScore !== undefined ? ` / ${result.maxScore}` : ''}
-          </p>
-          {result.maxScore && Number(result.maxScore) > 0 && (
-            <p className="text-sm text-ink-secondary">
-              Tỷ lệ: {((Number(result.score) / Number(result.maxScore)) * 100).toFixed(1)}%
+    <Card className="grid w-full gap-4 p-5 sm:p-7">
+      <div className="grid gap-2 rounded-2xl border border-brand-pink/60 bg-brand-pink/20 p-4 sm:p-5">
+        <p className="text-sm font-semibold text-success-foreground">Đã nhận kết quả</p>
+        <h2 className="font-display text-2xl font-bold">Kết quả bài làm</h2>
+        {result.score !== undefined && (
+          <div className="grid gap-1">
+            <p className="text-lg tabular-nums">
+              Điểm: {result.score}
+              {result.maxScore !== undefined ? ` / ${result.maxScore}` : ''}
             </p>
-          )}
-        </div>
-      )}
-      {result.correctCount !== undefined && (
-        <p className="text-sm text-ink-secondary">
-          {result.correctCount} / {result.totalQuestions} câu đúng
-        </p>
-      )}
-      {result.passed !== undefined && result.passed !== null && (
-        <p
-          className={`w-fit rounded-full px-3 py-1 text-sm font-semibold ${result.passed ? 'bg-pastel-lime text-pastel-lime-ink' : 'bg-surface-pink text-ink-primary'}`}
-        >
-          {result.passed ? 'Đạt yêu cầu' : 'Chưa đạt yêu cầu'}
-        </p>
-      )}
+            {result.maxScore && Number(result.maxScore) > 0 && (
+              <p className="text-sm text-ink-secondary">
+                Tỷ lệ: {((Number(result.score) / Number(result.maxScore)) * 100).toFixed(1)}%
+              </p>
+            )}
+          </div>
+        )}
+        {result.correctCount !== undefined && (
+          <p className="text-sm text-ink-secondary">
+            {result.correctCount} / {result.totalQuestions} câu đúng
+          </p>
+        )}
+        {result.passed !== undefined && result.passed !== null && (
+          <p
+            className={`w-fit rounded-full px-3 py-1 text-sm font-semibold ${result.passed ? 'bg-pastel-lime text-pastel-lime-ink' : 'bg-surface-pink text-ink-primary'}`}
+          >
+            {result.passed ? 'Đạt yêu cầu' : 'Chưa đạt yêu cầu'}
+          </p>
+        )}
+      </div>
       <QuizReview result={result} />
       <QuizRetryAction allowed={result.capabilities.canRetry} {...(onRetry ? { onRetry } : {})} />
     </Card>
@@ -417,9 +419,12 @@ export function QuizReview({ result }: { result: QuizResultViewModel }) {
   if (!result.review?.length)
     return <p className="text-sm text-ink-secondary">Không có phần giải thích cho kết quả này.</p>
   return (
-    <ol aria-label="Đáp án bài kiểm tra" className="grid gap-3">
+    <ol aria-label="Đáp án bài kiểm tra" className="grid gap-3 md:grid-cols-2">
       {result.review.map((item, index) => (
-        <li key={item.questionId} className="rounded-xl border border-border-subtle p-4">
+        <li
+          key={item.questionId}
+          className="rounded-xl border border-brand-pink/40 bg-brand-pink/10 p-4"
+        >
           <p className="font-semibold">
             Câu {index + 1}. {item.prompt}
           </p>

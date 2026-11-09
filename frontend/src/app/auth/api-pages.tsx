@@ -38,7 +38,10 @@ function AuthPageFrame({ title, children }: { title: string; children: ReactNode
   return (
     <AuthShell showBrand={false} showPreviewNotice={false} showFooter={false}>
       <div role="region" aria-label={title} className="mx-auto grid w-full max-w-3xl gap-4">
-        <BrandLogo className="mx-auto" />
+        <BrandLogo
+          className="mx-auto"
+          imageClassName="h-12 w-[17.75rem] max-w-[calc(100vw-3rem)]"
+        />
         {children}
       </div>
     </AuthShell>

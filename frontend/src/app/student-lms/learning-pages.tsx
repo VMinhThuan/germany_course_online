@@ -100,7 +100,7 @@ export function LearningCoursePage() {
       ) : (
         <div className="grid min-w-0 gap-4">
           <SectionHeader title="Lộ trình khóa học" />
-          <div className="rounded-2xl border border-brand-pink/60 bg-brand-pink/20 p-4 sm:p-5">
+          <div className="rounded-2xl border border-brand-pink/70 bg-brand-pink/30 p-4 sm:p-5">
             <Progress
               value={progressPercent}
               label={`${completedLessons}/${trackedLessons.length} bài học hoàn thành`}
@@ -700,6 +700,7 @@ export function LearningQuizResultPage() {
     <ProductPage
       title="Kết quả bài kiểm tra"
       backTo={lessonId ? `/learn/lessons/${lessonId}` : '/student/courses'}
+      wide
     >
       {result.isPending ? (
         <ProductLoading title="Đang tải kết quả" />
@@ -721,7 +722,7 @@ export function LearningQuizResultPage() {
       ) : !result.data ? (
         <ProductNotFound message="Không tìm thấy kết quả cho lượt làm này." />
       ) : (
-        <div className="mx-auto grid w-full max-w-3xl gap-4">
+        <div className="grid w-full gap-4">
           <QuizResult
             result={result.data}
             onRetry={() =>
