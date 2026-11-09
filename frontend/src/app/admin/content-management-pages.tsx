@@ -7,7 +7,6 @@ import {
   Eye,
   EyeOff,
   ExternalLink,
-  Link2,
   Plus,
   Search,
   Trash2,
@@ -691,6 +690,7 @@ export function AdminLessonsPage() {
 export function AdminExercisesPage() {
   const dialogs = useDialogs()
   const notifications = useNotifications()
+  const navigate = useNavigate()
   const idempotency = useStableIdempotencyKey()
   const courses = useCourseOptions()
   const [courseId, setCourseId] = useState('')
@@ -704,10 +704,6 @@ export function AdminExercisesPage() {
   const [mediaProgress, setMediaProgress] = useState<number | null>(null)
   const [isSavingExercise, setIsSavingExercise] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
-  const [assignmentExercise, setAssignmentExercise] = useState<ExerciseManagementRow | null>(null)
-  const [assignmentCourseId, setAssignmentCourseId] = useState('')
-  const [assignmentSectionId, setAssignmentSectionId] = useState('')
-  const [assignmentLessonId, setAssignmentLessonId] = useState('')
   const [validation, setValidation] = useState('')
   const sections = useSectionOptions(courseId)
   const lessons = useLessonOptions(sectionId)
@@ -723,16 +719,6 @@ export function AdminExercisesPage() {
       adminRepository.updateExercise(id, { status }),
   )
   const remove = useAdminMutation((id: string) => adminRepository.deleteExercise(id))
-  const assignLesson = useAdminMutation(
-    ({ exerciseId, lessonId }: { exerciseId: string; lessonId: string }) =>
-      adminRepository.updateExercise(exerciseId, { lessonId }),
-  )
-  const assignmentSections = (allSections.data ?? []).filter(
-    ({ course }) => course.id === assignmentCourseId,
-  )
-  const assignmentLessons = (allLessons.data ?? []).filter(
-    ({ section }) => section.id === assignmentSectionId,
-  )
   const filtered = (exercises.data ?? []).filter((row) =>
     normalizeSearch(
       `${row.exercise.title} ${row.exercise.instructions} ${row.lesson.title} ${row.section.title} ${row.course.title} ${row.course.code}`,
@@ -775,18 +761,23 @@ export function AdminExercisesPage() {
               : 'Mở bài tập để thử tải hoặc chọn tệp lại.',
           )
         }
-      } else {
+      } else if (exercise.exerciseType !== 'QUIZ') {
         notifications.success('Đã tạo bài tập.')
       }
       setTitle('')
       setInstructions('')
       setMediaSelections([])
+      setCreateOpen(false)
+      setValidation('')
+      if (exercise.exerciseType === 'QUIZ') {
+        notifications.success('Đã tạo quiz. Hãy thêm câu hỏi ở trang chi tiết.')
+        navigate(exercisePath(courseId, sectionId, lessonId, exercise.id))
+        return
+      }
       setCourseId('')
       setSectionId('')
       setLessonId('')
-      setCreateOpen(false)
       setExerciseType('FILE_BASED')
-      setValidation('')
     } catch {
       /* Error is shown below the form. */
     } finally {
@@ -819,29 +810,6 @@ export function AdminExercisesPage() {
         }
       },
     })
-  }
-
-  function chooseLesson(row: ExerciseManagementRow) {
-    setAssignmentExercise(row)
-    setAssignmentCourseId(row.course.id)
-    setAssignmentSectionId(row.section.id)
-    setAssignmentLessonId(row.lesson.id)
-    assignLesson.reset()
-  }
-
-  async function saveLessonAssignment(event: FormEvent) {
-    event.preventDefault()
-    if (!assignmentExercise || !assignmentLessonId) return
-    try {
-      await assignLesson.mutateAsync({
-        exerciseId: assignmentExercise.exercise.id,
-        lessonId: assignmentLessonId,
-      })
-      notifications.success('Đã cập nhật bài học của quiz.')
-      setAssignmentExercise(null)
-    } catch {
-      /* Error is shown in the dialog. */
-    }
   }
 
   const columns: AdminTableColumn<ExerciseManagementRow>[] = [
@@ -895,17 +863,6 @@ export function AdminExercisesPage() {
       className: 'text-right',
       render: (row) => (
         <div className="flex flex-wrap justify-end gap-2">
-          {row.exercise.exerciseType === 'QUIZ' && (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => chooseLesson(row)}
-              startIcon={<Link2 aria-hidden="true" className="size-4" />}
-            >
-              Chọn bài học
-            </Button>
-          )}
           <VisibilityButton
             status={row.exercise.status}
             onClick={() => toggle(row.exercise)}
@@ -941,13 +898,29 @@ export function AdminExercisesPage() {
               placeholder="Nhập tên bài tập, bài học hoặc khóa học"
             />
           </div>
-          <Button
-            type="button"
-            onClick={() => setCreateOpen(true)}
-            startIcon={<Plus aria-hidden="true" className="size-4" />}
-          >
-            Tạo bài tập
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              onClick={() => {
+                setExerciseType('FILE_BASED')
+                setCreateOpen(true)
+              }}
+              startIcon={<Plus aria-hidden="true" className="size-4" />}
+            >
+              Tạo bài tập
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setExerciseType('QUIZ')
+                setCreateOpen(true)
+              }}
+              startIcon={<Plus aria-hidden="true" className="size-4" />}
+            >
+              Tạo bài tập quiz
+            </Button>
+          </div>
         </div>
         {courses.isPending ||
         allSections.isPending ||
@@ -984,7 +957,7 @@ export function AdminExercisesPage() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         title="Tạo bài tập mới"
-        description="Chọn khóa học, chương và bài học để đặt bài tập đúng chỗ. Với bài tập PDF, có thể tải tệp hoặc chọn tệp đã có."
+        description="Chọn khóa học, chương và bài học. Sau khi tạo quiz, trang chi tiết sẽ mở để bạn nhập câu hỏi."
         footer={
           <>
             <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
@@ -995,7 +968,7 @@ export function AdminExercisesPage() {
               form="admin-create-exercise"
               loading={isSavingExercise || create.isPending || mediaProgress !== null}
             >
-              Tạo bài tập
+              {exerciseType === 'QUIZ' ? 'Tạo quiz và mở chi tiết' : 'Tạo bài tập'}
             </Button>
           </>
         }
@@ -1077,7 +1050,9 @@ export function AdminExercisesPage() {
               label="Loại bài tập"
               value={exerciseType}
               onChange={(value) => {
-                setExerciseType(value as typeof exerciseType)
+                const nextType = value as typeof exerciseType
+                setExerciseType(nextType)
+                if (nextType === 'QUIZ') setMediaSelections([])
               }}
               options={[
                 { value: 'FILE_BASED', label: 'Bài tập PDF' },
@@ -1093,11 +1068,17 @@ export function AdminExercisesPage() {
             required
             placeholder="Ví dụ: Mở tệp, hoàn thành bài rồi đánh dấu đã làm."
           />
-          <AdminExerciseMediaPicker
-            value={mediaSelections}
-            onChange={setMediaSelections}
-            disabled={isSavingExercise || mediaProgress !== null}
-          />
+          {exerciseType === 'FILE_BASED' ? (
+            <AdminExerciseMediaPicker
+              value={mediaSelections}
+              onChange={setMediaSelections}
+              disabled={isSavingExercise || mediaProgress !== null}
+            />
+          ) : (
+            <p className="rounded-xl bg-surface-muted p-3 text-sm leading-6 text-ink-secondary">
+              Sau khi tạo, trang chi tiết quiz sẽ mở để bạn thêm câu hỏi và đáp án.
+            </p>
+          )}
           {mediaProgress !== null && (
             <div className="rounded-xl bg-surface-muted p-3 text-sm" role="status">
               <p>Đang tải tệp lên {mediaProgress}%</p>
@@ -1113,81 +1094,6 @@ export function AdminExercisesPage() {
             </p>
           )}
           <AdminFeedback error={create.error} />
-        </form>
-      </BaseDialog>
-      <BaseDialog
-        open={assignmentExercise !== null}
-        onOpenChange={(open) => !open && setAssignmentExercise(null)}
-        title="Gắn quiz vào bài học"
-        description={
-          assignmentExercise
-            ? `Chọn vị trí cho “${assignmentExercise.exercise.title}”. Quiz sẽ xuất hiện dưới bài học này.`
-            : ''
-        }
-        footer={
-          <>
-            <Button type="button" variant="outline" onClick={() => setAssignmentExercise(null)}>
-              Hủy
-            </Button>
-            <Button
-              type="submit"
-              form="admin-assign-quiz-lesson"
-              loading={assignLesson.isPending}
-              disabled={!assignmentLessonId}
-            >
-              Lưu vị trí
-            </Button>
-          </>
-        }
-      >
-        <form
-          id="admin-assign-quiz-lesson"
-          className="grid gap-3"
-          onSubmit={(event) => void saveLessonAssignment(event)}
-        >
-          <AdminSelect
-            label="Khóa học"
-            value={assignmentCourseId}
-            onChange={(value) => {
-              setAssignmentCourseId(value)
-              setAssignmentSectionId('')
-              setAssignmentLessonId('')
-            }}
-            options={[
-              { value: '', label: 'Chọn khóa học' },
-              ...(courses.data ?? []).map((course) => ({ value: course.id, label: course.title })),
-            ]}
-          />
-          <AdminSelect
-            label="Chương"
-            value={assignmentSectionId}
-            onChange={(value) => {
-              setAssignmentSectionId(value)
-              setAssignmentLessonId('')
-            }}
-            disabled={!assignmentCourseId}
-            options={[
-              { value: '', label: 'Chọn chương' },
-              ...assignmentSections.map(({ section }) => ({
-                value: section.id,
-                label: section.title,
-              })),
-            ]}
-          />
-          <AdminSelect
-            label="Bài học"
-            value={assignmentLessonId}
-            onChange={setAssignmentLessonId}
-            disabled={!assignmentSectionId}
-            options={[
-              { value: '', label: 'Chọn bài học' },
-              ...assignmentLessons.map(({ lesson }) => ({
-                value: lesson.id,
-                label: lesson.title,
-              })),
-            ]}
-          />
-          <AdminFeedback error={assignLesson.error} />
         </form>
       </BaseDialog>
     </div>

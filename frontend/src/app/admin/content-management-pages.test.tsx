@@ -329,8 +329,7 @@ describe('course content management', () => {
     expect(statusHeader).toHaveAttribute('aria-sort', 'ascending')
   })
 
-  it('lets an admin choose the lesson that contains an existing quiz', async () => {
-    const user = userEvent.setup()
+  it('keeps quiz placement in its detail page and offers a dedicated create action', async () => {
     const quizExercise: ApiAdminExercise = {
       ...exercise,
       id: 'quiz-exercise-1',
@@ -342,16 +341,8 @@ describe('course content management', () => {
     renderPage(<AdminExercisesPage />)
 
     const row = await screen.findByRole('row', { name: /Quiz ngữ pháp/ })
-    await user.click(within(row).getByRole('button', { name: 'Chọn bài học' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Gắn quiz vào bài học' })
-    expect(within(dialog).getByRole('combobox', { name: 'Bài học' })).toHaveValue(lesson.id)
-    await user.click(within(dialog).getByRole('button', { name: 'Lưu vị trí' }))
-
-    await waitFor(() =>
-      expect(adminRepository.updateExercise).toHaveBeenCalledWith(quizExercise.id, {
-        lessonId: lesson.id,
-      }),
-    )
+    expect(within(row).queryByRole('button', { name: 'Chọn bài học' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Tạo bài tập quiz' })).toBeVisible()
   })
 
   it('uploads and attaches a selected PDF when creating an exercise in the dialog', async () => {

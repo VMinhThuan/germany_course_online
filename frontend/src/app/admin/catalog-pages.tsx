@@ -3,7 +3,13 @@ import { Link, useNavigate } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowDown, ArrowUp, Eye, EyeOff, FileUp, Plus, Search, Trash2 } from 'lucide-react'
 import { adminRepository } from '@/data/api/admin-repository'
-import type { ApiAdminCourse, ApiAdminQuiz } from '@/lib/api/types'
+import type {
+  ApiAdminCourse,
+  ApiAdminLesson,
+  ApiAdminQuiz,
+  ApiAdminSection,
+  ApiPage,
+} from '@/lib/api/types'
 import { parseQuizWorkbook, type QuizWorkbookImportPreview } from '@/domains/quizzes'
 import { ApiError } from '@/lib/api/client'
 import { formatVnd } from '@/shared/lib/format'
@@ -49,6 +55,19 @@ function sectionPath(courseId: string, sectionId: string) {
 }
 function lessonPath(courseId: string, sectionId: string, lessonId: string) {
   return `${sectionPath(courseId, sectionId)}/lessons/${encodeURIComponent(lessonId)}`
+}
+function exercisePath(courseId: string, sectionId: string, lessonId: string, exerciseId: string) {
+  return `${lessonPath(courseId, sectionId, lessonId)}/exercises/${encodeURIComponent(exerciseId)}`
+}
+
+async function loadAllAdminPages<T>(loadPage: (page: number) => Promise<ApiPage<T>>) {
+  const first = await loadPage(1)
+  const pageCount = Math.ceil(first.total / first.pageSize)
+  if (pageCount <= 1) return first.items
+  const rest = await Promise.all(
+    Array.from({ length: pageCount - 1 }, (_, index) => loadPage(index + 2)),
+  )
+  return first.items.concat(...rest.map((page) => page.items))
 }
 
 async function loadAllCoursePages(query: string) {
@@ -439,9 +458,39 @@ export function AdminExerciseEditorPage({
   exerciseId: string
 }) {
   const dialogs = useDialogs()
+  const notifications = useNotifications()
   const exercises = useQuery({
     queryKey: ['admin', 'exercises', lessonId],
-    queryFn: () => adminRepository.listExercises(lessonId),
+    queryFn: () => adminRepository.listExercises(lessonId, { page: 1, pageSize: 100 }),
+    retry: false,
+  })
+  const exercise = exercises.data?.items.find((item) => item.id === exerciseId)
+  const [assignmentCourseId, setAssignmentCourseId] = useState(courseId)
+  const [assignmentSectionId, setAssignmentSectionId] = useState(sectionId)
+  const [assignmentLessonId, setAssignmentLessonId] = useState(lessonId)
+  const courses = useQuery({
+    queryKey: ['admin', 'quiz-assignment-courses'],
+    queryFn: () =>
+      loadAllAdminPages((page) => adminRepository.listCourses({ page, pageSize: 100 })),
+    enabled: exercise?.exerciseType === 'QUIZ',
+    retry: false,
+  })
+  const sections = useQuery({
+    queryKey: ['admin', 'quiz-assignment-sections', assignmentCourseId],
+    queryFn: () =>
+      loadAllAdminPages((page) =>
+        adminRepository.listSections(assignmentCourseId, { page, pageSize: 100 }),
+      ),
+    enabled: exercise?.exerciseType === 'QUIZ' && Boolean(assignmentCourseId),
+    retry: false,
+  })
+  const lessons = useQuery({
+    queryKey: ['admin', 'quiz-assignment-lessons', assignmentSectionId],
+    queryFn: () =>
+      loadAllAdminPages((page) =>
+        adminRepository.listLessons(assignmentSectionId, { page, pageSize: 100 }),
+      ),
+    enabled: exercise?.exerciseType === 'QUIZ' && Boolean(assignmentSectionId),
     retry: false,
   })
   const update = useAdminMutation(({ id, input }: { id: string; input: Record<string, unknown> }) =>
@@ -449,7 +498,6 @@ export function AdminExerciseEditorPage({
   )
   const remove = useAdminMutation((id: string) => adminRepository.deleteExercise(id))
   const navigate = useNavigate()
-  const exercise = exercises.data?.items.find((item) => item.id === exerciseId)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [instructions, setInstructions] = useState('')
@@ -469,7 +517,14 @@ export function AdminExerciseEditorPage({
       setStatus(exercise.status)
     }
   }, [exercise])
-  if (exercises.isPending) return <AdminLoading />
+  useEffect(() => {
+    // Reset the selector when an admin navigates to another exercise location.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setAssignmentCourseId(courseId)
+    setAssignmentSectionId(sectionId)
+    setAssignmentLessonId(lessonId)
+  }, [courseId, sectionId, lessonId])
+  if (exercises.isPending || (update.isPending && !exercise)) return <AdminLoading />
   if (exercises.isError || !exercise)
     return (
       <AdminLoadError
@@ -496,6 +551,19 @@ export function AdminExerciseEditorPage({
       setSuccess('Đã lưu bài tập.')
     } catch {
       /* error shown */
+    }
+  }
+  async function saveQuizLesson(event: FormEvent) {
+    event.preventDefault()
+    if (!assignmentLessonId) return
+    try {
+      await update.mutateAsync({ id: exerciseId, input: { lessonId: assignmentLessonId } })
+      notifications.success('Đã gắn quiz vào bài học.')
+      navigate(
+        exercisePath(assignmentCourseId, assignmentSectionId, assignmentLessonId, exerciseId),
+      )
+    } catch {
+      /* Error shown in the exercise form. */
     }
   }
   function deleteSelected() {
@@ -568,11 +636,92 @@ export function AdminExerciseEditorPage({
         </form>
       </AdminCard>
       {exercise.exerciseType === 'QUIZ' ? (
-        <AdminQuizEditor
-          key={exerciseId}
-          exerciseId={exerciseId}
-          initialTitle={title || exercise.title}
-        />
+        <>
+          <AdminCard
+            title="Bài học chứa quiz"
+            description="Chọn khóa học, chương và bài học để đặt quiz đúng vị trí trong lộ trình."
+          >
+            {courses.isPending ? (
+              <AdminLoading label="Đang tải khóa học" />
+            ) : courses.isError ? (
+              <AdminLoadError error={courses.error} retry={() => void courses.refetch()} />
+            ) : (
+              <form className="grid gap-3" onSubmit={(event) => void saveQuizLesson(event)}>
+                <AdminSelect
+                  label="Khóa học"
+                  value={assignmentCourseId}
+                  onChange={(value) => {
+                    setAssignmentCourseId(value)
+                    setAssignmentSectionId('')
+                    setAssignmentLessonId('')
+                  }}
+                  options={[
+                    { value: '', label: 'Chọn khóa học' },
+                    ...(courses.data ?? []).map((course) => ({
+                      value: course.id,
+                      label: course.title,
+                    })),
+                  ]}
+                />
+                <AdminSelect
+                  label="Chương"
+                  value={assignmentSectionId}
+                  onChange={(value) => {
+                    setAssignmentSectionId(value)
+                    setAssignmentLessonId('')
+                  }}
+                  disabled={!assignmentCourseId || sections.isPending}
+                  options={[
+                    { value: '', label: sections.isPending ? 'Đang tải chương…' : 'Chọn chương' },
+                    ...(sections.data ?? []).map((section: ApiAdminSection) => ({
+                      value: section.id,
+                      label: section.title,
+                    })),
+                  ]}
+                />
+                {sections.isError && (
+                  <AdminLoadError error={sections.error} retry={() => void sections.refetch()} />
+                )}
+                <AdminSelect
+                  label="Bài học"
+                  value={assignmentLessonId}
+                  onChange={setAssignmentLessonId}
+                  disabled={!assignmentSectionId || lessons.isPending}
+                  options={[
+                    { value: '', label: lessons.isPending ? 'Đang tải bài học…' : 'Chọn bài học' },
+                    ...(lessons.data ?? []).map((lesson: ApiAdminLesson) => ({
+                      value: lesson.id,
+                      label: lesson.title,
+                    })),
+                  ]}
+                />
+                {lessons.isError && (
+                  <AdminLoadError error={lessons.error} retry={() => void lessons.refetch()} />
+                )}
+                <AdminFeedback error={update.error} />
+                <div>
+                  <Button
+                    type="submit"
+                    loading={update.isPending}
+                    disabled={
+                      !assignmentCourseId ||
+                      !assignmentSectionId ||
+                      !assignmentLessonId ||
+                      assignmentLessonId === lessonId
+                    }
+                  >
+                    Lưu bài học
+                  </Button>
+                </div>
+              </form>
+            )}
+          </AdminCard>
+          <AdminQuizEditor
+            key={exerciseId}
+            exerciseId={exerciseId}
+            initialTitle={title || exercise.title}
+          />
+        </>
       ) : (
         <AdminExerciseMediaManager exercises={[exercise]} selectedExerciseId={exercise.id} />
       )}
