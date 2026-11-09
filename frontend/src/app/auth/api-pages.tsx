@@ -56,17 +56,18 @@ function AuthFormCard({
 }) {
   return (
     <Card className="border-border-subtle/90 shadow-soft">
-      <CardHeader className="space-y-3 pb-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="space-y-2">
+      <CardHeader className="pb-3">
+        <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+          <span aria-hidden="true" />
+          <div className="grid justify-items-center gap-2 text-center">
             {title && (
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-action-primary">
                 {title}
               </p>
             )}
-            <DecorativeHeading text={description} level={1} size="sm" />
+            <DecorativeHeading text={description} level={1} size="sm" className="text-center" />
           </div>
-          <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-surface-lime text-pastel-lime-ink">
+          <span className="grid size-10 shrink-0 place-items-center justify-self-end rounded-2xl bg-surface-lime text-pastel-lime-ink">
             <ShieldCheck aria-hidden="true" className="size-5" />
           </span>
         </div>

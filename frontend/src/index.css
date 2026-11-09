@@ -112,12 +112,12 @@
 }
 
 body.app-theme-pink {
-  --page-surface: #fff8fa;
-  --brand-blue: #f8e3e9;
-  --surface-muted: #f9e9ef;
-  --surface-blue: #f8e5eb;
+  --page-surface: #fff3f6;
+  --brand-blue: #f5dfe7;
+  --surface-muted: #fbe5ec;
+  --surface-blue: #f8dce5;
   --surface-pink: #f7cbd8;
-  --border-subtle: #e9d0d8;
+  --border-subtle: #eac8d4;
   min-height: 100vh;
   background: var(--page-surface);
 }

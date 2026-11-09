@@ -25,6 +25,11 @@ export function ProductRouteEffects() {
   const positions = useRef(new Map<string, { x: number; y: number }>())
   const firstRender = useRef(true)
 
+  useLayoutEffect(() => {
+    document.body.classList.toggle('app-theme-pink', location.pathname !== '/')
+    return () => document.body.classList.remove('app-theme-pink')
+  }, [location.pathname])
+
   useEffect(() => {
     const savePosition = () => {
       positions.current.set(location.key, { x: window.scrollX, y: window.scrollY })

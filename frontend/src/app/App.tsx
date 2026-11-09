@@ -1,5 +1,4 @@
-import { useLayoutEffect } from 'react'
-import { BrowserRouter, useLocation, useRoutes, type RouteObject } from 'react-router'
+import { BrowserRouter, useRoutes, type RouteObject } from 'react-router'
 import { AppErrorBoundary } from '@/app/error-boundary'
 import { AppProviders } from '@/app/providers'
 import { LayoutPreviewPage } from '@/app/layout-preview'
@@ -9,11 +8,6 @@ import { productRoutes, ProductRouteEffects, publicNotFoundRoute } from '@/app/p
 import { StudentDemoDevControls } from '@/app/dev/student-demo-controls'
 
 function DevRoutes() {
-  const location = useLocation()
-  useLayoutEffect(() => {
-    document.body.classList.toggle('app-theme-pink', location.pathname !== '/')
-    return () => document.body.classList.remove('app-theme-pink')
-  }, [location.pathname])
   const devRoutes: RouteObject[] = [
     { path: '/__dev/ui-kit', element: <UiKitPage /> },
     { path: '/__dev/lms-kit', element: <LmsKitPage /> },
