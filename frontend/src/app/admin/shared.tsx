@@ -20,6 +20,7 @@ import {
 import { Link, NavLink, useLocation } from 'react-router'
 import { useQueryClient, useMutation } from '@tanstack/react-query'
 import { useAuthSession } from '@/app/auth/auth-session'
+import { DecorativeHeading } from '@/domains/shared/decorative-heading'
 import { Button, Card, ErrorState, Skeleton } from '@/shared/ui'
 import { useNotifications } from '@/shared/ui/notifications'
 import { ApiError } from '@/lib/api/client'
@@ -163,9 +164,7 @@ export function AdminLayout({
               <p className="text-xs font-bold uppercase tracking-[0.15em] text-action-primary">
                 Khu vực quản trị
               </p>
-              <h1 className="mt-1 font-display text-2xl font-extrabold tracking-tight sm:text-3xl">
-                {title}
-              </h1>
+              <DecorativeHeading text={title} level={1} size="md" className="mt-1" />
               {description && (
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">{description}</p>
               )}

@@ -73,6 +73,7 @@ import {
   VisuallyHidden,
 } from '@/shared/ui'
 import { DialogExamples } from '@/shared/ui/dialogs'
+import { DecorativeHeading } from '@/domains/shared/decorative-heading'
 import { useNotifications } from '@/shared/ui/notifications'
 import { LayoutPreviewIntro } from '@/shared/layouts/shells'
 
@@ -398,9 +399,7 @@ export function UiKitPage() {
                 <Badge tone="info">Foundation</Badge>
                 <Badge tone="neutral">Build · components · layouts</Badge>
               </div>
-              <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl">
-                Hệ thống giao diện, sẵn sàng mở rộng.
-              </h1>
+              <DecorativeHeading text="Hệ thống giao diện, sẵn sàng mở rộng." level={1} size="lg" />
               <p className="max-w-2xl text-lg leading-7 text-ink-secondary">
                 Tập trung token, thành phần dùng lại, trạng thái tương tác và năm khung bố cục. Mọi
                 nội dung ở đây chỉ để xem trước UI.

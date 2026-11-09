@@ -4,6 +4,7 @@ import { Navigate, useNavigate, useSearchParams } from 'react-router'
 import { ApiError } from '@/lib/api/client'
 import { apiAuth } from '@/lib/auth/api-auth'
 import { useAuthSession } from '@/app/auth/auth-session'
+import { DecorativeHeading } from '@/domains/shared/decorative-heading'
 import { brandConfig, setBrandPageTitle } from '@/config/brand'
 import { AuthShell } from '@/shared/layouts/shells'
 import {
@@ -66,9 +67,7 @@ function AuthFormCard({
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-action-primary">
               {title}
             </p>
-            <h1 className="font-display text-2xl font-extrabold tracking-tight sm:text-3xl">
-              {description}
-            </h1>
+            <DecorativeHeading text={description} level={1} size="sm" />
           </div>
           <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-surface-lime text-pastel-lime-ink">
             <ShieldCheck aria-hidden="true" className="size-5" />

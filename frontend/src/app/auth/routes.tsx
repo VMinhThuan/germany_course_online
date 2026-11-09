@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router'
+import { DecorativeHeading } from '@/domains/shared/decorative-heading'
 import {
   ApiForgotPasswordPage,
   ApiLoginPage,
@@ -60,7 +61,7 @@ export function ProtectedStudentRoute() {
   if (status === 'error') {
     return (
       <main className="mx-auto grid min-h-[60vh] max-w-xl content-center gap-4 px-5 py-12 text-center">
-        <h1 className="font-display text-2xl font-bold">Chưa xác minh được phiên đăng nhập</h1>
+        <DecorativeHeading text="Chưa xác minh được phiên đăng nhập" level={1} size="sm" />
         <p className="text-ink-secondary">
           Không thể kết nối với API để khôi phục phiên. Thử lại trước khi đăng nhập lại.
         </p>
@@ -97,7 +98,7 @@ export function ProtectedAdminRoute() {
   if (status === 'error') {
     return (
       <main className="mx-auto grid min-h-[60vh] max-w-xl content-center gap-4 px-5 py-12 text-center">
-        <h1 className="font-display text-2xl font-bold">Chưa xác minh được quyền quản trị</h1>
+        <DecorativeHeading text="Chưa xác minh được quyền quản trị" level={1} size="sm" />
         <p className="text-ink-secondary">
           Kết nối API đang lỗi. Hãy thử khôi phục phiên trước khi tiếp tục.
         </p>

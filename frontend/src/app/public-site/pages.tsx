@@ -2,6 +2,7 @@ import { useEffect, type ReactNode } from 'react'
 import { ArrowLeft, ArrowRight, BookOpenText } from 'lucide-react'
 import { setBrandPageTitle } from '@/config/brand'
 import { useAuthSession } from '@/app/auth/auth-session'
+import { DecorativeHeading } from '@/domains/shared/decorative-heading'
 import { PublicShell } from '@/shared/layouts/shells'
 import { Card, Container, LinkButton } from '@/shared/ui'
 
@@ -39,7 +40,7 @@ export function PublicNotFoundPage() {
         <Card className="grid max-w-xl justify-items-center gap-4 p-7 text-center sm:p-10">
           <BookOpenText aria-hidden="true" className="size-10 text-action-primary" />
           <p className="text-sm font-bold uppercase tracking-[0.16em] text-action-primary">404</p>
-          <h1 className="font-display text-3xl font-extrabold">Không tìm thấy trang</h1>
+          <DecorativeHeading text="Không tìm thấy trang" level={1} size="md" />
           <p className="leading-7 text-ink-secondary">
             Đường dẫn có thể đã thay đổi hoặc không thuộc website khóa học.
           </p>
@@ -66,9 +67,7 @@ export function PublicHelpPage() {
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-action-primary">
             HỖ TRỢ
           </p>
-          <h1 className="font-display text-3xl font-extrabold tracking-tight sm:text-4xl">
-            Trợ giúp và câu hỏi thường gặp
-          </h1>
+          <DecorativeHeading text="Trợ giúp và câu hỏi thường gặp" level={1} size="md" />
           <p className="text-base leading-7 text-ink-secondary">
             Thông tin về khóa học, tài khoản, quyền truy cập và chuyển khoản.
           </p>

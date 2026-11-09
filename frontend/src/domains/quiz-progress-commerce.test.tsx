@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { CouponField, EnrollmentStatusCard, PaymentStatusPanel } from '@/domains/commerce'
 import { LessonNotesEditor, NoteSaveStatus, ProgressRing } from '@/domains/progress'
-import { QuizIntro, QuizOption, QuizResult, QuizRunner } from '@/domains/quizzes'
+import { QuizIntro, QuizOption, QuizResult, QuizReview, QuizRunner } from '@/domains/quizzes'
 import { MOCK_QUIZ_ATTEMPT, MOCK_QUIZ_RESULT } from '@/data/mock'
 
 function deferred<T>() {
@@ -42,9 +42,9 @@ describe('quiz components', () => {
       />,
     )
     expect(screen.getByText('Hệ thống chưa cho phép xem đáp án.')).toBeVisible()
-    expect(screen.queryByText(/Đáp án được hệ thống trả về/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Đáp án đúng:/)).not.toBeInTheDocument()
     rerender(<QuizResult result={MOCK_QUIZ_RESULT} onRetry={() => undefined} />)
-    expect(screen.getAllByText(/Đáp án được hệ thống trả về/)).toHaveLength(2)
+    expect(screen.getAllByText(/Đáp án đúng:/)).toHaveLength(2)
     expect(screen.getByRole('button', { name: 'Làm bài mới' })).toBeVisible()
   })
 
@@ -61,10 +61,40 @@ describe('quiz components', () => {
       />,
     )
     await user.click(screen.getByRole('button', { name: 'Nộp bài' }))
-    expect(screen.getByRole('button', { name: 'Nộp bài' })).toBeDisabled()
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('Còn 2 câu chưa trả lời')
+    await user.click(screen.getByRole('button', { name: 'Vẫn nộp bài' }))
+    expect(screen.getByRole('button', { name: 'Vẫn nộp bài' })).toBeDisabled()
     submission.reject(new Error('Network unavailable'))
     expect(await screen.findByRole('alert')).toHaveTextContent('Không gửi được bài kiểm tra')
     await waitFor(() => expect(screen.getByRole('button', { name: 'Nộp bài' })).toBeEnabled())
+  })
+
+  it('shows the right-side navigator and keeps blank-answer feedback free of answer keys', () => {
+    const unansweredResult = {
+      ...MOCK_QUIZ_RESULT,
+      review: [
+        {
+          questionId: 'question-blank',
+          prompt: 'Câu hỏi chưa làm',
+          isCorrect: false,
+        },
+      ],
+    }
+    const { rerender } = render(
+      <QuizRunner
+        attempt={MOCK_QUIZ_ATTEMPT}
+        currentQuestionIndex={0}
+        onNavigate={() => undefined}
+        onAnswer={() => undefined}
+        onSubmit={async () => MOCK_QUIZ_RESULT}
+      />,
+    )
+    expect(screen.getByRole('region', { name: 'Nội dung câu hỏi' })).toBeVisible()
+    expect(screen.getByRole('navigation', { name: 'Câu hỏi trong bài kiểm tra' })).toBeVisible()
+
+    rerender(<QuizReview result={unansweredResult} />)
+    expect(screen.getByText('Bạn chưa chọn đáp án. Hãy chọn đáp án để xem kết quả.')).toBeVisible()
+    expect(screen.queryByText(/Đáp án đúng:/)).not.toBeInTheDocument()
   })
 
   it('shows a persisted attempt status and disables answer controls while saving', () => {

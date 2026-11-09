@@ -10,6 +10,7 @@ import { StudentShell } from '@/shared/layouts/shells'
 import { formatDateInTimezone } from '@/shared/lib/format'
 import { setBrandPageTitle } from '@/config/brand'
 import type { CourseAccessViewModel } from '@/domains/catalog/models'
+import { DecorativeHeading } from '@/domains/shared/decorative-heading'
 import {
   Card,
   CardContent,
@@ -180,7 +181,11 @@ export function StudentDashboardPage() {
           <Loading />
         ) : dashboard.isError ? (
           <>
-            <PageHeader eyebrow="" title="Tổng quan học tập" />
+            <PageHeader
+              eyebrow=""
+              title="Tổng quan học tập"
+              heading={<DecorativeHeading text="Tổng quan học tập" level={1} size="md" />}
+            />
             <ErrorState
               title="Chưa tải được tổng quan"
               description="Hãy thử tải lại sau ít phút."
@@ -189,7 +194,11 @@ export function StudentDashboardPage() {
           </>
         ) : dashboard.data ? (
           <>
-            <PageHeader eyebrow="" title="Tổng quan học tập" />
+            <PageHeader
+              eyebrow=""
+              title="Tổng quan học tập"
+              heading={<DecorativeHeading text="Tổng quan học tập" level={1} size="md" />}
+            />
             <SectionHeader
               title="Khóa học của tôi"
               action={
@@ -225,6 +234,7 @@ export function StudentCoursesPage() {
         <PageHeader
           eyebrow=""
           title="Khóa học của tôi"
+          heading={<DecorativeHeading text="Khóa học của tôi" level={1} size="md" />}
           actions={
             <LinkButton to="/courses" variant="outline">
               Khám phá khóa học

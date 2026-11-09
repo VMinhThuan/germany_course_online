@@ -1,4 +1,4 @@
-import { createElement, type ReactNode } from 'react'
+import { createElement, type HTMLAttributes, type ReactNode } from 'react'
 import { createLetteringLayout, type LetteringLayout } from './lettering-engine'
 import type { HeadingLevel } from './heading'
 
@@ -53,18 +53,19 @@ export function DecorativeHeading({
   level = 1,
   size = 'lg',
   className,
+  ...headingProps
 }: {
   text: string
   level?: HeadingLevel
   size?: 'sm' | 'md' | 'lg'
-  className?: string
-}) {
+  className?: string | undefined
+} & Omit<HTMLAttributes<HTMLHeadingElement>, 'children'>) {
   const layout = safeCreateLetteringLayout(text)
-  const semanticText: ReactNode = layout ? <span className="sr-only">{text}</span> : text
-  const scale = size === 'lg' ? 'w-[36rem]' : size === 'md' ? 'w-[32rem]' : 'w-[28rem]'
+  const semanticText: ReactNode = <span className="sr-only">{text}</span>
+  const width = size === 'lg' ? '36rem' : size === 'md' ? '32rem' : '28rem'
   const headingClass = [
-    'w-full text-3xl font-bold tracking-tight sm:text-4xl',
-    layout ? 'decorative-lettering-heading' : 'font-display',
+    'min-w-0 max-w-full',
+    layout ? 'decorative-lettering-heading' : 'font-display decorative-heading-fallback',
     className,
   ]
     .filter(Boolean)
@@ -72,17 +73,19 @@ export function DecorativeHeading({
 
   return createElement(
     `h${level}`,
-    { className: headingClass },
+    { ...headingProps, className: headingClass },
     semanticText,
-    layout ? (
-      <span
-        aria-hidden="true"
-        className="mt-1 inline-block max-w-full rounded-3xl border border-brand-pink bg-brand-pink/45 px-4 py-3 shadow-raised sm:px-6 sm:py-4"
-      >
-        <span className={`block max-w-full ${scale}`}>
+    <span
+      aria-hidden="true"
+      className="decorative-heading-card mt-1 inline-flex w-fit max-w-full items-center rounded-3xl border border-brand-pink bg-brand-pink/45 px-2 py-2 shadow-raised sm:px-5 sm:py-3"
+    >
+      {layout ? (
+        <span className="block max-w-full" style={{ width, maxWidth: 'calc(100vw - 6rem)' }}>
           <LetteringSvg layout={layout} />
         </span>
-      </span>
-    ) : null,
+      ) : (
+        <span className="block max-w-full">{text}</span>
+      )}
+    </span>,
   )
 }

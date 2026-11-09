@@ -290,6 +290,44 @@ describe('LearningLessonPage', () => {
     expect(await screen.findByText('Bài tập đã hoàn thành')).toBeVisible()
   })
 
+  it('shows a linked quiz card with its question count in the lesson exercise list', () => {
+    mocks.useProductLesson.mockReturnValue({
+      data: {
+        ...lessonData,
+        exercises: [
+          {
+            id: 'quiz-exercise-1',
+            lessonId: 'lesson-2',
+            title: 'Verbkonjugation',
+            description: 'Luyện chia động từ.',
+            instructions: 'Chọn đáp án phù hợp.',
+            exerciseType: 'QUIZ',
+            completionMode: 'QUIZ_SUBMISSION',
+            status: 'NOT_STARTED',
+            isRequired: true,
+            assets: [],
+            capabilities: { canMarkComplete: false, canViewSolutions: false },
+            quiz: {
+              title: 'Unregelmäßige Verben',
+              description: 'Ôn lại động từ bất quy tắc.',
+              questionCount: 20,
+            },
+            href: '/learn/exercises/quiz-exercise-1',
+          },
+        ],
+      },
+      isPending: false,
+      isError: false,
+    })
+
+    renderLesson()
+
+    const card = screen.getByRole('link', { name: /Unregelmäßige Verben/ })
+    expect(card).toHaveAttribute('href', '/learn/exercises/quiz-exercise-1')
+    expect(card).toHaveTextContent('Bài kiểm tra · 20 câu')
+    expect(card).toHaveTextContent('Ôn lại động từ bất quy tắc.')
+  })
+
   it('renders a YouTube lesson solution video', () => {
     mocks.useProductLesson.mockReturnValue({
       data: {

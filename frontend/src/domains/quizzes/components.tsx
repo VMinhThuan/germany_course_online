@@ -1,8 +1,18 @@
-import { Check, ChevronLeft, ChevronRight, RotateCcw, Send } from 'lucide-react'
+import {
+  ArrowRight,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardCheck,
+  RotateCcw,
+  Send,
+} from 'lucide-react'
 import { useState } from 'react'
+import { Link } from 'react-router'
 import { Button, Card, ConfirmDialog, InlineAlert, Progress } from '@/shared/ui'
 import type { DialogRequest } from '@/shared/ui'
 import { DomainState } from '@/domains/shared/presentation'
+import type { ExerciseViewModel } from '@/domains/exercises/models'
 import type {
   QuizAttemptViewModel,
   QuizOptionViewModel,
@@ -52,6 +62,47 @@ export function QuizIntro({
         </Button>
       )}
     </Card>
+  )
+}
+
+export function QuizExerciseCard({ exercise }: { exercise: ExerciseViewModel & { href: string } }) {
+  const title = exercise.quiz?.title ?? exercise.title
+  const description = exercise.quiz?.description || exercise.description
+  const status =
+    exercise.status === 'COMPLETED'
+      ? 'Đã hoàn thành'
+      : exercise.status === 'IN_PROGRESS'
+        ? 'Đang làm'
+        : exercise.isRequired
+          ? 'Bắt buộc'
+          : 'Tùy chọn'
+
+  return (
+    <Link
+      to={exercise.href}
+      className="group grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border border-brand-pink/80 bg-card-surface p-4 transition hover:-translate-y-0.5 hover:border-action-primary/50 hover:shadow-soft focus-visible:outline-2 focus-visible:outline-action-focus"
+    >
+      <span className="grid size-11 place-items-center rounded-xl bg-surface-pink text-action-primary">
+        <ClipboardCheck aria-hidden="true" className="size-5" />
+      </span>
+      <span className="grid min-w-0 gap-1">
+        <span className="text-xs font-bold uppercase tracking-wide text-action-primary">
+          Bài kiểm tra
+          {exercise.quiz ? ` · ${exercise.quiz.questionCount} câu` : ''}
+        </span>
+        <span className="truncate font-semibold text-ink-primary">{title}</span>
+        {description ? (
+          <span className="line-clamp-2 text-sm leading-5 text-ink-secondary">{description}</span>
+        ) : null}
+      </span>
+      <span className="flex shrink-0 items-center gap-2 text-right text-xs font-semibold text-ink-secondary">
+        <span className="hidden sm:inline">{status}</span>
+        <ArrowRight
+          aria-hidden="true"
+          className="size-4 text-action-primary transition-transform group-hover:translate-x-0.5"
+        />
+      </span>
+    </Link>
   )
 }
 
@@ -128,7 +179,10 @@ export function QuizQuestionNavigator({
   onNavigate: (questionId: string) => void
 }) {
   return (
-    <nav aria-label="Câu hỏi trong bài kiểm tra" className="flex flex-wrap gap-2">
+    <nav
+      aria-label="Câu hỏi trong bài kiểm tra"
+      className="grid grid-cols-5 gap-2 sm:grid-cols-8 lg:grid-cols-4"
+    >
       {questions.map((question, index) => (
         <Button
           key={question.id}
@@ -160,9 +214,9 @@ export function QuizSubmissionPanel({
   onSubmit: () => void
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border-subtle pt-4">
-      <p className="text-sm text-ink-secondary">Bài làm sẽ được gửi để hệ thống xử lý.</p>
+    <div className="border-t border-border-subtle pt-4">
       <Button
+        className="w-full"
         loading={loading}
         disabled={disabled}
         onClick={onSubmit}
@@ -181,7 +235,7 @@ export function QuizRunner({
   onAnswer,
   onSubmit,
   onRetry,
-  confirmBeforeSubmit = false,
+  confirmBeforeSubmit = true,
   answerSaving = false,
 }: {
   attempt: QuizAttemptViewModel
@@ -203,6 +257,7 @@ export function QuizRunner({
   const answeredCount = attempt.questions.filter((item) =>
     Boolean(attempt.selectedAnswers[item.id]),
   ).length
+  const unansweredCount = attempt.questions.length - answeredCount
   if (!question && attempt.questions.length === 0)
     return (
       <DomainState kind="empty" title="Chưa có câu hỏi" message="Bài kiểm tra chưa có nội dung." />
@@ -221,71 +276,88 @@ export function QuizRunner({
   }
   const confirmation: DialogRequest = {
     kind: 'confirm',
-    title: 'Nộp bài kiểm tra?',
-    description: 'Sau khi nộp, lượt làm này sẽ được lưu và kết quả do máy chủ trả về.',
-    confirmLabel: 'Nộp bài',
+    title: unansweredCount > 0 ? `Còn ${unansweredCount} câu chưa trả lời` : 'Nộp bài kiểm tra?',
+    description:
+      unansweredCount > 0
+        ? 'Bạn vẫn có thể nộp bài ngay. Câu chưa chọn đáp án sẽ không có phần xem kết quả.'
+        : 'Sau khi nộp, lượt làm này sẽ kết thúc và kết quả được lưu.',
+    confirmLabel: 'Vẫn nộp bài',
+    cancelLabel: 'Quay lại làm tiếp',
     onConfirm: submit,
   }
   if (result) return <QuizResult result={result} {...(onRetry ? { onRetry } : {})} />
   return (
     <>
-      <Card className="mx-auto grid w-full max-w-3xl gap-5 p-5 sm:p-7">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="font-semibold">
-            Câu {currentIndex + 1} / {attempt.questions.length}
-          </p>
-          <QuizProgress answered={answeredCount} total={attempt.questions.length} />
-        </div>
-        <QuizQuestionNavigator
-          questions={attempt.questions}
-          selectedAnswers={attempt.selectedAnswers}
-          {...(question ? { currentId: question.id } : {})}
-          onNavigate={(id) => onNavigate(attempt.questions.findIndex((item) => item.id === id))}
-        />
-        {question && (
-          <QuizQuestion
-            question={question}
-            {...(selectedOptionId ? { selectedOptionId } : {})}
-            onSelect={onAnswer}
-            disabled={pending || answerSaving || attempt.status === 'SUBMITTED'}
-          />
-        )}
-        {answerSaving && (
-          <p role="status" aria-live="polite" className="text-sm text-ink-secondary">
-            Đang lưu lựa chọn…
-          </p>
-        )}
-        <div className="flex justify-between gap-3">
-          <Button
-            variant="outline"
-            disabled={currentIndex === 0}
-            onClick={() => onNavigate(currentIndex - 1)}
-            startIcon={<ChevronLeft aria-hidden="true" />}
-          >
-            Câu trước
-          </Button>
-          <Button
-            variant="outline"
-            disabled={currentIndex >= attempt.questions.length - 1}
-            onClick={() => onNavigate(currentIndex + 1)}
-            endIcon={<ChevronRight aria-hidden="true" />}
-          >
-            Câu tiếp
-          </Button>
-        </div>
-        {error && (
-          <InlineAlert tone="danger" title={error}>
-            Kiểm tra kết nối rồi thử lại.
-          </InlineAlert>
-        )}
-        {attempt.capabilities.canSubmit && attempt.status === 'IN_PROGRESS' && (
-          <QuizSubmissionPanel
-            loading={pending}
-            disabled={answerSaving}
-            onSubmit={() => (confirmBeforeSubmit ? setConfirmOpen(true) : void submit())}
-          />
-        )}
-      </Card>
+      <div className="grid min-w-0 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <Card role="region" aria-label="Nội dung câu hỏi" className="grid min-w-0 gap-5 p-5 sm:p-7">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="font-semibold">
+              Câu {currentIndex + 1} / {attempt.questions.length}
+            </p>
+            <p className="text-sm text-ink-secondary">Đã chọn {answeredCount} câu</p>
+          </div>
+          {question && (
+            <QuizQuestion
+              question={question}
+              {...(selectedOptionId ? { selectedOptionId } : {})}
+              onSelect={onAnswer}
+              disabled={pending || answerSaving || attempt.status === 'SUBMITTED'}
+            />
+          )}
+          {answerSaving && (
+            <p role="status" aria-live="polite" className="text-sm text-ink-secondary">
+              Đang lưu lựa chọn…
+            </p>
+          )}
+          <div className="flex justify-between gap-3 border-t border-border-subtle pt-4">
+            <Button
+              variant="outline"
+              disabled={currentIndex === 0}
+              onClick={() => onNavigate(currentIndex - 1)}
+              startIcon={<ChevronLeft aria-hidden="true" />}
+            >
+              Câu trước
+            </Button>
+            <Button
+              variant="outline"
+              disabled={currentIndex >= attempt.questions.length - 1}
+              onClick={() => onNavigate(currentIndex + 1)}
+              endIcon={<ChevronRight aria-hidden="true" />}
+            >
+              Câu tiếp
+            </Button>
+          </div>
+          {error && (
+            <InlineAlert tone="danger" title={error}>
+              Kiểm tra kết nối rồi thử lại.
+            </InlineAlert>
+          )}
+        </Card>
+        <aside className="lg:sticky lg:top-24">
+          <Card className="grid gap-4 p-4 sm:p-5">
+            <div className="grid gap-2">
+              <h2 className="font-semibold text-ink-primary">Danh sách câu</h2>
+              <QuizProgress answered={answeredCount} total={attempt.questions.length} />
+            </div>
+            <QuizQuestionNavigator
+              questions={attempt.questions}
+              selectedAnswers={attempt.selectedAnswers}
+              {...(question ? { currentId: question.id } : {})}
+              onNavigate={(id) => onNavigate(attempt.questions.findIndex((item) => item.id === id))}
+            />
+            {unansweredCount > 0 && (
+              <p className="text-sm text-ink-secondary">Còn {unansweredCount} câu chưa chọn.</p>
+            )}
+            {attempt.capabilities.canSubmit && attempt.status === 'IN_PROGRESS' && (
+              <QuizSubmissionPanel
+                loading={pending}
+                disabled={answerSaving}
+                onSubmit={() => (confirmBeforeSubmit ? setConfirmOpen(true) : void submit())}
+              />
+            )}
+          </Card>
+        </aside>
+      </div>
       {confirmBeforeSubmit && (
         <ConfirmDialog open={confirmOpen} request={confirmation} onOpenChange={setConfirmOpen} />
       )}
@@ -351,23 +423,26 @@ export function QuizReview({ result }: { result: QuizResultViewModel }) {
           <p className="font-semibold">
             Câu {index + 1}. {item.prompt}
           </p>
-          <p
-            className={`mt-2 text-sm font-semibold ${item.isCorrect ? 'text-success-foreground' : 'text-danger-foreground'}`}
-          >
-            {item.isCorrect ? 'Bạn đã trả lời đúng.' : 'Bạn chưa trả lời đúng câu này.'}
-          </p>
-          {(item.correctOption || item.correctOptionId) && (
-            <p className="mt-2 text-sm text-success-foreground">
-              Đáp án được hệ thống trả về: {item.correctOption ?? item.correctOptionId}
+          {item.selectedOption || item.selectedOptionId ? (
+            <>
+              <p
+                className={`mt-2 text-sm font-semibold ${item.isCorrect ? 'text-success-foreground' : 'text-danger-foreground'}`}
+              >
+                {item.isCorrect ? 'Bạn đã trả lời đúng.' : 'Bạn chưa trả lời đúng câu này.'}
+              </p>
+              {(item.correctOption || item.correctOptionId) && (
+                <p className="mt-2 text-sm text-success-foreground">
+                  Đáp án đúng: {item.correctOption ?? item.correctOptionId}
+                </p>
+              )}
+              {item.explanation && (
+                <p className="mt-2 text-sm leading-6 text-ink-secondary">{item.explanation}</p>
+              )}
+            </>
+          ) : (
+            <p className="mt-2 text-sm text-ink-secondary">
+              Bạn chưa chọn đáp án. Hãy chọn đáp án để xem kết quả.
             </p>
-          )}
-          {(item.selectedOption || item.selectedOptionId) && (
-            <p className="mt-1 text-sm text-ink-secondary">
-              Bạn đã chọn: {item.selectedOption ?? item.selectedOptionId}
-            </p>
-          )}
-          {item.explanation && (
-            <p className="mt-2 text-sm leading-6 text-ink-secondary">{item.explanation}</p>
           )}
         </li>
       ))}

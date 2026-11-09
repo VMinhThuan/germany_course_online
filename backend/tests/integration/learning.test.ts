@@ -336,6 +336,15 @@ describe("BE-02 student learning APIs", () => {
     });
     expect(JSON.stringify(lesson.body)).not.toContain("must-not-leak");
     expect(lesson.body.data.assets[0].role).toBe("LECTURE_VIDEO");
+    expect(lesson.body.data.exercises).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: quizExerciseId,
+          exerciseType: "QUIZ",
+          quiz: { title: "Greetings", description: null, questionCount: 1 },
+        }),
+      ]),
+    );
 
     const exercise = await requestAs(
       student,
@@ -791,6 +800,90 @@ describe("BE-02 student learning APIs", () => {
     expect(hiddenResult.body.data.review).toEqual([]);
     expect(hiddenResult.body.data.score).toBe("0");
     expect(hiddenResult.body.data.passed).toBe(false);
+  });
+
+  it("allows submitting an incomplete quiz without revealing answers for blank questions", async () => {
+    const exercise = await Exercise.create({
+      lessonId,
+      title: "Partial greeting quiz",
+      description: null,
+      instructions: "Answer the questions you can.",
+      exerciseType: "QUIZ",
+      completionMode: "QUIZ_SUBMISSION",
+      isRequired: false,
+      sortOrder: 3,
+      status: "PUBLISHED",
+      deletedAt: null,
+    });
+    const quiz = await Quiz.create({
+      exerciseId: exercise._id,
+      title: "Partial answers",
+      description: null,
+      passScorePercent: 100,
+      showCorrectAnswers: true,
+      questions: [
+        {
+          questionText: "Greeting one?",
+          questionType: "SINGLE_CHOICE",
+          explanation: "Hallo is a greeting.",
+          points: mongoose.Types.Decimal128.fromString("1"),
+          sortOrder: 1,
+          options: [
+            { optionText: "Hallo", isCorrect: true, sortOrder: 1 },
+            { optionText: "Tschüss", isCorrect: false, sortOrder: 2 },
+          ],
+        },
+        {
+          questionText: "Greeting two?",
+          questionType: "SINGLE_CHOICE",
+          explanation: "Guten Morgen is used in the morning.",
+          points: mongoose.Types.Decimal128.fromString("1"),
+          sortOrder: 2,
+          options: [
+            { optionText: "Guten Morgen", isCorrect: true, sortOrder: 1 },
+            { optionText: "Danke", isCorrect: false, sortOrder: 2 },
+          ],
+        },
+      ],
+    });
+    const attempt = await request(app)
+      .post(`/api/v1/learn/exercises/${exercise._id}/quiz-attempts`)
+      .set("Authorization", student.authorization)
+      .send({});
+    expect(attempt.status).toBe(201);
+    const firstQuestion = quiz.questions[0]!;
+    const firstCorrect = firstQuestion.options.find(
+      (option) => option.isCorrect,
+    )!;
+    await request(app)
+      .put(
+        `/api/v1/learn/quiz-attempts/${attempt.body.data.id}/answers/${firstQuestion._id}`,
+      )
+      .set("Authorization", student.authorization)
+      .send({ selectedOptionId: firstCorrect._id.toString() });
+
+    const submission = await request(app)
+      .post(`/api/v1/learn/quiz-attempts/${attempt.body.data.id}/submit`)
+      .set("Authorization", student.authorization);
+
+    expect(submission.status).toBe(200);
+    expect(submission.body.data.review).toEqual([
+      expect.objectContaining({
+        prompt: "Greeting one?",
+        selectedOption: "Hallo",
+        correctOption: "Hallo",
+        explanation: "Hallo is a greeting.",
+      }),
+      expect.objectContaining({
+        prompt: "Greeting two?",
+        selectedOptionId: null,
+        selectedOption: null,
+        isCorrect: false,
+        correctOptionId: null,
+        correctOption: null,
+        explanation: null,
+      }),
+    ]);
   });
 
   it("completes required quizzes after low or zero scores and unlocks lesson completion", async () => {

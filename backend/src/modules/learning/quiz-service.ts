@@ -601,23 +601,24 @@ export class QuizService {
             const answer = attempt.answers.find((row) =>
               row.questionId.equals(question.questionId),
             );
-            const correctOption = question.options.find(
-              (option) => option.isCorrect,
-            );
-            const selectedOption = question.options.find((option) =>
-              option.optionId.equals(
-                answer?.selectedOptionId ?? new Types.ObjectId(),
-              ),
-            );
+            const hasAnswer = Boolean(answer?.selectedOptionId);
+            const correctOption = hasAnswer
+              ? question.options.find((option) => option.isCorrect)
+              : undefined;
+            const selectedOption = hasAnswer
+              ? question.options.find((option) =>
+                  option.optionId.equals(answer!.selectedOptionId!),
+                )
+              : undefined;
             return {
               questionId: question.questionId.toString(),
               prompt: question.prompt,
               selectedOptionId: answer?.selectedOptionId?.toString() ?? null,
               selectedOption: selectedOption?.label ?? null,
-              isCorrect: answer?.isCorrect ?? false,
+              isCorrect: hasAnswer ? answer!.isCorrect : false,
               correctOptionId: correctOption?.optionId.toString() ?? null,
               correctOption: correctOption?.label ?? null,
-              explanation: question.explanation ?? null,
+              explanation: hasAnswer ? (question.explanation ?? null) : null,
               awardedPoints: decimalString(
                 answer?.awardedPoints ?? Types.Decimal128.fromString("0"),
               ),

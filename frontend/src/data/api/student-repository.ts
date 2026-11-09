@@ -309,6 +309,15 @@ async function toLessonExercise(exercise: ApiExercise): Promise<StudentLessonExe
         : {}),
     })),
     capabilities: exercise.capabilities,
+    ...(exercise.quiz
+      ? {
+          quiz: {
+            title: exercise.quiz.title,
+            questionCount: exercise.quiz.questionCount,
+            ...(exercise.quiz.description ? { description: exercise.quiz.description } : {}),
+          },
+        }
+      : {}),
     href: `/learn/exercises/${exercise.id}`,
   }
 }

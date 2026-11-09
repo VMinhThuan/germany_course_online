@@ -97,6 +97,27 @@
   line-height: 1;
 }
 
+.decorative-heading-card {
+  box-sizing: border-box;
+  white-space: nowrap;
+}
+
+.decorative-heading-fallback {
+  font-size: clamp(0.85rem, 4.5vw, 2.5rem);
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+body.app-theme-pink {
+  --page-surface: #fff8fa;
+  --surface-muted: #faeef2;
+  --surface-blue: #fff0f4;
+  --surface-pink: #f9dce5;
+  --border-subtle: #ead8df;
+  min-height: 100vh;
+  background: var(--page-surface);
+}
+
 h2.font-extrabold,
 h3.font-extrabold,
 h4.font-extrabold,

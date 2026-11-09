@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { ArrowRight, BookOpenText, Check, ChevronLeft, ChevronRight, ListTree } from 'lucide-react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
+import { BookOpenText, Check, ChevronLeft, ChevronRight, ListTree } from 'lucide-react'
+import { useNavigate, useParams, useSearchParams } from 'react-router'
 import { useAuthSession } from '@/app/auth/auth-session'
 import {
   useCompleteExercise,
@@ -39,6 +39,7 @@ import {
   YouTubeLessonPlayer,
   LessonOutlineAccordion,
   QuizIntro,
+  QuizExerciseCard,
   QuizResult,
   QuizRunner,
 } from '@/domains'
@@ -291,26 +292,7 @@ export function LearningLessonPage() {
                           }}
                         />
                       ) : (
-                        <Link
-                          key={exercise.id}
-                          to={exercise.href}
-                          className="flex min-h-16 items-center justify-between gap-3 rounded-xl border border-border-subtle bg-card-surface px-4 py-3 hover:border-action-primary"
-                        >
-                          <span className="min-w-0 truncate font-semibold">{exercise.title}</span>
-                          <span className="shrink-0 text-xs text-ink-secondary">
-                            {exercise.status === 'COMPLETED'
-                              ? 'Hoàn thành'
-                              : exercise.status === 'IN_PROGRESS'
-                                ? 'Đang làm'
-                                : exercise.isRequired
-                                  ? 'Bắt buộc'
-                                  : 'Tùy chọn'}
-                          </span>
-                          <ArrowRight
-                            aria-hidden="true"
-                            className="size-4 shrink-0 text-action-primary"
-                          />
-                        </Link>
+                        <QuizExerciseCard key={exercise.id} exercise={exercise} />
                       ),
                     )}
                   </div>

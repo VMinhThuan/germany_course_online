@@ -11,6 +11,7 @@ import {
   StudentShell,
 } from '@/shared/layouts/shells'
 import { Badge, Card, LearningPath, LearningPathStep, Progress } from '@/shared/ui'
+import { DecorativeHeading } from '@/domains/shared/decorative-heading'
 
 const layouts = {
   public: { title: 'Public shell', detail: 'Khung trang giới thiệu và điều hướng công khai' },
@@ -29,9 +30,11 @@ function PreviewContent({ layout }: { layout: LayoutKey }) {
         <div className="mx-auto grid w-full max-w-6xl gap-12 px-4 py-12 sm:px-6 sm:py-20 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-16 lg:px-8">
           <div className="space-y-6">
             <Badge tone="info">Bố cục công khai · mẫu</Badge>
-            <h1 className="max-w-xl text-4xl font-extrabold tracking-tight sm:text-5xl">
-              Một lộ trình học tiếng Đức rõ ràng, từng bước.
-            </h1>
+            <DecorativeHeading
+              text="Một lộ trình học tiếng Đức rõ ràng, từng bước."
+              level={1}
+              size="lg"
+            />
             <p className="max-w-xl text-lg leading-8 text-ink-secondary">
               Vùng này dùng để kiểm tra nhịp điệu tiêu đề, đoạn giới thiệu và nút hành động ở nhiều
               kích thước màn hình.
@@ -205,9 +208,13 @@ function PreviewContent({ layout }: { layout: LayoutKey }) {
       <div className="mx-auto max-w-3xl space-y-5">
         <Card className="p-5 sm:p-8">
           <Badge tone="success">Bài học · mẫu</Badge>
-          <h1 id="learning-greeting" className="mt-4 text-3xl font-extrabold">
-            Guten Tag!
-          </h1>
+          <DecorativeHeading
+            id="learning-greeting"
+            text="Guten Tag!"
+            level={1}
+            size="sm"
+            className="mt-4"
+          />
           <p id="learning-guten-tag" className="mt-3 text-lg leading-8 text-ink-secondary">
             Vùng nội dung chính cho văn bản, âm thanh hoặc hình ảnh trong tương lai.
           </p>

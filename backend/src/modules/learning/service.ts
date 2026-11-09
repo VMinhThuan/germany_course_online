@@ -438,14 +438,21 @@ export class LearningService {
     })
       .sort({ sortOrder: 1, _id: 1 })
       .lean();
-    const [lessonAssets, exerciseProgress, exerciseAssets] = await Promise.all([
-      this.lessonAssetDtos(lesson._id),
-      ExerciseProgress.find({
-        userId: new Types.ObjectId(userId),
-        exerciseId: { $in: exercises.map((exercise) => exercise._id) },
-      }).lean(),
-      this.exerciseAssetDtos(exercises.map((exercise) => exercise._id)),
-    ]);
+    const quizExerciseIds = exercises
+      .filter((exercise) => exercise.exerciseType === "QUIZ")
+      .map((exercise) => exercise._id);
+    const [lessonAssets, exerciseProgress, exerciseAssets, quizSummaries] =
+      await Promise.all([
+        this.lessonAssetDtos(lesson._id),
+        ExerciseProgress.find({
+          userId: new Types.ObjectId(userId),
+          exerciseId: { $in: exercises.map((exercise) => exercise._id) },
+        }).lean(),
+        this.exerciseAssetDtos(exercises.map((exercise) => exercise._id)),
+        Quiz.find({ exerciseId: { $in: quizExerciseIds } })
+          .select("exerciseId title description questions")
+          .lean(),
+      ]);
     const progressByExercise = new Map(
       exerciseProgress.map((progress) => [
         progress.exerciseId.toString(),
@@ -458,6 +465,9 @@ export class LearningService {
       rows.push(asset);
       assetsByExercise.set(asset.exerciseId, rows);
     }
+    const quizzesByExercise = new Map(
+      quizSummaries.map((quiz) => [quiz.exerciseId.toString(), quiz]),
+    );
     const required = exercises.filter((exercise) => exercise.isRequired);
     const missingRequired = required.filter(
       (exercise) =>
@@ -487,7 +497,19 @@ export class LearningService {
       exercises: exercises.map((exercise) => {
         const assets = assetsByExercise.get(exercise._id.toString()) ?? [];
         const progress = progressByExercise.get(exercise._id.toString());
-        return this.exerciseDto(exercise, assets, progress);
+        const quiz = quizzesByExercise.get(exercise._id.toString());
+        return {
+          ...this.exerciseDto(exercise, assets, progress),
+          ...(quiz
+            ? {
+                quiz: {
+                  title: quiz.title,
+                  description: quiz.description ?? null,
+                  questionCount: quiz.questions.length,
+                },
+              }
+            : {}),
+        };
       }),
       canCompleteLesson: missingRequired.length === 0,
       outstandingRequiredCount: missingRequired.length,

@@ -1,6 +1,7 @@
 import { useEffect, type PropsWithChildren, type ReactNode } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { DomainState } from '@/domains/shared/presentation'
+import { DecorativeHeading } from '@/domains/shared/decorative-heading'
 import { Container, ErrorState, LinkButton, PageHeader, Skeleton } from '@/shared/ui'
 import { ProductStudentLayout } from '@/app/student/pages'
 import { setBrandPageTitle } from '@/config/brand'
@@ -32,10 +33,10 @@ export function ProductPage({
       >
         <div className="flex flex-wrap items-start justify-between gap-4">
           <PageHeader
-            {...(heading ? { className: 'min-w-0 flex-1 basis-full sm:basis-auto' } : {})}
+            className="min-w-0 flex-1 basis-full sm:basis-auto"
             eyebrow={eyebrow}
             title={title}
-            {...(heading ? { heading } : {})}
+            heading={heading ?? <DecorativeHeading text={title} level={1} size="md" />}
             {...(description ? { description } : {})}
           />
           <LinkButton to={backTo} variant="outline" className="ml-auto shrink-0">

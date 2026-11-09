@@ -68,6 +68,7 @@ import {
   NoteSaveStatus,
 } from '@/domains/progress'
 import { QuizIntro, QuizResult, QuizRunner } from '@/domains/quizzes'
+import { DecorativeHeading } from '@/domains/shared/decorative-heading'
 import {
   A11_COURSE,
   MOCK_EXERCISE,
@@ -295,6 +296,7 @@ export function LmsKitPage() {
           <PageHeader
             eyebrow="Phase 1B · Development showcase"
             title="Thư viện giao diện học tập"
+            heading={<DecorativeHeading text="Thư viện giao diện học tập" level={1} size="md" />}
             description="Các component nhận presentation model và callback. Dữ liệu, quyền truy cập và kết quả quiz đến từ repository demo."
             actions={
               <Button variant="outline" onClick={() => setDialogOpen(true)}>

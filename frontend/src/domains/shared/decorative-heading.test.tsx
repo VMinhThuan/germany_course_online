@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { DecorativeHeading } from './decorative-heading'
+import { SemanticHeading } from './heading'
 import { LETTERING_GLYPHS } from './lettering-generated'
 import { createLetteringLayout } from './lettering-engine'
 
@@ -53,6 +54,11 @@ describe('OpenType and Paper.js decorative lettering', () => {
     expect(container.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
     expect(container.querySelector('svg')).toHaveAttribute('viewBox')
     expect(container.querySelectorAll('svg text')).toHaveLength(0)
+    expect(container.querySelector('.decorative-heading-card')).toHaveClass('w-fit', 'max-w-full')
+    expect(container.querySelector('.decorative-heading-card > span')).toHaveAttribute(
+      'style',
+      'width: 36rem; max-width: calc(100vw - 6rem);',
+    )
 
     rerender(<DecorativeHeading text="Không gian khóa học" level={2} />)
     expect(screen.getByRole('heading', { level: 2, name: 'Không gian khóa học' })).toBeVisible()
@@ -65,5 +71,16 @@ describe('OpenType and Paper.js decorative lettering', () => {
     expect(screen.getByRole('heading', { level: 2, name: unsupportedText })).toBeVisible()
     expect(container.querySelector('svg')).toBeNull()
     expect(container.querySelector('h2')).toHaveClass('font-display')
+    expect(container.querySelector('.decorative-heading-card')).toHaveTextContent(unsupportedText)
+  })
+
+  it('uses the shared renderer for semantic page headings', () => {
+    const { container } = render(
+      <div>
+        <SemanticHeading level={1}>Trang tổng quan</SemanticHeading>
+      </div>,
+    )
+    expect(screen.getByRole('heading', { level: 1, name: 'Trang tổng quan' })).toBeVisible()
+    expect(container.querySelector('.decorative-heading-card')).toBeVisible()
   })
 })

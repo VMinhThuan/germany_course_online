@@ -19,6 +19,7 @@ import {
 } from '@/data/public-demo'
 import { CourseOutline, CourseGrid } from '@/domains/catalog'
 import { DomainState } from '@/domains/shared/presentation'
+import { DecorativeHeading } from '@/domains/shared/decorative-heading'
 import { PublicShell } from '@/shared/layouts/shells'
 import { Button, Card, Container, Pagination } from '@/shared/ui'
 import { formatVnd } from '@/shared/lib/format'
@@ -148,9 +149,7 @@ export function ApiCourseCatalogPage() {
           >
             UNSERE DEUTSCHKURSE
           </p>
-          <h1 className="font-display text-3xl font-extrabold tracking-tight sm:text-4xl">
-            Chọn lộ trình phù hợp
-          </h1>
+          <DecorativeHeading text="Chọn lộ trình phù hợp" level={1} size="md" />
           <p className="text-lg leading-7 text-ink-secondary">
             Thông tin khóa học, học phí và thời hạn được tải trực tiếp từ hệ thống.
           </p>
@@ -247,9 +246,7 @@ export function ApiCourseDetailPage() {
                 Trình độ {course.level}
               </p>
             )}
-            <h1 className="font-display text-3xl font-extrabold tracking-tight text-ink-primary sm:text-4xl">
-              {course.title}
-            </h1>
+            <DecorativeHeading text={course.title} level={1} size="lg" />
             <div className="mt-4 flex flex-wrap gap-2 text-sm text-ink-secondary">
               {course.chapterCount !== undefined && (
                 <span className="rounded-full bg-card-surface px-3 py-1">
