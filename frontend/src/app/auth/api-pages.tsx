@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
-import { ArrowLeft, ArrowRight, BookOpenText, MailCheck, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, ArrowRight, MailCheck, ShieldCheck } from 'lucide-react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router'
 import { ApiError } from '@/lib/api/client'
 import { apiAuth } from '@/lib/auth/api-auth'
 import { useAuthSession } from '@/app/auth/auth-session'
 import { DecorativeHeading } from '@/domains/shared/decorative-heading'
-import { brandConfig, setBrandPageTitle } from '@/config/brand'
+import { setBrandPageTitle } from '@/config/brand'
+import { BrandLogo } from '@/shared/brand/BrandLogo'
 import { AuthShell } from '@/shared/layouts/shells'
 import {
   Button,
@@ -35,15 +36,9 @@ function authError(error: unknown) {
 
 function AuthPageFrame({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <AuthShell
-      previewNotice="Kết nối bảo mật tới PAniverseDeutsch"
-      footerMessage="Thông tin được gửi trực tiếp tới API xác thực."
-    >
+    <AuthShell showBrand={false} showPreviewNotice={false} showFooter={false}>
       <div role="region" aria-label={title} className="mx-auto grid w-full max-w-3xl gap-4">
-        <div className="flex items-center gap-2 text-sm font-semibold text-action-primary">
-          <BookOpenText aria-hidden="true" className="size-5" />
-          {brandConfig.name}
-        </div>
+        <BrandLogo className="mx-auto" />
         {children}
       </div>
     </AuthShell>
@@ -55,7 +50,7 @@ function AuthFormCard({
   description,
   children,
 }: {
-  title: string
+  title?: string
   description: string
   children: ReactNode
 }) {
@@ -64,9 +59,11 @@ function AuthFormCard({
       <CardHeader className="space-y-3 pb-3">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-2">
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-action-primary">
-              {title}
-            </p>
+            {title && (
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-action-primary">
+                {title}
+              </p>
+            )}
             <DecorativeHeading text={description} level={1} size="sm" />
           </div>
           <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-surface-lime text-pastel-lime-ink">
@@ -120,7 +117,7 @@ export function ApiLoginPage() {
 
   return (
     <AuthPageFrame title="Đăng nhập">
-      <AuthFormCard title="Tài khoản PAniverseDeutsch" description="Đăng nhập">
+      <AuthFormCard description="Đăng nhập">
         {search.get('registered') === '1' && (
           <InlineAlert tone="success" title="Tạo tài khoản thành công">
             Đăng nhập bằng email và mật khẩu vừa đăng ký. Tài khoản chưa được đăng nhập tự động.

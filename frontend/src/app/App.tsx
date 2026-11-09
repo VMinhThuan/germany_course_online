@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useLayoutEffect } from 'react'
 import { BrowserRouter, useLocation, useRoutes, type RouteObject } from 'react-router'
 import { AppErrorBoundary } from '@/app/error-boundary'
 import { AppProviders } from '@/app/providers'
@@ -10,7 +10,7 @@ import { StudentDemoDevControls } from '@/app/dev/student-demo-controls'
 
 function DevRoutes() {
   const location = useLocation()
-  useEffect(() => {
+  useLayoutEffect(() => {
     document.body.classList.toggle('app-theme-pink', location.pathname !== '/')
     return () => document.body.classList.remove('app-theme-pink')
   }, [location.pathname])

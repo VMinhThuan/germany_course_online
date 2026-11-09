@@ -341,23 +341,32 @@ export function AuthShell({
   backLabel = 'Về trang chủ',
   previewNotice = 'Kết nối bảo mật tới PAniverseDeutsch',
   footerMessage = 'Thông tin được gửi trực tiếp tới máy chủ xác thực.',
+  showBrand = true,
+  showPreviewNotice = true,
+  showFooter = true,
 }: ShellProps & {
   brandHref?: string
   backHref?: string
   backLabel?: string
   previewNotice?: string
   footerMessage?: string
+  showBrand?: boolean
+  showPreviewNotice?: boolean
+  showFooter?: boolean
 }) {
   return (
     <div className="min-h-screen bg-page-surface">
       <SkipLink />
       <header>
-        <PreviewNotice text={previewNotice} />
+        {showPreviewNotice && <PreviewNotice text={previewNotice} />}
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-5 sm:px-6">
-          <BrandLogo to={brandHref} />
+          {showBrand && <BrandLogo to={brandHref} />}
           <Link
             to={backHref}
-            className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-ink-secondary hover:bg-surface-muted hover:text-ink-primary"
+            className={cn(
+              'inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-ink-secondary hover:bg-surface-muted hover:text-ink-primary',
+              !showBrand && 'ml-auto',
+            )}
           >
             <ChevronLeft aria-hidden="true" className="size-4" />
             {backLabel}
@@ -371,7 +380,9 @@ export function AuthShell({
       >
         <div className={cn('w-full max-w-md', className)}>{children}</div>
       </main>
-      <footer className="pb-5 text-center text-xs text-ink-muted">{footerMessage}</footer>
+      {showFooter && (
+        <footer className="pb-5 text-center text-xs text-ink-muted">{footerMessage}</footer>
+      )}
     </div>
   )
 }
