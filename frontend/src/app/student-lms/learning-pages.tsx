@@ -35,6 +35,7 @@ import {
   LessonCompletionIndicator,
   LessonContent,
   LessonNotesEditor,
+  LessonDiscussion,
   LessonProgressList,
   YouTubeLessonPlayer,
   LessonOutlineAccordion,
@@ -343,6 +344,7 @@ export function LearningLessonPage() {
                   />
                 )}
               </section>
+              <LessonDiscussion lessonId={lessonId} />
               <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)_minmax(0,1fr)] gap-2 border-t border-border-subtle pt-4">
                 <Button
                   variant="outline"

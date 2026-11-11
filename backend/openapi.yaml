@@ -17,6 +17,8 @@ tags:
     description: Authenticated Student self-service.
   - name: Learning
     description: Enrolled Student lesson, exercise, progress, notes and asset access.
+  - name: Lesson Comments
+    description: Enrollment-gated lesson discussions with student-safe anonymity DTOs and Admin moderation.
   - name: Quiz
     description: Student attempts; answer correctness is withheld before authorized result.
   - name: Commerce
@@ -9667,6 +9669,453 @@ paths:
         validation: ""
       security:
         - AccessToken: []
+  /learn/lessons/{lessonId}/comments:
+    get:
+      tags: [Lesson Comments]
+      operationId: listLessonComments
+      summary: List root comments for an accessible lesson
+      security: [{ AccessToken: [] }]
+      parameters:
+        - { name: lessonId, in: path, required: true, schema: { $ref: "#/components/schemas/ObjectId" } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 30, default: 20 } }
+        - { name: cursor, in: query, schema: { type: string, maxLength: 512 } }
+        - { name: sort, in: query, schema: { type: string, enum: [newest, oldest], default: newest } }
+      responses:
+        "200":
+          description: Cursor-paginated public comments. Anonymous author identities are omitted.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - properties: { data: { $ref: "#/components/schemas/StudentLessonCommentPage" } }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/UnauthorizedError" }
+        "404": { $ref: "#/components/responses/NotFoundError" }
+      x-contract:
+        access: STUDENT
+        backendModule: lesson-comments
+        relatedCollections: [lesson_comments, lesson_comment_reactions, lessons, course_sections, courses, enrollments]
+        query: limit,cursor,sort
+        requestBody: none
+        responseData: StudentLessonCommentPage
+        idempotency: Read only
+        validation: Requires active enrollment and published lesson hierarchy
+    post:
+      tags: [Lesson Comments]
+      operationId: createLessonComment
+      summary: Create a lesson comment or nested reply
+      security: [{ AccessToken: [] }]
+      parameters:
+        - { name: lessonId, in: path, required: true, schema: { $ref: "#/components/schemas/ObjectId" } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/StudentLessonCommentCreate" } } }
+      responses:
+        "201":
+          description: Created comment with a student-safe author DTO.
+          content: { application/json: { schema: { allOf: [{ $ref: "#/components/schemas/SuccessEnvelope" }, { properties: { data: { $ref: "#/components/schemas/StudentLessonComment" } } }] } } }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/UnauthorizedError" }
+        "404": { $ref: "#/components/responses/NotFoundError" }
+        "409": { $ref: "#/components/responses/ConflictError" }
+        "429": { $ref: "#/components/responses/RateLimitedError" }
+      x-contract:
+        access: STUDENT
+        backendModule: lesson-comments
+        relatedCollections: [lesson_comments, lessons, course_sections, courses, enrollments, lesson_comment_rate_limits]
+        query: none
+        requestBody: StudentLessonCommentCreate
+        responseData: StudentLessonComment
+        idempotency: Transactional insert
+        validation: Author identity comes only from the access token; maximum reply depth is five levels
+  /learn/comments/{commentId}/replies:
+    get:
+      tags: [Lesson Comments]
+      operationId: listLessonCommentReplies
+      summary: List direct replies to a visible comment
+      security: [{ AccessToken: [] }]
+      parameters:
+        - { name: commentId, in: path, required: true, schema: { $ref: "#/components/schemas/ObjectId" } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 30, default: 20 } }
+        - { name: cursor, in: query, schema: { type: string, maxLength: 512 } }
+      responses:
+        "200":
+          description: Chronological direct replies with anonymous identity redaction.
+          content: { application/json: { schema: { allOf: [{ $ref: "#/components/schemas/SuccessEnvelope" }, { properties: { data: { $ref: "#/components/schemas/StudentLessonCommentPage" } } }] } } }
+        "401": { $ref: "#/components/responses/UnauthorizedError" }
+        "404": { $ref: "#/components/responses/NotFoundError" }
+      x-contract:
+        access: STUDENT
+        backendModule: lesson-comments
+        relatedCollections: [lesson_comments, lesson_comment_reactions, lessons, enrollments]
+        query: limit,cursor
+        requestBody: none
+        responseData: StudentLessonCommentPage
+        idempotency: Read only
+        validation: Parent and all ancestors must remain visible
+  /learn/comments/{commentId}:
+    patch:
+      tags: [Lesson Comments]
+      operationId: editLessonComment
+      summary: Edit the author's comment within ten minutes
+      security: [{ AccessToken: [] }]
+      parameters:
+        - { name: commentId, in: path, required: true, schema: { $ref: "#/components/schemas/ObjectId" } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/LessonCommentEditRequest" } } }
+      responses:
+        "200":
+          description: Updated comment and revision.
+          content: { application/json: { schema: { allOf: [{ $ref: "#/components/schemas/SuccessEnvelope" }, { properties: { data: { $ref: "#/components/schemas/StudentLessonComment" } } }] } } }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/UnauthorizedError" }
+        "404": { $ref: "#/components/responses/NotFoundError" }
+        "409": { $ref: "#/components/responses/ConflictError" }
+        "429": { $ref: "#/components/responses/RateLimitedError" }
+      x-contract:
+        access: STUDENT
+        backendModule: lesson-comments
+        relatedCollections: [lesson_comments, lesson_comment_edits, lessons, enrollments, lesson_comment_rate_limits]
+        query: none
+        requestBody: LessonCommentEditRequest
+        responseData: StudentLessonComment
+        idempotency: Revision guarded transaction
+        validation: Uses server time and expectedRevision; no window reset after edits
+    delete:
+      tags: [Lesson Comments]
+      operationId: deleteLessonComment
+      summary: Soft-delete a comment and its reply subtree
+      security: [{ AccessToken: [] }]
+      parameters:
+        - { name: commentId, in: path, required: true, schema: { $ref: "#/components/schemas/ObjectId" } }
+      responses:
+        "200":
+          description: Deleted subtree result.
+          content: { application/json: { schema: { allOf: [{ $ref: "#/components/schemas/SuccessEnvelope" }, { properties: { data: { $ref: "#/components/schemas/LessonCommentDeleteResult" } } }] } } }
+        "401": { $ref: "#/components/responses/UnauthorizedError" }
+        "404": { $ref: "#/components/responses/NotFoundError" }
+        "429": { $ref: "#/components/responses/RateLimitedError" }
+      x-contract:
+        access: STUDENT
+        backendModule: lesson-comments
+        relatedCollections: [lesson_comments, lessons, enrollments, lesson_comment_rate_limits]
+        query: none
+        requestBody: none
+        responseData: LessonCommentDeleteResult
+        idempotency: Transactional subtree soft-delete
+        validation: Only the original author can delete; all descendants are hidden atomically
+  /learn/comments/{commentId}/reaction:
+    put:
+      tags: [Lesson Comments]
+      operationId: setLessonCommentReaction
+      summary: Add, change, or toggle off the current user's reaction
+      security: [{ AccessToken: [] }]
+      parameters:
+        - { name: commentId, in: path, required: true, schema: { $ref: "#/components/schemas/ObjectId" } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/LessonCommentReactionRequest" } } }
+      responses:
+        "200":
+          description: Current user's resulting reaction.
+          content: { application/json: { schema: { allOf: [{ $ref: "#/components/schemas/SuccessEnvelope" }, { properties: { data: { $ref: "#/components/schemas/LessonCommentReactionResult" } } }] } } }
+        "401": { $ref: "#/components/responses/UnauthorizedError" }
+        "404": { $ref: "#/components/responses/NotFoundError" }
+        "429": { $ref: "#/components/responses/RateLimitedError" }
+      x-contract:
+        access: STUDENT
+        backendModule: lesson-comments
+        relatedCollections: [lesson_comments, lesson_comment_reactions, lesson_comment_rate_limits]
+        query: none
+        requestBody: LessonCommentReactionRequest
+        responseData: LessonCommentReactionResult
+        idempotency: Unique commentId and userId key
+        validation: One active reaction per user per comment
+    delete:
+      tags: [Lesson Comments]
+      operationId: removeLessonCommentReaction
+      summary: Remove the current user's reaction
+      security: [{ AccessToken: [] }]
+      parameters:
+        - { name: commentId, in: path, required: true, schema: { $ref: "#/components/schemas/ObjectId" } }
+      responses:
+        "200":
+          description: No active reaction remains.
+          content: { application/json: { schema: { allOf: [{ $ref: "#/components/schemas/SuccessEnvelope" }, { properties: { data: { $ref: "#/components/schemas/LessonCommentReactionResult" } } }] } } }
+        "401": { $ref: "#/components/responses/UnauthorizedError" }
+        "404": { $ref: "#/components/responses/NotFoundError" }
+        "429": { $ref: "#/components/responses/RateLimitedError" }
+      x-contract:
+        access: STUDENT
+        backendModule: lesson-comments
+        relatedCollections: [lesson_comments, lesson_comment_reactions, lesson_comment_rate_limits]
+        query: none
+        requestBody: none
+        responseData: LessonCommentReactionResult
+        idempotency: Idempotent delete
+        validation: Uses authenticated user ID only
+  /learn/comments/{commentId}/history:
+    get:
+      tags: [Lesson Comments]
+      operationId: getLessonCommentHistory
+      summary: Get public self-edit history while it remains shareable
+      security: [{ AccessToken: [] }]
+      parameters:
+        - { name: commentId, in: path, required: true, schema: { $ref: "#/components/schemas/ObjectId" } }
+      responses:
+        "200":
+          description: Public edits only. Admin moderation history is never returned.
+          content: { application/json: { schema: { allOf: [{ $ref: "#/components/schemas/SuccessEnvelope" }, { properties: { data: { $ref: "#/components/schemas/StudentLessonCommentHistory" } } }] } } }
+        "401": { $ref: "#/components/responses/UnauthorizedError" }
+        "404": { $ref: "#/components/responses/NotFoundError" }
+      x-contract:
+        access: STUDENT
+        backendModule: lesson-comments
+        relatedCollections: [lesson_comments, lesson_comment_edits, enrollments]
+        query: none
+        requestBody: none
+        responseData: StudentLessonCommentHistory
+        idempotency: Read only
+        validation: Returns 404 after Admin moderation to protect removed content
+  /admin/lesson-comments/summary:
+    get:
+      tags: [Lesson Comments]
+      operationId: getAdminLessonCommentSummary
+      summary: Get live discussion management counts
+      security: [{ AccessToken: [] }]
+      responses:
+        "200":
+          description: Current database counts.
+          content: { application/json: { schema: { allOf: [{ $ref: "#/components/schemas/SuccessEnvelope" }, { properties: { data: { $ref: "#/components/schemas/AdminLessonCommentSummary" } } }] } } }
+        "401": { $ref: "#/components/responses/UnauthorizedError" }
+        "403": { $ref: "#/components/responses/ForbiddenError" }
+      x-contract:
+        access: ADMIN
+        backendModule: lesson-comments
+        relatedCollections: [lesson_comments]
+        query: none
+        requestBody: none
+        responseData: AdminLessonCommentSummary
+        idempotency: Read only
+        validation: No hardcoded counters
+  /admin/lesson-comments:
+    get:
+      tags: [Lesson Comments]
+      operationId: listAdminLessonComments
+      summary: Search and filter comments across courses
+      security: [{ AccessToken: [] }]
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: courseId, in: query, schema: { $ref: "#/components/schemas/ObjectId" } }
+        - { name: lessonId, in: query, schema: { $ref: "#/components/schemas/ObjectId" } }
+        - { name: authorId, in: query, schema: { $ref: "#/components/schemas/ObjectId" } }
+        - { name: anonymous, in: query, schema: { type: string, enum: ["true", "false"] } }
+        - { name: status, in: query, schema: { type: string, enum: [ACTIVE, DELETED, ALL], default: ALL } }
+        - { name: type, in: query, schema: { type: string, enum: [ROOT, REPLY, ALL], default: ALL } }
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to, in: query, schema: { type: string, format: date-time } }
+        - { name: search, in: query, schema: { type: string, minLength: 1, maxLength: 120 } }
+        - { name: sort, in: query, schema: { type: string, enum: [newest, oldest], default: newest } }
+      responses:
+        "200":
+          description: Paginated records with full author identity for Admin.
+          content: { application/json: { schema: { allOf: [{ $ref: "#/components/schemas/SuccessEnvelope" }, { properties: { data: { $ref: "#/components/schemas/AdminLessonCommentPage" } } }] } } }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/UnauthorizedError" }
+        "403": { $ref: "#/components/responses/ForbiddenError" }
+      x-contract:
+        access: ADMIN
+        backendModule: lesson-comments
+        relatedCollections: [lesson_comments, users, lessons, course_sections, courses, lesson_comment_reactions]
+        query: page,pageSize,courseId,lessonId,authorId,anonymous,status,type,from,to,search,sort
+        requestBody: none
+        responseData: AdminLessonCommentPage
+        idempotency: Read only
+        validation: Bounded pagination and MongoDB text index for content search
+  /admin/lesson-comments/{commentId}/history:
+    get:
+      tags: [Lesson Comments]
+      operationId: getAdminLessonCommentHistory
+      summary: Get complete edit history and editor identities
+      security: [{ AccessToken: [] }]
+      parameters:
+        - { name: commentId, in: path, required: true, schema: { $ref: "#/components/schemas/ObjectId" } }
+      responses:
+        "200":
+          description: All revisions, including moderated content.
+          content: { application/json: { schema: { allOf: [{ $ref: "#/components/schemas/SuccessEnvelope" }, { properties: { data: { type: array, items: { $ref: "#/components/schemas/AdminLessonCommentHistoryItem" } } } }] } } }
+        "401": { $ref: "#/components/responses/UnauthorizedError" }
+        "403": { $ref: "#/components/responses/ForbiddenError" }
+        "404": { $ref: "#/components/responses/NotFoundError" }
+      x-contract:
+        access: ADMIN
+        backendModule: lesson-comments
+        relatedCollections: [lesson_comments, lesson_comment_edits, users]
+        query: none
+        requestBody: none
+        responseData: AdminLessonCommentHistoryItem[]
+        idempotency: Read only
+        validation: Admin-only history
+  /admin/lessons/{lessonId}/comments:
+    post:
+      tags: [Lesson Comments]
+      operationId: createAdminLessonComment
+      summary: Create an Admin comment or reply
+      security: [{ AccessToken: [] }]
+      parameters:
+        - { name: lessonId, in: path, required: true, schema: { $ref: "#/components/schemas/ObjectId" } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/AdminLessonCommentCreate" } } }
+      responses:
+        "201":
+          description: Admin-authored comment with audit record.
+          content: { application/json: { schema: { allOf: [{ $ref: "#/components/schemas/SuccessEnvelope" }, { properties: { data: { $ref: "#/components/schemas/AdminLessonComment" } } }] } } }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/UnauthorizedError" }
+        "403": { $ref: "#/components/responses/ForbiddenError" }
+        "404": { $ref: "#/components/responses/NotFoundError" }
+        "409": { $ref: "#/components/responses/ConflictError" }
+      x-contract:
+        access: ADMIN
+        backendModule: lesson-comments
+        relatedCollections: [lesson_comments, audit_logs, lesson_comment_edits]
+        query: none
+        requestBody: AdminLessonCommentCreate
+        responseData: AdminLessonComment
+        idempotency: Transactional insert and audit
+        validation: Admin identity cannot be replaced by a Student identity
+  /admin/lesson-comments/{commentId}:
+    get:
+      tags: [Lesson Comments]
+      operationId: getAdminLessonComment
+      summary: Get a discussion thread and selected-comment details
+      security: [{ AccessToken: [] }]
+      parameters:
+        - { name: commentId, in: path, required: true, schema: { $ref: "#/components/schemas/ObjectId" } }
+      responses:
+        "200":
+          description: Thread (up to 500 entries), author identity and full selected-comment history.
+          content: { application/json: { schema: { allOf: [{ $ref: "#/components/schemas/SuccessEnvelope" }, { properties: { data: { $ref: "#/components/schemas/AdminLessonCommentDetail" } } }] } } }
+        "401": { $ref: "#/components/responses/UnauthorizedError" }
+        "403": { $ref: "#/components/responses/ForbiddenError" }
+        "404": { $ref: "#/components/responses/NotFoundError" }
+      x-contract:
+        access: ADMIN
+        backendModule: lesson-comments
+        relatedCollections: [lesson_comments, lesson_comment_edits, lesson_comment_reactions, users, lessons, course_sections, courses]
+        query: none
+        requestBody: none
+        responseData: AdminLessonCommentDetail
+        idempotency: Read only
+        validation: Admin-only identity and moderation history
+    patch:
+      tags: [Lesson Comments]
+      operationId: adminEditLessonComment
+      summary: Edit any comment without a time limit
+      security: [{ AccessToken: [] }]
+      parameters:
+        - { name: commentId, in: path, required: true, schema: { $ref: "#/components/schemas/ObjectId" } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/AdminLessonCommentEditRequest" } } }
+      responses:
+        "200":
+          description: Moderated edit with Admin audit record.
+          content: { application/json: { schema: { allOf: [{ $ref: "#/components/schemas/SuccessEnvelope" }, { properties: { data: { $ref: "#/components/schemas/AdminLessonComment" } } }] } } }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/UnauthorizedError" }
+        "403": { $ref: "#/components/responses/ForbiddenError" }
+        "404": { $ref: "#/components/responses/NotFoundError" }
+        "409": { $ref: "#/components/responses/ConflictError" }
+      x-contract:
+        access: ADMIN
+        backendModule: lesson-comments
+        relatedCollections: [lesson_comments, lesson_comment_edits, audit_logs]
+        query: none
+        requestBody: AdminLessonCommentEditRequest
+        responseData: AdminLessonComment
+        idempotency: Revision guarded transaction
+        validation: Preserves original author and hides moderated history from Student APIs
+    delete:
+      tags: [Lesson Comments]
+      operationId: adminDeleteLessonComment
+      summary: Delete any comment and its full reply subtree
+      security: [{ AccessToken: [] }]
+      parameters:
+        - { name: commentId, in: path, required: true, schema: { $ref: "#/components/schemas/ObjectId" } }
+      requestBody:
+        required: false
+        content: { application/json: { schema: { $ref: "#/components/schemas/LessonCommentDeleteRequest" } } }
+      responses:
+        "200":
+          description: Deleted subtree count and Admin audit record.
+          content: { application/json: { schema: { allOf: [{ $ref: "#/components/schemas/SuccessEnvelope" }, { properties: { data: { $ref: "#/components/schemas/LessonCommentDeleteResult" } } }] } } }
+        "401": { $ref: "#/components/responses/UnauthorizedError" }
+        "403": { $ref: "#/components/responses/ForbiddenError" }
+        "404": { $ref: "#/components/responses/NotFoundError" }
+      x-contract:
+        access: ADMIN
+        backendModule: lesson-comments
+        relatedCollections: [lesson_comments, audit_logs]
+        query: none
+        requestBody: LessonCommentDeleteRequest
+        responseData: LessonCommentDeleteResult
+        idempotency: Transactional subtree soft-delete and audit
+        validation: Preserves deletedBy, deletedAt and reason for audit
+  /admin/lesson-comments/{commentId}/reaction:
+    put:
+      tags: [Lesson Comments]
+      operationId: adminSetLessonCommentReaction
+      summary: Add, change, or toggle the Admin reaction
+      security: [{ AccessToken: [] }]
+      parameters:
+        - { name: commentId, in: path, required: true, schema: { $ref: "#/components/schemas/ObjectId" } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/LessonCommentReactionRequest" } } }
+      responses:
+        "200":
+          description: Admin reaction result.
+          content: { application/json: { schema: { allOf: [{ $ref: "#/components/schemas/SuccessEnvelope" }, { properties: { data: { $ref: "#/components/schemas/LessonCommentReactionResult" } } }] } } }
+        "401": { $ref: "#/components/responses/UnauthorizedError" }
+        "403": { $ref: "#/components/responses/ForbiddenError" }
+        "404": { $ref: "#/components/responses/NotFoundError" }
+      x-contract:
+        access: ADMIN
+        backendModule: lesson-comments
+        relatedCollections: [lesson_comments, lesson_comment_reactions, audit_logs]
+        query: none
+        requestBody: LessonCommentReactionRequest
+        responseData: LessonCommentReactionResult
+        idempotency: Unique comment and Admin key
+        validation: Uses authenticated Admin identity
+    delete:
+      tags: [Lesson Comments]
+      operationId: adminRemoveLessonCommentReaction
+      summary: Remove the Admin reaction
+      security: [{ AccessToken: [] }]
+      parameters:
+        - { name: commentId, in: path, required: true, schema: { $ref: "#/components/schemas/ObjectId" } }
+      responses:
+        "200":
+          description: No active Admin reaction remains.
+          content: { application/json: { schema: { allOf: [{ $ref: "#/components/schemas/SuccessEnvelope" }, { properties: { data: { $ref: "#/components/schemas/LessonCommentReactionResult" } } }] } } }
+        "401": { $ref: "#/components/responses/UnauthorizedError" }
+        "403": { $ref: "#/components/responses/ForbiddenError" }
+        "404": { $ref: "#/components/responses/NotFoundError" }
+      x-contract:
+        access: ADMIN
+        backendModule: lesson-comments
+        relatedCollections: [lesson_comments, lesson_comment_reactions, audit_logs]
+        query: none
+        requestBody: none
+        responseData: LessonCommentReactionResult
+        idempotency: Idempotent delete
+        validation: Uses authenticated Admin identity
 components:
   securitySchemes:
     AccessToken:
@@ -9677,6 +10126,25 @@ components:
       type: apiKey
       in: cookie
       name: refreshToken
+  responses:
+    ValidationError:
+      description: Standard validation error envelope.
+      content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } }
+    UnauthorizedError:
+      description: Standard authentication error envelope.
+      content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } }
+    ForbiddenError:
+      description: Standard authorization error envelope.
+      content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } }
+    NotFoundError:
+      description: Resource not found or inaccessible.
+      content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } }
+    ConflictError:
+      description: Revision, thread depth, or business conflict.
+      content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } }
+    RateLimitedError:
+      description: Shared per-user action limit was exceeded.
+      content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } }
   schemas:
     ErrorEnvelope:
       type: object
@@ -14232,4 +14700,240 @@ components:
         - assetId
         - assetRole
         - detached
+      additionalProperties: false
+    ObjectId:
+      type: string
+      pattern: ^[a-fA-F0-9]{24}$
+    SuccessEnvelope:
+      type: object
+      properties:
+        success: { type: boolean, const: true }
+      required: [success]
+    LessonCommentReactionType:
+      type: string
+      enum: [LIKE, LOVE, HAHA, WOW, CLAP]
+    LessonCommentReactionSummary:
+      type: object
+      properties:
+        reactionType: { $ref: "#/components/schemas/LessonCommentReactionType" }
+        count: { type: integer, minimum: 0 }
+        isMine: { type: boolean }
+      required: [reactionType, count, isMine]
+      additionalProperties: false
+    StudentLessonComment:
+      type: object
+      properties:
+        id: { $ref: "#/components/schemas/ObjectId" }
+        lessonId: { $ref: "#/components/schemas/ObjectId" }
+        parentId: { oneOf: [{ $ref: "#/components/schemas/ObjectId" }, { type: "null" }] }
+        rootId: { $ref: "#/components/schemas/ObjectId" }
+        content: { type: string, maxLength: 2000 }
+        isAnonymous: { type: boolean }
+        isModerated: { type: boolean }
+        revision: { type: integer, minimum: 1 }
+        editedAt: { type: [string, "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        author:
+          type: object
+          properties:
+            displayName: { type: string }
+            avatarUrl: { type: "null" }
+            isAnonymous: { type: boolean }
+            role: { type: string, enum: [STUDENT, ADMIN] }
+          required: [displayName, avatarUrl, isAnonymous, role]
+          additionalProperties: false
+        isMine: { type: boolean }
+        canEdit: { type: boolean }
+        canDelete: { type: boolean }
+        replyCount: { type: integer, minimum: 0 }
+        reactions:
+          type: array
+          items: { $ref: "#/components/schemas/LessonCommentReactionSummary" }
+      required: [id, lessonId, parentId, rootId, content, isAnonymous, isModerated, revision, editedAt, createdAt, updatedAt, author, isMine, canEdit, canDelete, replyCount, reactions]
+      additionalProperties: false
+    StudentLessonCommentPage:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/StudentLessonComment" } }
+        total: { type: integer, minimum: 0 }
+        hasMore: { type: boolean }
+        nextCursor: { type: [string, "null"] }
+      required: [items, total, hasMore, nextCursor]
+      additionalProperties: false
+    StudentLessonCommentCreate:
+      type: object
+      properties:
+        content: { type: string, minLength: 1, maxLength: 2000 }
+        isAnonymous: { type: boolean, default: false }
+        parentId: { oneOf: [{ $ref: "#/components/schemas/ObjectId" }, { type: "null" }] }
+      required: [content]
+      additionalProperties: false
+    LessonCommentEditRequest:
+      type: object
+      properties:
+        content: { type: string, minLength: 1, maxLength: 2000 }
+        expectedRevision: { type: integer, minimum: 1 }
+      required: [content, expectedRevision]
+      additionalProperties: false
+    AdminLessonCommentEditRequest:
+      type: object
+      properties:
+        content: { type: string, minLength: 1, maxLength: 2000 }
+        expectedRevision: { type: integer, minimum: 1 }
+        reason: { type: string, maxLength: 300 }
+      required: [content, expectedRevision]
+      additionalProperties: false
+    LessonCommentDeleteRequest:
+      type: object
+      properties:
+        reason: { type: string, maxLength: 300 }
+      additionalProperties: false
+    LessonCommentDeleteResult:
+      type: object
+      properties:
+        id: { $ref: "#/components/schemas/ObjectId" }
+        descendantsDeleted: { type: integer, minimum: 0 }
+      required: [id, descendantsDeleted]
+      additionalProperties: false
+    LessonCommentReactionRequest:
+      type: object
+      properties:
+        reactionType: { $ref: "#/components/schemas/LessonCommentReactionType" }
+      required: [reactionType]
+      additionalProperties: false
+    LessonCommentReactionResult:
+      type: object
+      properties:
+        reactionType:
+          oneOf:
+            - $ref: "#/components/schemas/LessonCommentReactionType"
+            - type: "null"
+      required: [reactionType]
+      additionalProperties: false
+    StudentLessonCommentHistoryItem:
+      type: object
+      properties:
+        previousContent: { type: string }
+        newContent: { type: string }
+        previousRevision: { type: integer }
+        newRevision: { type: integer }
+        editedAt: { type: string, format: date-time }
+      required: [previousContent, newContent, previousRevision, newRevision, editedAt]
+      additionalProperties: false
+    StudentLessonCommentHistory:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/StudentLessonCommentHistoryItem" } }
+      required: [items]
+      additionalProperties: false
+    AdminLessonCommentHistoryItem:
+      allOf:
+        - $ref: "#/components/schemas/StudentLessonCommentHistoryItem"
+        - type: object
+          properties:
+            id: { $ref: "#/components/schemas/ObjectId" }
+            reason: { type: [string, "null"] }
+            editedBy:
+              oneOf:
+                - type: object
+                  properties:
+                    id: { $ref: "#/components/schemas/ObjectId" }
+                    fullName: { type: string }
+                    email: { type: string, format: email }
+                    role: { type: string, enum: [STUDENT, ADMIN] }
+                  required: [id, fullName, email, role]
+                - type: "null"
+          required: [id, reason, editedBy]
+    AdminLessonComment:
+      type: object
+      properties:
+        id: { $ref: "#/components/schemas/ObjectId" }
+        lessonId: { $ref: "#/components/schemas/ObjectId" }
+        parentId: { oneOf: [{ $ref: "#/components/schemas/ObjectId" }, { type: "null" }] }
+        rootId: { $ref: "#/components/schemas/ObjectId" }
+        depth: { type: integer, minimum: 0, maximum: 4 }
+        content: { type: string, maxLength: 2000 }
+        isAnonymous: { type: boolean }
+        author:
+          oneOf:
+            - type: object
+              properties:
+                id: { $ref: "#/components/schemas/ObjectId" }
+                fullName: { type: string }
+                email: { type: string, format: email }
+                role: { type: string, enum: [STUDENT, ADMIN] }
+                status: { type: string, enum: [ACTIVE, BLOCKED] }
+              required: [id, fullName, email, role, status]
+            - type: "null"
+        revision: { type: integer, minimum: 1 }
+        editedAt: { type: [string, "null"], format: date-time }
+        moderationEditedAt: { type: [string, "null"], format: date-time }
+        deletedAt: { type: [string, "null"], format: date-time }
+        deletedBy: { type: [string, "null"] }
+        deletionReason: { type: [string, "null"], maxLength: 300 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        replyCount: { type: integer, minimum: 0 }
+        reactionCount: { type: integer, minimum: 0 }
+        reactions:
+          type: array
+          items:
+            type: object
+            properties:
+              reactionType: { $ref: "#/components/schemas/LessonCommentReactionType" }
+              count: { type: integer, minimum: 1 }
+            required: [reactionType, count]
+            additionalProperties: false
+        myReaction: { oneOf: [{ $ref: "#/components/schemas/LessonCommentReactionType" }, { type: "null" }] }
+        context:
+          type: object
+          properties:
+            courseId: { oneOf: [{ $ref: "#/components/schemas/ObjectId" }, { type: "null" }] }
+            courseTitle: { type: [string, "null"] }
+            sectionId: { oneOf: [{ $ref: "#/components/schemas/ObjectId" }, { type: "null" }] }
+            sectionTitle: { type: [string, "null"] }
+            lessonId: { $ref: "#/components/schemas/ObjectId" }
+            lessonTitle: { type: [string, "null"] }
+          required: [courseId, courseTitle, sectionId, sectionTitle, lessonId, lessonTitle]
+          additionalProperties: false
+      required: [id, lessonId, parentId, rootId, depth, content, isAnonymous, author, revision, editedAt, moderationEditedAt, deletedAt, deletedBy, deletionReason, createdAt, updatedAt, replyCount, reactionCount, reactions, myReaction, context]
+      additionalProperties: false
+    AdminLessonCommentPage:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/AdminLessonComment" } }
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, minimum: 0 }
+        hasMore: { type: boolean }
+      required: [items, page, pageSize, total, hasMore]
+      additionalProperties: false
+    AdminLessonCommentDetail:
+      type: object
+      properties:
+        comment: { $ref: "#/components/schemas/AdminLessonComment" }
+        thread: { type: array, maxItems: 500, items: { $ref: "#/components/schemas/AdminLessonComment" } }
+        threadTotal: { type: integer, minimum: 0 }
+        threadHasMore: { type: boolean }
+        history: { type: array, items: { $ref: "#/components/schemas/AdminLessonCommentHistoryItem" } }
+      required: [comment, thread, threadTotal, threadHasMore, history]
+      additionalProperties: false
+    AdminLessonCommentCreate:
+      type: object
+      properties:
+        content: { type: string, minLength: 1, maxLength: 2000 }
+        isAnonymous: { type: boolean, const: false }
+        parentId: { oneOf: [{ $ref: "#/components/schemas/ObjectId" }, { type: "null" }] }
+      required: [content]
+      additionalProperties: false
+    AdminLessonCommentSummary:
+      type: object
+      properties:
+        total: { type: integer, minimum: 0 }
+        recent: { type: integer, minimum: 0 }
+        anonymous: { type: integer, minimum: 0 }
+        edited: { type: integer, minimum: 0 }
+        deleted: { type: integer, minimum: 0 }
+      required: [total, recent, anonymous, edited, deleted]
       additionalProperties: false

@@ -37,6 +37,7 @@ const environmentSchema = z.object({
     .default(900),
   SESSION_TTL_DAYS: z.coerce.number().int().min(1).max(365).default(30),
   APP_ORIGINS: z.string().trim().min(1),
+  LESSON_COMMENTS_ENABLED: truthy.default(false),
   CRON_SECRET: z.preprocess(
     (value) => (value === "" ? undefined : value),
     z.string().min(32).optional(),
@@ -126,6 +127,7 @@ export type AppConfig = {
   accessTokenTtlSeconds: number;
   sessionTtlDays: number;
   allowedOrigins: string[];
+  lessonCommentsEnabled: boolean;
   cronSecret?: string;
   cookieSecure: boolean;
   cookieSameSite: "lax" | "strict" | "none";
@@ -388,6 +390,7 @@ export function parseEnvironment(
     accessTokenTtlSeconds: env.ACCESS_TOKEN_TTL_SECONDS,
     sessionTtlDays: env.SESSION_TTL_DAYS,
     allowedOrigins: normalizedOrigins,
+    lessonCommentsEnabled: env.LESSON_COMMENTS_ENABLED,
     ...(env.CRON_SECRET ? { cronSecret: env.CRON_SECRET } : {}),
     cookieSecure: env.COOKIE_SECURE,
     cookieSameSite: env.COOKIE_SAME_SITE,

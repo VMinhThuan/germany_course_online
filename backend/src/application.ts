@@ -35,6 +35,8 @@ import {
   type MediaStorageAdapter,
 } from "./modules/learning/media-storage.js";
 import { createLearningRouter } from "./modules/learning/routes.js";
+import { LessonCommentService } from "./modules/lesson-comments/service.js";
+import { createLessonCommentRouter } from "./modules/lesson-comments/routes.js";
 import { CommerceService } from "./modules/commerce/service.js";
 import { createCommerceRouter } from "./modules/commerce/routes.js";
 import { EmailOutboxWorker } from "./modules/commerce/email-outbox-worker.js";
@@ -49,6 +51,7 @@ export type AppDependencies = {
   mediaStorage?: MediaStorageAdapter;
   readiness?: () => boolean;
   ensureDatabase?: () => Promise<void>;
+  lessonCommentsNow?: () => Date;
 };
 
 function hasValidCronAuthorization(
@@ -99,6 +102,10 @@ export function createApp(
   );
   const catalogService = new PublicCatalogService(mediaStorage);
   const learningService = new LearningService();
+  const lessonCommentService = new LessonCommentService(
+    config.lessonCommentsEnabled,
+    dependencies.lessonCommentsNow,
+  );
   const quizService = new QuizService(learningService);
   const mediaAccessService = new MediaAccessService(
     learningService,
@@ -257,6 +264,7 @@ export function createApp(
   app.use("/api/v1", apiLimiter);
   app.use("/api/v1", databaseMiddleware);
   app.use("/api/v1/auth", createAuthRouter(config, authService));
+  app.use("/api/v1", createLessonCommentRouter(config, lessonCommentService));
   app.use("/api/v1", createAccountRouter(config, authService));
   app.use("/api/v1", createAdminRouter(config, adminService));
   app.use("/api/v1", createCommerceRouter(config, commerceService));
@@ -276,6 +284,7 @@ export function createApp(
   app.locals.emailService = emailService;
   app.locals.authService = authService;
   app.locals.learningService = learningService;
+  app.locals.lessonCommentService = lessonCommentService;
   app.locals.mediaAccessService = mediaAccessService;
   app.locals.commerceService = commerceService;
   app.locals.adminService = adminService;

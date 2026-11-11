@@ -44,6 +44,7 @@ const config: AppConfig = {
   mediaStorage: undefined,
   mediaProvider: undefined,
   cloudinaryMedia: undefined,
+  lessonCommentsEnabled: false,
 };
 const server = createServer(
   createApp(config, {

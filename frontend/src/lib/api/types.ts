@@ -641,6 +641,113 @@ export interface ApiAuditLog {
   createdAt: string
 }
 
+export type ApiLessonCommentReactionType = 'LIKE' | 'LOVE' | 'HAHA' | 'WOW' | 'CLAP'
+
+export interface ApiStudentLessonComment {
+  id: string
+  lessonId: string
+  parentId: string | null
+  rootId: string
+  content: string
+  isAnonymous: boolean
+  isModerated: boolean
+  revision: number
+  editedAt: string | null
+  createdAt: string
+  updatedAt: string
+  author: {
+    displayName: string
+    avatarUrl: null
+    isAnonymous: boolean
+    role: 'STUDENT' | 'ADMIN'
+  }
+  isMine: boolean
+  canEdit: boolean
+  canDelete: boolean
+  replyCount: number
+  reactions: Array<{
+    reactionType: ApiLessonCommentReactionType
+    count: number
+    isMine: boolean
+  }>
+}
+
+export interface ApiAdminLessonComment {
+  id: string
+  lessonId: string
+  parentId: string | null
+  rootId: string
+  depth: number
+  content: string
+  isAnonymous: boolean
+  author: {
+    id: string
+    fullName: string
+    email: string
+    role: 'STUDENT' | 'ADMIN'
+    status: 'ACTIVE' | 'BLOCKED'
+  } | null
+  revision: number
+  editedAt: string | null
+  moderationEditedAt: string | null
+  deletedAt: string | null
+  deletedBy: string | null
+  deletionReason: string | null
+  createdAt: string
+  updatedAt: string
+  replyCount: number
+  reactionCount: number
+  reactions: Array<{ reactionType: ApiLessonCommentReactionType; count: number }>
+  myReaction: ApiLessonCommentReactionType | null
+  context: {
+    courseId: string | null
+    courseTitle: string | null
+    sectionId: string | null
+    sectionTitle: string | null
+    lessonId: string
+    lessonTitle: string | null
+  }
+}
+
+export interface ApiLessonCommentCursorPage<T> {
+  items: T[]
+  total: number
+  hasMore: boolean
+  nextCursor: string | null
+}
+
+export interface ApiLessonCommentHistoryItem {
+  id?: string
+  previousContent: string
+  newContent: string
+  previousRevision: number
+  newRevision: number
+  editedAt: string
+  reason?: string | null
+  editedBy?: {
+    id: string
+    fullName: string
+    email: string
+    role: 'STUDENT' | 'ADMIN'
+  } | null
+}
+
+export interface ApiAdminLessonCommentDetail {
+  comment: ApiAdminLessonComment
+  thread: ApiAdminLessonComment[]
+  threadTotal: number
+  threadHasMore: boolean
+  history: ApiLessonCommentHistoryItem[]
+}
+
+export interface ApiAdminLessonCommentSummary {
+  total: number
+  recent: number
+  anonymous: number
+  edited: number
+  deleted: number
+}
+
 export interface ApiMediaUploadIntent {
   assetId: string
   provider: 'S3_COMPATIBLE' | 'CLOUDINARY'

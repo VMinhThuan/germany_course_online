@@ -177,6 +177,7 @@ async function verifyPublicCatalogApi(courseId: string) {
     mediaStorage: undefined,
     mediaProvider: undefined,
     cloudinaryMedia: undefined,
+    lessonCommentsEnabled: false,
   };
   const app = createApp(config, {
     logger: createLogger("test"),

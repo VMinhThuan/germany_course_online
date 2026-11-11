@@ -26,10 +26,14 @@ describe("BE-06A environment examples and release authorization", () => {
     const frontendExample = parse(
       readFileSync(new URL("frontend/.env.staging.example", root), "utf8"),
     );
-    expect(Object.keys(frontendExample)).toEqual(["VITE_API_BASE_URL"]);
+    expect(Object.keys(frontendExample)).toEqual([
+      "VITE_API_BASE_URL",
+      "VITE_LESSON_COMMENTS_ENABLED",
+    ]);
     expect(frontendExample.VITE_API_BASE_URL).toBe(
       "https://api.staging.example.invalid/api/v1",
     );
+    expect(frontendExample.VITE_LESSON_COMMENTS_ENABLED).toBe("false");
   });
 
   it("normalizes MongoDB hosts without exposing credentials", () => {

@@ -37,6 +37,7 @@ const navigation = [
     ],
   },
   { to: '/admin/media', label: 'Thư viện tệp' },
+  { to: '/admin/lesson-comments', label: 'Quản lý bình luận' },
   { to: '/admin/students', label: 'Học viên' },
   { to: '/admin/enrollments', label: 'Quyền học' },
   { to: '/admin/orders', label: 'Đơn hàng' },

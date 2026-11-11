@@ -449,6 +449,138 @@ for (const [method, path, operationId] of be07aOperations) {
     throw new Error(`${operationId} must require an access token.`);
 }
 
+const be10Operations = [
+  [
+    "get",
+    "/learn/lessons/{lessonId}/comments",
+    "listLessonComments",
+    "STUDENT",
+  ],
+  [
+    "post",
+    "/learn/lessons/{lessonId}/comments",
+    "createLessonComment",
+    "STUDENT",
+  ],
+  [
+    "get",
+    "/learn/comments/{commentId}/replies",
+    "listLessonCommentReplies",
+    "STUDENT",
+  ],
+  ["patch", "/learn/comments/{commentId}", "editLessonComment", "STUDENT"],
+  ["delete", "/learn/comments/{commentId}", "deleteLessonComment", "STUDENT"],
+  [
+    "put",
+    "/learn/comments/{commentId}/reaction",
+    "setLessonCommentReaction",
+    "STUDENT",
+  ],
+  [
+    "delete",
+    "/learn/comments/{commentId}/reaction",
+    "removeLessonCommentReaction",
+    "STUDENT",
+  ],
+  [
+    "get",
+    "/learn/comments/{commentId}/history",
+    "getLessonCommentHistory",
+    "STUDENT",
+  ],
+  [
+    "get",
+    "/admin/lesson-comments/summary",
+    "getAdminLessonCommentSummary",
+    "ADMIN",
+  ],
+  ["get", "/admin/lesson-comments", "listAdminLessonComments", "ADMIN"],
+  [
+    "get",
+    "/admin/lesson-comments/{commentId}",
+    "getAdminLessonComment",
+    "ADMIN",
+  ],
+  [
+    "get",
+    "/admin/lesson-comments/{commentId}/history",
+    "getAdminLessonCommentHistory",
+    "ADMIN",
+  ],
+  [
+    "post",
+    "/admin/lessons/{lessonId}/comments",
+    "createAdminLessonComment",
+    "ADMIN",
+  ],
+  [
+    "patch",
+    "/admin/lesson-comments/{commentId}",
+    "adminEditLessonComment",
+    "ADMIN",
+  ],
+  [
+    "delete",
+    "/admin/lesson-comments/{commentId}",
+    "adminDeleteLessonComment",
+    "ADMIN",
+  ],
+  [
+    "put",
+    "/admin/lesson-comments/{commentId}/reaction",
+    "adminSetLessonCommentReaction",
+    "ADMIN",
+  ],
+  [
+    "delete",
+    "/admin/lesson-comments/{commentId}/reaction",
+    "adminRemoveLessonCommentReaction",
+    "ADMIN",
+  ],
+] as const;
+for (const [method, path, operationId, access] of be10Operations) {
+  const operation = (paths[path] as OpenApiObject | undefined)?.[method] as
+    OpenApiObject | undefined;
+  if (!operation || operation.operationId !== operationId)
+    throw new Error(`Missing or mismatched BE-10 operation: ${operationId}`);
+  if ((operation["x-contract"] as OpenApiObject | undefined)?.access !== access)
+    throw new Error(`${operationId} must declare ${access} access.`);
+  const security = operation.security as Array<OpenApiObject> | undefined;
+  if (!security?.some((scheme) => Object.hasOwn(scheme, "AccessToken")))
+    throw new Error(`${operationId} must require an access token.`);
+}
+
+const studentComment = schemas.StudentLessonComment as OpenApiObject;
+const studentCommentProperties = studentComment.properties as OpenApiObject;
+for (const key of ["authorId", "userId", "email", "phone", "fullName"])
+  if (Object.hasOwn(studentCommentProperties, key))
+    throw new Error(`StudentLessonComment must not expose ${key}.`);
+const studentAuthor = studentCommentProperties.author as OpenApiObject;
+const studentAuthorProperties = studentAuthor.properties as OpenApiObject;
+for (const key of ["id", "email", "phone", "fullName", "authorId"])
+  if (Object.hasOwn(studentAuthorProperties, key))
+    throw new Error(`StudentLessonComment.author must not expose ${key}.`);
+const adminComment = schemas.AdminLessonComment as OpenApiObject;
+const adminAuthor = (adminComment.properties as OpenApiObject)
+  .author as OpenApiObject;
+if (!Array.isArray(adminAuthor.oneOf))
+  throw new Error(
+    "AdminLessonComment must expose a separate full-identity author DTO.",
+  );
+const adminAuthorFields = (adminAuthor.oneOf[0] as OpenApiObject)
+  .properties as OpenApiObject;
+if (
+  !Object.hasOwn(adminAuthorFields, "email") ||
+  !Object.hasOwn(adminAuthorFields, "id")
+)
+  throw new Error(
+    "AdminLessonComment.author must include the private user identity.",
+  );
+if (be10Operations.length !== 17)
+  throw new Error(
+    "BE-10 must document exactly 17 Student and Admin operations.",
+  );
+
 process.stdout.write(
   `OpenAPI 3.1 valid: ${Object.keys(paths).length} paths, ${referencesChecked} internal references, 11 BE-01 operations, 18 BE-02 operations, 10 BE-03A operations, 34 BE-03B operations, 7 BE-03B extensions, 12 BE-03C operations, 4 BE-03C extensions.\n`,
 );

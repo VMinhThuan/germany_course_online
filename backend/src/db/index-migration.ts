@@ -12,6 +12,7 @@ type ExistingIndex = {
   expireAfterSeconds?: number;
   partialFilterExpression?: unknown;
   collation?: unknown;
+  weights?: Record<string, number>;
 };
 
 export type IndexPlanStatus =
@@ -66,19 +67,14 @@ export async function createIndexPlan(): Promise<IndexPlan> {
         typeof index.options.name === "string"
           ? index.options.name
           : defaultIndexName(index.key);
-      const sameKeyIndexes = existing.filter(
-        (candidate) =>
-          candidate.key && sameOrderedObject(candidate.key, index.key),
-      );
-      const matchingIndex = sameKeyIndexes.find(
-        (candidate) => candidate.name === name,
-      );
-
-      if (matchingIndex) {
-        if (matchingIndex.name) matchedExisting.add(matchingIndex.name);
+      const namedIndex = existing.find((candidate) => candidate.name === name);
+      if (namedIndex) {
+        matchedExisting.add(name);
         const expected = normalizedOptions(index.options);
-        const actual = normalizedOptions(matchingIndex);
+        const actual = normalizedOptions(namedIndex);
         const compatible =
+          namedIndex.key !== undefined &&
+          sameIndexKey(index.key, namedIndex) &&
           stableStringify(expected) === stableStringify(actual);
         entries.push({
           model: model.modelName,
@@ -88,10 +84,14 @@ export async function createIndexPlan(): Promise<IndexPlan> {
           status: compatible ? "PRESENT" : "CONFLICT",
           note: compatible
             ? "Desired index exists with matching keys and supported options."
-            : "Same key pattern exists with a different name or options; manual review required.",
+            : "Same index name exists with different keys or options; manual review required.",
         });
         continue;
       }
+
+      const sameKeyIndexes = existing.filter(
+        (candidate) => candidate.key && sameIndexKey(index.key, candidate),
+      );
 
       if (sameKeyIndexes.length > 0) {
         for (const candidate of sameKeyIndexes) {
@@ -221,6 +221,25 @@ function normalizedOptions(options: ExistingIndex | IndexOptions) {
 
 function sameOrderedObject(left: object, right: object): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function sameIndexKey(desired: IndexKey, existing: ExistingIndex): boolean {
+  if (!existing.key) return false;
+  const desiredTextFields = Object.entries(desired)
+    .filter(([, direction]) => direction === "text")
+    .map(([field]) => field);
+  if (desiredTextFields.length > 0 || existing.key._fts === "text") {
+    if (desiredTextFields.length === 0 || existing.key._fts !== "text")
+      return false;
+    const expectedWeights = Object.fromEntries(
+      desiredTextFields.map((field) => [field, 1]),
+    );
+    return (
+      stableStringify(expectedWeights) ===
+      stableStringify(existing.weights ?? {})
+    );
+  }
+  return sameOrderedObject(existing.key, desired);
 }
 
 function stableStringify(value: unknown): string {

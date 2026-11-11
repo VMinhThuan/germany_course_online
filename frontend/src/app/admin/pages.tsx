@@ -25,6 +25,7 @@ import {
 import { AdminEnrollmentsPage, AdminStudentsPage } from './directory-pages'
 import { AdminCouponsPage, AdminOrdersPage, AdminRenewalPlansPage } from './commerce-pages'
 import { AdminAuditLogsPage, AdminMediaPage, AdminSettingsPage } from './media-settings-pages'
+import { AdminLessonCommentsPage } from './lesson-comments-page'
 
 function Metric({ label, value, icon }: { label: string; value: number; icon: React.ReactNode }) {
   return (
@@ -157,6 +158,7 @@ function titleFor(path: string) {
   if (path.startsWith('/admin/lessons')) return 'Bài học'
   if (path.startsWith('/admin/exercises')) return 'Bài tập'
   if (path.startsWith('/admin/media')) return 'Thư viện tệp'
+  if (path.startsWith('/admin/lesson-comments')) return 'Quản lý bình luận'
   if (path.startsWith('/admin/students')) return 'Quản lý học viên'
   if (path.startsWith('/admin/enrollments')) return 'Quản lý quyền học'
   if (path.startsWith('/admin/orders')) return 'Kiểm duyệt đơn hàng'
@@ -203,6 +205,8 @@ export function AdminWorkspacePage() {
   else if (segment === 'lessons' && parts.length === 2) content = <AdminLessonsPage />
   else if (segment === 'exercises' && parts.length === 2) content = <AdminExercisesPage />
   else if (segment === 'media' && parts.length === 2) content = <AdminMediaPage />
+  else if (segment === 'lesson-comments' && parts.length === 2)
+    content = <AdminLessonCommentsPage />
   else if (segment === 'students')
     content = <AdminStudentsPage {...(parts[2] ? { userId: parts[2] } : {})} />
   else if (segment === 'enrollments')
