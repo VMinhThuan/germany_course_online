@@ -82,6 +82,8 @@ export type StudentCommentDto = {
   isMine: boolean;
   canEdit: boolean;
   canDelete: boolean;
+  isDeleted: boolean;
+  isThreadLocked: boolean;
   replyCount: number;
   reactions: Array<{
     reactionType: LessonCommentReactionType;
@@ -234,9 +236,14 @@ export class LessonCommentService {
   private async lockThread(
     rootId: Types.ObjectId,
     session: ClientSession,
+    allowDeletedRoot = false,
   ): Promise<void> {
     const root = await LessonComment.findOneAndUpdate(
-      { _id: rootId, parentId: null, deletedAt: null },
+      {
+        _id: rootId,
+        parentId: null,
+        ...(allowDeletedRoot ? {} : { deletedAt: null }),
+      },
       { $inc: { threadVersion: 1 } },
       { session, returnDocument: "after" },
     ).lean();
@@ -267,6 +274,64 @@ export class LessonCommentService {
       { $group: { _id: "$parentId", count: { $sum: 1 } } },
     ]);
     return new Map(records.map((row) => [row._id.toString(), row.count]));
+  }
+
+  private async studentReplyCounts(ids: Types.ObjectId[]) {
+    if (!ids.length) return new Map<string, number>();
+    const counts = await this.replyCounts(ids);
+    const deletedChildren = await LessonComment.find({
+      parentId: { $in: ids },
+      deletedAt: { $ne: null },
+    })
+      .select("_id parentId")
+      .lean();
+    if (!deletedChildren.length) return counts;
+
+    const deletedChildIds = deletedChildren.map((comment) => comment._id);
+    const visibleDeletedIds = new Set(
+      (
+        await LessonComment.distinct("ancestorIds", {
+          ancestorIds: { $in: deletedChildIds },
+          deletedAt: null,
+        })
+      ).map((id) => id.toString()),
+    );
+    for (const child of deletedChildren) {
+      if (!visibleDeletedIds.has(child._id.toString()) || !child.parentId)
+        continue;
+      const parentId = child.parentId.toString();
+      counts.set(parentId, (counts.get(parentId) ?? 0) + 1);
+    }
+    return counts;
+  }
+
+  private async studentLockedCommentIds(comments: CommentRecord[]) {
+    const ancestorIds = [
+      ...new Map(
+        comments.flatMap((comment) =>
+          (comment.ancestorIds ?? []).map((id) => [id.toString(), id] as const),
+        ),
+      ).values(),
+    ];
+    if (!ancestorIds.length) return new Set<string>();
+    const deletedAncestors = await LessonComment.find({
+      _id: { $in: ancestorIds },
+      deletedAt: { $ne: null },
+    })
+      .select("_id")
+      .lean();
+    const deletedIds = new Set(
+      deletedAncestors.map((comment) => comment._id.toString()),
+    );
+    return new Set(
+      comments
+        .filter((comment) =>
+          (comment.ancestorIds ?? []).some((id) =>
+            deletedIds.has(id.toString()),
+          ),
+        )
+        .map((comment) => comment._id.toString()),
+    );
   }
 
   private async reactionSummary(ids: Types.ObjectId[], userId?: string) {
@@ -329,12 +394,13 @@ export class LessonCommentService {
         ]),
       ).values(),
     ];
-    const [authors, replies, reactions] = await Promise.all([
+    const [authors, replies, reactions, lockedCommentIds] = await Promise.all([
       User.find({ _id: { $in: authorIds } })
         .select("fullName role")
         .lean(),
-      this.replyCounts(ids),
+      this.studentReplyCounts(ids),
       this.reactionSummary(ids, userId),
+      this.studentLockedCommentIds(comments),
     ]);
     const authorMap = new Map(
       authors.map((author) => [author._id.toString(), author]),
@@ -345,9 +411,11 @@ export class LessonCommentService {
       const isMine = comment.authorId.toString() === userId;
       const publicAnonymous =
         comment.authorRole === "STUDENT" && comment.isAnonymous;
+      const isDeleted = Boolean(comment.deletedAt);
+      const isThreadLocked = isDeleted || lockedCommentIds.has(id);
       const canEdit =
         isMine &&
-        !comment.deletedAt &&
+        !isThreadLocked &&
         this.now().getTime() < comment.createdAt.getTime() + EDIT_WINDOW_MS;
       const values = reactions.counts.get(id);
       return {
@@ -355,39 +423,44 @@ export class LessonCommentService {
         lessonId: comment.lessonId.toString(),
         parentId: comment.parentId?.toString() ?? null,
         rootId: comment.rootId.toString(),
-        content: comment.content,
-        isAnonymous: publicAnonymous,
-        isModerated: Boolean(comment.moderationEditedAt),
+        content: isDeleted ? "Bình luận này đã bị gỡ." : comment.content,
+        isAnonymous: isDeleted ? false : publicAnonymous,
+        isModerated: !isDeleted && Boolean(comment.moderationEditedAt),
         revision: comment.revision,
-        editedAt: comment.editedAt?.toISOString() ?? null,
+        editedAt: isDeleted ? null : (comment.editedAt?.toISOString() ?? null),
         createdAt: comment.createdAt.toISOString(),
         updatedAt: comment.updatedAt.toISOString(),
         author: {
-          displayName:
-            comment.authorRole === "ADMIN"
+          displayName: isDeleted
+            ? "Bình luận đã gỡ"
+            : comment.authorRole === "ADMIN"
               ? "Quản trị viên"
               : publicAnonymous
                 ? "Học viên ẩn danh"
                 : (author?.fullName ?? "Học viên"),
           avatarUrl: null,
-          isAnonymous: publicAnonymous,
+          isAnonymous: isDeleted ? false : publicAnonymous,
           role: comment.authorRole,
         },
         isMine,
         canEdit,
-        canDelete: isMine && !comment.deletedAt,
+        canDelete: isMine && !isThreadLocked,
+        isDeleted,
+        isThreadLocked,
         replyCount: replies.get(id) ?? 0,
-        reactions: LESSON_COMMENT_REACTIONS.flatMap((reactionType) => {
-          const count = values?.get(reactionType) ?? 0;
-          if (!count && reactions.mine.get(id) !== reactionType) return [];
-          return [
-            {
-              reactionType,
-              count,
-              isMine: reactions.mine.get(id) === reactionType,
-            },
-          ];
-        }),
+        reactions: isDeleted
+          ? []
+          : LESSON_COMMENT_REACTIONS.flatMap((reactionType) => {
+              const count = values?.get(reactionType) ?? 0;
+              if (!count && reactions.mine.get(id) !== reactionType) return [];
+              return [
+                {
+                  reactionType,
+                  count,
+                  isMine: reactions.mine.get(id) === reactionType,
+                },
+              ];
+            }),
       };
     });
   }
@@ -566,16 +639,26 @@ export class LessonCommentService {
   ) {
     await this.assertStudentLessonAccess(userId, lessonId);
     const cursor = this.decodeCursor(input.cursor);
-    const filter: Record<string, unknown> = {
+    const visibleThreadRoots = await LessonComment.distinct("rootId", {
+      lessonId: new Types.ObjectId(lessonId),
+      parentId: { $ne: null },
+      deletedAt: null,
+    });
+    const rootFilter: Record<string, unknown> = {
       lessonId: new Types.ObjectId(lessonId),
       parentId: null,
-      deletedAt: null,
+      $or: [{ deletedAt: null }, { _id: { $in: visibleThreadRoots } }],
     };
+    const filter: Record<string, unknown> = { ...rootFilter };
     if (cursor) {
       const operator = input.sort === "newest" ? "$lt" : "$gt";
-      filter.$or = [
-        { createdAt: { [operator]: cursor.createdAt } },
-        { createdAt: cursor.createdAt, _id: { [operator]: cursor.id } },
+      filter.$and = [
+        {
+          $or: [
+            { createdAt: { [operator]: cursor.createdAt } },
+            { createdAt: cursor.createdAt, _id: { [operator]: cursor.id } },
+          ],
+        },
       ];
     }
     const direction = input.sort === "newest" ? -1 : 1;
@@ -584,11 +667,7 @@ export class LessonCommentService {
         .sort({ createdAt: direction, _id: direction })
         .limit(input.limit + 1)
         .lean(),
-      LessonComment.countDocuments({
-        lessonId: new Types.ObjectId(lessonId),
-        parentId: null,
-        deletedAt: null,
-      }),
+      LessonComment.countDocuments(rootFilter),
     ]);
     const hasMore = rows.length > input.limit;
     const items = rows.slice(0, input.limit);
@@ -611,17 +690,43 @@ export class LessonCommentService {
     const comment = await LessonComment.findById(commentId).lean();
     if (!comment) throw notFound();
     await this.assertStudentLessonAccess(userId, comment.lessonId.toString());
-    await this.assertVisibleComment(comment);
+    if (comment.deletedAt) {
+      const hasVisibleDescendant = await LessonComment.exists({
+        lessonId: comment.lessonId,
+        ancestorIds: comment._id,
+        deletedAt: null,
+      });
+      if (!hasVisibleDescendant) throw notFound();
+    }
     const cursor = this.decodeCursor(input.cursor);
-    const filter: Record<string, unknown> = {
+    const deletedChildren = await LessonComment.find({
       lessonId: comment.lessonId,
       parentId: comment._id,
-      deletedAt: null,
+      deletedAt: { $ne: null },
+    })
+      .select("_id")
+      .lean();
+    const visibleDeletedReplyIds = deletedChildren.length
+      ? await LessonComment.distinct("ancestorIds", {
+          lessonId: comment.lessonId,
+          ancestorIds: { $in: deletedChildren.map((child) => child._id) },
+          deletedAt: null,
+        })
+      : [];
+    const replyFilter: Record<string, unknown> = {
+      lessonId: comment.lessonId,
+      parentId: comment._id,
+      $or: [{ deletedAt: null }, { _id: { $in: visibleDeletedReplyIds } }],
     };
+    const filter: Record<string, unknown> = { ...replyFilter };
     if (cursor) {
-      filter.$or = [
-        { createdAt: { $gt: cursor.createdAt } },
-        { createdAt: cursor.createdAt, _id: { $gt: cursor.id } },
+      filter.$and = [
+        {
+          $or: [
+            { createdAt: { $gt: cursor.createdAt } },
+            { createdAt: cursor.createdAt, _id: { $gt: cursor.id } },
+          ],
+        },
       ];
     }
     const [rows, total] = await Promise.all([
@@ -629,11 +734,7 @@ export class LessonCommentService {
         .sort({ createdAt: 1, _id: 1 })
         .limit(input.limit + 1)
         .lean(),
-      LessonComment.countDocuments({
-        lessonId: comment.lessonId,
-        parentId: comment._id,
-        deletedAt: null,
-      }),
+      LessonComment.countDocuments(replyFilter),
     ]);
     const hasMore = rows.length > input.limit;
     const items = rows.slice(0, input.limit);
@@ -844,7 +945,7 @@ export class LessonCommentService {
     commentId: string,
     reason?: string,
   ) {
-    return this.deleteComment(commentId, adminId, "ADMIN", reason);
+    return this.deleteComment(commentId, adminId, "ADMIN", reason, false);
   }
 
   private async deleteComment(
@@ -852,36 +953,42 @@ export class LessonCommentService {
     actorId: string,
     actorRole: "STUDENT" | "ADMIN",
     reason?: string,
+    cascadeDescendants = true,
   ) {
     const result = await withTransaction(async (session) => {
       const initial = await LessonComment.findById(commentId)
         .session(session)
         .lean();
       if (!initial || initial.deletedAt) throw notFound();
-      await this.lockThread(initial.rootId, session);
+      await this.lockThread(initial.rootId, session, actorRole === "ADMIN");
       const comment = await LessonComment.findById(commentId)
         .session(session)
         .lean();
       if (!comment || comment.deletedAt) throw notFound();
-      await this.assertVisibleComment(comment, session);
+      if (actorRole === "STUDENT")
+        await this.assertVisibleComment(comment, session);
       if (actorRole === "STUDENT" && comment.authorId.toString() !== actorId)
         throw notFound();
       const deletedAt = this.now();
-      const descendants = await LessonComment.updateMany(
-        {
-          lessonId: comment.lessonId,
-          ancestorIds: comment._id,
-          deletedAt: null,
-        },
-        {
-          $set: {
-            deletedAt,
-            deletedBy: new Types.ObjectId(actorId),
-            deletionReason: reason ?? null,
-          },
-        },
-        { session },
-      );
+      const descendantsDeleted = cascadeDescendants
+        ? (
+            await LessonComment.updateMany(
+              {
+                lessonId: comment.lessonId,
+                ancestorIds: comment._id,
+                deletedAt: null,
+              },
+              {
+                $set: {
+                  deletedAt,
+                  deletedBy: new Types.ObjectId(actorId),
+                  deletionReason: reason ?? null,
+                },
+              },
+              { session },
+            )
+          ).modifiedCount
+        : 0;
       await LessonComment.updateOne(
         { _id: comment._id, deletedAt: null },
         {
@@ -904,7 +1011,7 @@ export class LessonCommentService {
               oldValue: { deleted: false },
               newValue: {
                 deleted: true,
-                descendantsDeleted: descendants.modifiedCount,
+                descendantsDeleted,
                 reason: reason ?? null,
               },
             },
@@ -913,7 +1020,7 @@ export class LessonCommentService {
         );
       return {
         id: comment._id.toString(),
-        descendantsDeleted: descendants.modifiedCount,
+        descendantsDeleted,
       };
     });
     return result;

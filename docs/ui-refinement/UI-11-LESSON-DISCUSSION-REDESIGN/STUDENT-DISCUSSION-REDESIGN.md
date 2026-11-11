@@ -9,6 +9,8 @@ The discussion remains part of the lesson page, after lesson content, notes, and
 - Root comments and replies share a compact list. A fine vertical connector links replies to their parent without wrapping each reply in a separate card.
 - Anonymous participants get an anonymous label/icon. Admin identity is identified with an Admin badge. The student API's author display remains the source of truth for privacy.
 - Newest/oldest sorting is available for the root list.
+- When Admin removes a comment, the original text is replaced by a removal notice. Surviving replies stay visible in their thread and the branch is read-only.
+- The comment action menu does not lock the page scroll; the student navigation and course outline stay available while it is open.
 
 ## Actions
 

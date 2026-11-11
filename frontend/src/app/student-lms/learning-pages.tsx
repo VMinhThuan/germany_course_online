@@ -400,7 +400,7 @@ export function LearningLessonPage() {
             </div>
             <aside
               aria-label="Nội dung khóa học"
-              className="sticky top-[4.5rem] hidden max-h-[calc(100dvh-5rem)] min-w-0 self-start overflow-y-auto rounded-2xl border border-border-subtle bg-card-surface p-4 lg:block"
+              className="fixed top-[4.5rem] right-5 z-20 hidden max-h-[calc(100dvh-5rem)] w-80 min-w-0 overflow-y-auto rounded-2xl border border-border-subtle bg-card-surface p-4 lg:col-start-2 lg:block xl:w-[23rem]"
             >
               <h2 className="mb-3 flex items-center gap-2 font-display text-base font-bold">
                 <BookOpenText aria-hidden="true" className="size-4 text-action-primary" />

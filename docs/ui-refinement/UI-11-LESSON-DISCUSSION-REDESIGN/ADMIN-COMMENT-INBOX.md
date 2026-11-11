@@ -2,16 +2,17 @@
 
 ## Inbox layout
 
-- A plain page heading, short purpose statement, create action, and compact summary metrics replace the decorative heading and wide table presentation on this route.
+- The title uses the shared decorative heading renderer inside a card, with the “Khu vực quản trị” eyebrow and create action.
 - The desktop inbox uses a paginated list beside a selected comment detail pane. The selected item is identifiable and keyboard-operable.
+- Inbox rows include only root comments and are grouped under their lesson. Selecting a root loads the complete thread in the detail pane.
 - Search, catalog context, status, sort, and advanced filters are available without forcing the detail view into an eight-column table.
 - The list avoids exposing author email. The Admin-only detail pane shows the real author identity, role, anonymity status as seen by learners, lesson context, reactions, and the discussion branch.
-- Moderation keeps the existing edit, history, reply, reaction, and subtree-delete actions and reason fields.
+- Moderation keeps the existing edit, history, reply, and reaction actions. Deleting a comment marks only that selected comment and records the action in Audit Log; surviving replies remain available to students in read-only form beneath a removal notice.
 
 ## Filtering and creation
 
 - Course, section, and lesson selection follow the existing catalog APIs. Section narrows the lesson choices; a chosen lesson is the effective catalog filter.
-- Advanced filters include author lookup by name/email, anonymous/public status, root/reply type, and date range.
+- Advanced filters include author lookup by name/email, anonymous/public status, and date range. The inbox always requests root comments.
 - The create dialog uses dependent searchable Course → Section → Lesson selectors. It never asks an Admin to type an ObjectId.
 - Create/edit/reply flows use existing repositories and payloads.
 

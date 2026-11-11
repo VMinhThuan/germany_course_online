@@ -45,6 +45,8 @@ const comment: ApiStudentLessonComment = {
   isMine: false,
   canEdit: false,
   canDelete: false,
+  isDeleted: false,
+  isThreadLocked: false,
   replyCount: 0,
   reactions: [],
 }

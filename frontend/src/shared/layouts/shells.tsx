@@ -505,7 +505,10 @@ export function StudentShell({
       <div className="min-h-screen lg:grid lg:grid-cols-[15.5rem_minmax(0,1fr)]">
         <aside
           aria-label="Điều hướng học viên chính"
-          className="sticky top-0 hidden h-screen flex-col border-r border-border-subtle bg-card-surface lg:flex"
+          className={cn(
+            'top-0 hidden h-screen flex-col border-r border-border-subtle bg-card-surface lg:col-start-1 lg:flex',
+            isLessonWorkspace ? 'fixed left-0 z-20 w-[15.5rem]' : 'sticky',
+          )}
         >
           <div className="flex h-16 items-center border-b border-border-subtle px-5">
             <BrandLogo compact to={productMode ? '/student' : '/__dev/layouts/student'} />
@@ -534,7 +537,7 @@ export function StudentShell({
             </div>
           </div>
         </aside>
-        <div className="min-w-0">
+        <div className="min-w-0 lg:col-start-2">
           <div
             role="region"
             aria-label="Điều khiển học viên"

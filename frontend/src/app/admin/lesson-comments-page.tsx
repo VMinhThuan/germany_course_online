@@ -23,7 +23,8 @@ import type {
   ApiLessonCommentReactionType,
   ApiPage,
 } from '@/lib/api/types'
-import { Button, DropdownMenu, Pagination, Popover } from '@/shared/ui'
+import { DecorativeHeading } from '@/domains/shared/decorative-heading'
+import { Button, Card, DropdownMenu, PageHeader, Pagination, Popover } from '@/shared/ui'
 import { BaseDialog, ConfirmDialog } from '@/shared/ui/dialogs'
 import { AdminField, AdminLoadError, AdminLoading, AdminSearchSelect, AdminSelect } from './shared'
 import { CommentReactionControl } from '@/domains/learning/comment-reaction-control'
@@ -79,6 +80,35 @@ function dateTime(value: string | null) {
   return value
     ? new Date(value).toLocaleString('vi-VN', { dateStyle: 'medium', timeStyle: 'short' })
     : '—'
+}
+
+function groupCommentsByLesson(comments: readonly ApiAdminLessonComment[]) {
+  const groups = new Map<
+    string,
+    {
+      lessonId: string
+      courseTitle: string | null
+      sectionTitle: string | null
+      lessonTitle: string | null
+      comments: ApiAdminLessonComment[]
+    }
+  >()
+
+  for (const comment of comments) {
+    if (comment.parentId !== null) continue
+    const lessonId = comment.context.lessonId
+    const group = groups.get(lessonId) ?? {
+      lessonId,
+      courseTitle: comment.context.courseTitle,
+      sectionTitle: comment.context.sectionTitle,
+      lessonTitle: comment.context.lessonTitle,
+      comments: [],
+    }
+    group.comments.push(comment)
+    groups.set(lessonId, group)
+  }
+
+  return [...groups.values()]
 }
 
 function SummaryMetric({ label, value, icon }: { label: string; value: number; icon: ReactNode }) {
@@ -262,8 +292,6 @@ function AdminCreateCommentDialog({
 }
 
 type CommentStatus = 'ALL' | 'ACTIVE' | 'DELETED'
-type CommentType = 'ALL' | 'ROOT' | 'REPLY'
-
 export function AdminLessonCommentsPage() {
   const queryClient = useQueryClient()
   const [searchDraft, setSearchDraft] = useState('')
@@ -277,7 +305,6 @@ export function AdminLessonCommentsPage() {
   const [authorLabel, setAuthorLabel] = useState('')
   const [anonymous, setAnonymous] = useState('')
   const [status, setStatus] = useState<CommentStatus>('ALL')
-  const [type, setType] = useState<CommentType>('ALL')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [sort, setSort] = useState<'newest' | 'oldest'>('newest')
@@ -354,7 +381,7 @@ export function AdminLessonCommentsPage() {
     authorId: authorId || undefined,
     anonymous: anonymous || undefined,
     status,
-    type,
+    type: 'ROOT' as const,
     from: from ? new Date(`${from}T00:00:00.000Z`).toISOString() : undefined,
     to: to ? new Date(`${to}T23:59:59.999Z`).toISOString() : undefined,
     sort,
@@ -370,6 +397,7 @@ export function AdminLessonCommentsPage() {
     retry: false,
   })
   const activeSelectedId = selectionCleared ? '' : selectedId || list.data?.items[0]?.id || ''
+  const inboxGroups = groupCommentsByLesson(list.data?.items ?? [])
   const detail = useQuery({
     queryKey: ['admin', 'lesson-comment', activeSelectedId],
     queryFn: () => lessonCommentsRepository.getAdminComment(activeSelectedId),
@@ -449,50 +477,37 @@ export function AdminLessonCommentsPage() {
 
   const deleteRequest = {
     kind: 'confirm' as const,
-    title: 'Xóa toàn bộ nhánh thảo luận?',
+    title: 'Xóa bình luận này?',
     description:
-      'Bình luận này và toàn bộ phản hồi bên dưới sẽ được ẩn với học viên. Hành động sẽ được ghi vào Audit Log.',
-    confirmLabel: 'Xóa nhánh',
+      'Chỉ bình luận đã chọn sẽ được gỡ. Các phản hồi bên dưới vẫn được giữ để học viên đọc. Hành động sẽ được ghi vào Audit Log.',
+    confirmLabel: 'Xóa bình luận',
     destructive: true,
     onConfirm: async () => {
       await removeComment.mutateAsync()
     },
   }
 
-  const advancedFilterCount = [anonymous, type !== 'ALL' ? type : '', authorId, from, to].filter(
-    Boolean,
-  ).length
+  const advancedFilterCount = [anonymous, authorId, from, to].filter(Boolean).length
   const hasFilters = Boolean(
-    search ||
-    courseId ||
-    lessonId ||
-    authorId ||
-    anonymous ||
-    status !== 'ALL' ||
-    type !== 'ALL' ||
-    from ||
-    to,
+    search || courseId || lessonId || authorId || anonymous || status !== 'ALL' || from || to,
   )
   const lessonFilterOptions = catalogLessonOptions(lessons.data)
 
   return (
     <div className="grid min-w-0 gap-4 sm:gap-5">
-      <header className="flex flex-wrap items-end justify-between gap-3 border-b border-border-subtle pb-4">
-        <div className="min-w-0">
-          <p className="mb-1 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-action-primary">
-            <MessageCircle aria-hidden="true" className="size-4" /> Hộp thư kiểm duyệt
-          </p>
-          <h1 className="!font-sans text-2xl font-bold tracking-tight text-ink-primary sm:text-3xl">
-            Quản lý bình luận
-          </h1>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-ink-secondary">
-            Theo dõi và xử lý thảo luận trong các bài học.
-          </p>
-        </div>
-        <Button onClick={() => setCreateOpen(true)} startIcon={<Plus aria-hidden="true" />}>
-          Bình luận mới
-        </Button>
-      </header>
+      <Card className="p-4 sm:p-5">
+        <PageHeader
+          eyebrow="Khu vực quản trị"
+          title="Quản lý bình luận"
+          heading={<DecorativeHeading text="Quản lý bình luận" level={1} size="md" />}
+          actions={
+            <Button onClick={() => setCreateOpen(true)} startIcon={<Plus aria-hidden="true" />}>
+              Bình luận mới
+            </Button>
+          }
+          className="items-center gap-4"
+        />
+      </Card>
 
       <section
         aria-label="Thống kê bình luận"
@@ -710,19 +725,6 @@ export function AdminLessonCommentsPage() {
                     { value: 'false', label: 'Đăng công khai' },
                   ]}
                 />
-                <AdminSelect
-                  label="Loại bình luận"
-                  value={type}
-                  onChange={(value) => {
-                    setType(value as CommentType)
-                    resetSelectionForFilter()
-                  }}
-                  options={[
-                    { value: 'ALL', label: 'Bình luận và phản hồi' },
-                    { value: 'ROOT', label: 'Bình luận gốc' },
-                    { value: 'REPLY', label: 'Phản hồi' },
-                  ]}
-                />
                 <div className="grid grid-cols-2 gap-2">
                   <AdminField
                     label="Từ ngày"
@@ -750,7 +752,6 @@ export function AdminLessonCommentsPage() {
                   className="justify-start"
                   onClick={() => {
                     setAnonymous('')
-                    setType('ALL')
                     setAuthorId('')
                     setAuthorLabel('')
                     setAuthorSearchDraft('')
@@ -781,7 +782,6 @@ export function AdminLessonCommentsPage() {
                 setAuthorLabel('')
                 setAnonymous('')
                 setStatus('ALL')
-                setType('ALL')
                 setFrom('')
                 setTo('')
                 setSort('newest')
@@ -808,7 +808,9 @@ export function AdminLessonCommentsPage() {
                 Hộp thư
               </h2>
               <p className="text-xs text-ink-muted">
-                {list.data ? `${list.data.total.toLocaleString('vi-VN')} kết quả` : 'Đang tải'}
+                {list.data
+                  ? `${list.data.total.toLocaleString('vi-VN')} bình luận gốc`
+                  : 'Đang tải'}
               </p>
             </div>
             {hasFilters && (
@@ -829,64 +831,83 @@ export function AdminLessonCommentsPage() {
           ) : list.data.items.length ? (
             <>
               <ul
-                aria-label="Danh sách bình luận"
-                className="grid min-h-0 divide-y divide-border-subtle overflow-y-auto p-2 xl:flex-1"
+                aria-label="Danh sách bình luận gốc theo bài học"
+                className="grid min-h-0 content-start gap-3 overflow-y-auto p-2 xl:flex-1"
               >
-                {list.data.items.map((item) => (
-                  <li key={item.id}>
-                    <button
-                      type="button"
-                      aria-current={activeSelectedId === item.id ? 'true' : undefined}
-                      aria-label={`Mở bình luận của ${item.author?.fullName ?? 'tài khoản đã xóa'}: ${item.content.slice(0, 100)}`}
-                      onClick={() => {
-                        setSelectedId(item.id)
-                        setSelectionCleared(false)
-                        setMobileDetailOpen(true)
-                      }}
-                      className={`relative grid w-full min-w-0 gap-1.5 rounded-xl px-3 py-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-action-focus ${activeSelectedId === item.id ? 'bg-brand-blue/35 before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-full before:bg-action-primary' : 'hover:bg-surface-muted'}`}
-                    >
-                      <span className="flex min-w-0 items-center justify-between gap-3">
-                        <span className="flex min-w-0 items-center gap-2 font-semibold">
-                          <span
-                            aria-hidden="true"
-                            className="grid size-7 shrink-0 place-items-center rounded-full bg-surface-blue text-xs text-action-primary"
-                          >
-                            {(item.author?.fullName ?? '?').slice(0, 1).toUpperCase()}
-                          </span>
-                          <span className="truncate">
-                            {item.author?.fullName ?? 'Tài khoản đã xóa'}
-                          </span>
-                        </span>
-                        <time
-                          dateTime={item.createdAt}
-                          className="shrink-0 text-xs text-ink-secondary"
+                {inboxGroups.map((group) => (
+                  <li key={group.lessonId}>
+                    <section aria-labelledby={`lesson-inbox-${group.lessonId}`}>
+                      <header className="px-3 pb-1 pt-2">
+                        <h3
+                          id={`lesson-inbox-${group.lessonId}`}
+                          className="text-sm font-bold text-ink-primary"
                         >
-                          {dateTime(item.createdAt)}
-                        </time>
-                      </span>
-                      <span className="line-clamp-2 whitespace-pre-wrap break-words pl-9 text-sm leading-5 text-ink-secondary">
-                        {item.content}
-                      </span>
-                      <span className="truncate pl-9 text-xs text-ink-secondary">
-                        {item.context.courseTitle ?? 'Khóa học'} ·{' '}
-                        {item.context.lessonTitle ?? 'Bài học'}
-                      </span>
-                      <span className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-9 text-[11px] text-ink-secondary">
-                        {item.isAnonymous && <span>Đăng ẩn danh</span>}
-                        {item.replyCount > 0 && <span>{item.replyCount} phản hồi</span>}
-                        {item.reactionCount > 0 && <span>{item.reactionCount} reaction</span>}
-                        {item.editedAt && <span>Đã chỉnh sửa</span>}
-                        {item.deletedAt && (
-                          <span className="font-semibold text-danger-foreground">Đã xóa</span>
-                        )}
-                      </span>
-                    </button>
+                          {group.lessonTitle ?? 'Bài học không còn khả dụng'}
+                        </h3>
+                        <p className="mt-0.5 text-xs text-ink-secondary">
+                          {group.courseTitle ?? 'Khóa học'} · {group.sectionTitle ?? 'Chương'}
+                        </p>
+                      </header>
+                      <ul className="grid divide-y divide-border-subtle">
+                        {group.comments.map((item) => (
+                          <li key={item.id}>
+                            <button
+                              type="button"
+                              aria-current={activeSelectedId === item.id ? 'true' : undefined}
+                              aria-label={`Mở bình luận của ${item.author?.fullName ?? 'tài khoản đã xóa'}: ${item.content.slice(0, 100)}`}
+                              onClick={() => {
+                                setSelectedId(item.id)
+                                setSelectionCleared(false)
+                                setMobileDetailOpen(true)
+                              }}
+                              className={`relative grid w-full min-w-0 gap-1.5 rounded-xl px-3 py-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-action-focus ${activeSelectedId === item.id ? 'bg-brand-blue/35 before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-full before:bg-action-primary' : 'hover:bg-surface-muted'}`}
+                            >
+                              <span className="flex min-w-0 items-center justify-between gap-3">
+                                <span className="flex min-w-0 items-center gap-2 font-semibold">
+                                  <span
+                                    aria-hidden="true"
+                                    className="grid size-7 shrink-0 place-items-center rounded-full bg-surface-blue text-xs text-action-primary"
+                                  >
+                                    {(item.author?.fullName ?? '?').slice(0, 1).toUpperCase()}
+                                  </span>
+                                  <span className="truncate">
+                                    {item.author?.fullName ?? 'Tài khoản đã xóa'}
+                                  </span>
+                                </span>
+                                <time
+                                  dateTime={item.createdAt}
+                                  className="shrink-0 text-xs text-ink-secondary"
+                                >
+                                  {dateTime(item.createdAt)}
+                                </time>
+                              </span>
+                              <span className="line-clamp-2 whitespace-pre-wrap break-words pl-9 text-sm leading-5 text-ink-secondary">
+                                {item.content}
+                              </span>
+                              <span className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-9 text-[11px] text-ink-secondary">
+                                {item.isAnonymous && <span>Đăng ẩn danh</span>}
+                                {item.replyCount > 0 && <span>{item.replyCount} phản hồi</span>}
+                                {item.reactionCount > 0 && (
+                                  <span>{item.reactionCount} reaction</span>
+                                )}
+                                {item.editedAt && <span>Đã chỉnh sửa</span>}
+                                {item.deletedAt && (
+                                  <span className="font-semibold text-danger-foreground">
+                                    Đã xóa
+                                  </span>
+                                )}
+                              </span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
                   </li>
                 ))}
               </ul>
               <div className="grid gap-2 border-t border-border-subtle px-3 py-3">
                 <p className="text-center text-xs text-ink-muted">
-                  Trang {page} · {list.data.total.toLocaleString('vi-VN')} bình luận
+                  Trang {page} · {list.data.total.toLocaleString('vi-VN')} bình luận gốc
                 </p>
                 <Pagination
                   page={page}
@@ -1130,7 +1151,7 @@ function AdminCommentDetail({
                     disabled: detail.history.length === 0,
                   },
                   {
-                    label: 'Xóa toàn bộ nhánh',
+                    label: 'Xóa bình luận',
                     onSelect: onDelete,
                     disabled: isDeleted,
                     destructive: true,

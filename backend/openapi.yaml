@@ -14746,11 +14746,13 @@ components:
         isMine: { type: boolean }
         canEdit: { type: boolean }
         canDelete: { type: boolean }
+        isDeleted: { type: boolean }
+        isThreadLocked: { type: boolean }
         replyCount: { type: integer, minimum: 0 }
         reactions:
           type: array
           items: { $ref: "#/components/schemas/LessonCommentReactionSummary" }
-      required: [id, lessonId, parentId, rootId, content, isAnonymous, isModerated, revision, editedAt, createdAt, updatedAt, author, isMine, canEdit, canDelete, replyCount, reactions]
+      required: [id, lessonId, parentId, rootId, content, isAnonymous, isModerated, revision, editedAt, createdAt, updatedAt, author, isMine, canEdit, canDelete, isDeleted, isThreadLocked, replyCount, reactions]
       additionalProperties: false
     StudentLessonCommentPage:
       type: object

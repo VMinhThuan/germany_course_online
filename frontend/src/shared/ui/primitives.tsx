@@ -519,13 +519,15 @@ export function DropdownMenu({
   label,
   items,
   trigger,
+  modal = true,
 }: {
   label: string
   items: MenuAction[]
   trigger?: ReactNode
+  modal?: boolean
 }) {
   return (
-    <DropdownMenuPrimitive.Root>
+    <DropdownMenuPrimitive.Root modal={modal}>
       <DropdownMenuPrimitive.Trigger asChild>
         {trigger ?? (
           <Button variant="outline" endIcon={<ChevronDown aria-hidden="true" />}>

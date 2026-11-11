@@ -223,6 +223,7 @@ function StudentCommentCard({
     retry: false,
   })
   const nestedReplies = replies.data?.pages.flatMap((page) => page.items) ?? []
+  const threadLocked = comment.isThreadLocked
 
   function refreshCommentContainer() {
     void queryClient.invalidateQueries({
@@ -317,7 +318,7 @@ function StudentCommentCard({
             </p>
             <p className="mt-0.5 text-xs text-ink-muted">
               {displayTime(comment.createdAt)}
-              {comment.editedAt && (
+              {comment.editedAt && !threadLocked && (
                 <>
                   {' · '}
                   {comment.isModerated ? (
@@ -380,10 +381,20 @@ function StudentCommentCard({
             </p>
           )}
         </div>
+      ) : comment.isDeleted ? (
+        <p className="rounded-lg bg-surface-muted px-3 py-2 text-xs leading-5 text-ink-secondary">
+          Bình luận này đã được gỡ. Các phản hồi còn lại được giữ để tham khảo.
+        </p>
       ) : (
         <p className="whitespace-pre-wrap break-words text-sm leading-6 text-ink-primary">
           {comment.content}
         </p>
+      )}
+
+      {!comment.isDeleted && threadLocked && (
+        <span className="w-fit rounded-full bg-surface-muted px-2.5 py-1 text-xs font-medium text-ink-secondary">
+          Nhánh thảo luận đã khóa
+        </span>
       )}
 
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -392,6 +403,7 @@ function StudentCommentCard({
           activeReaction={
             comment.reactions.find((reaction) => reaction.isMine)?.reactionType ?? null
           }
+          disabled={threadLocked}
           onSelect={(reactionType) => {
             const active = comment.reactions.find((reaction) => reaction.isMine)?.reactionType
             void react(reactionType, active === reactionType)
@@ -401,6 +413,7 @@ function StudentCommentCard({
           size="sm"
           variant="ghost"
           startIcon={<Reply aria-hidden="true" className="size-4" />}
+          disabled={threadLocked}
           onClick={() => setReplying((value) => !value)}
         >
           Trả lời
@@ -419,6 +432,7 @@ function StudentCommentCard({
         {(comment.canEdit || comment.canDelete) && !editing && (
           <DropdownMenu
             label="Thao tác"
+            modal={false}
             trigger={
               <Button
                 type="button"
@@ -460,7 +474,7 @@ function StudentCommentCard({
           {actionError}
         </p>
       )}
-      {replying && (
+      {replying && !threadLocked && (
         <StudentCommentComposer
           lessonId={lessonId}
           parentId={comment.id}

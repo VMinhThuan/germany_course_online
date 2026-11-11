@@ -664,6 +664,8 @@ export interface ApiStudentLessonComment {
   isMine: boolean
   canEdit: boolean
   canDelete: boolean
+  isDeleted: boolean
+  isThreadLocked: boolean
   replyCount: number
   reactions: Array<{
     reactionType: ApiLessonCommentReactionType

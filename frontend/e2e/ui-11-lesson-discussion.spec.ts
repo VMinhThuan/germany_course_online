@@ -625,7 +625,33 @@ test('Student lesson discussion threads and comment actions at desktop and mobil
   await expectNoSeriousA11yViolations(page, 'Student reaction picker')
   await capture(page, 'student-reaction-picker-1440x900.png')
   await page.keyboard.press('Escape')
+  const studentSidebar = page.locator('aside[aria-label="Điều hướng học viên chính"]')
+  const courseOutline = page.locator('aside[aria-label="Nội dung khóa học"]')
+  await expect(studentSidebar).toBeVisible()
+  await expect(courseOutline).toBeVisible()
   await page.getByRole('button', { name: 'Thao tác bình luận' }).click()
+  const layoutVisibility = await page.evaluate(() => {
+    const intersectsViewport = (element: Element | null) => {
+      if (!element) return false
+      const style = getComputedStyle(element)
+      const rect = element.getBoundingClientRect()
+      return (
+        style.display !== 'none' &&
+        style.visibility !== 'hidden' &&
+        rect.bottom > 0 &&
+        rect.top < window.innerHeight
+      )
+    }
+    return {
+      sidebar: intersectsViewport(
+        document.querySelector('aside[aria-label="Điều hướng học viên chính"]'),
+      ),
+      outline: intersectsViewport(document.querySelector('aside[aria-label="Nội dung khóa học"]')),
+    }
+  })
+  expect(layoutVisibility).toEqual({ sidebar: true, outline: true })
+  await expect(studentSidebar).toBeVisible()
+  await expect(courseOutline).toBeVisible()
   await capture(page, 'student-action-menu-1440x900.png')
   await page.keyboard.press('Escape')
 
