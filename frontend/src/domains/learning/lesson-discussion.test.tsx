@@ -49,6 +49,17 @@ const comment: ApiStudentLessonComment = {
   reactions: [],
 }
 
+const reply: ApiStudentLessonComment = {
+  ...comment,
+  id: 'f'.repeat(24),
+  parentId: comment.id,
+  rootId: comment.id,
+  content: 'Bạn có thể xem lại ví dụ thứ hai.',
+  isAnonymous: false,
+  author: { displayName: 'Minh Anh', avatarUrl: null, isAnonymous: false, role: 'STUDENT' },
+  replyCount: 0,
+}
+
 const adminComment: ApiAdminLessonComment = {
   ...comment,
   depth: 0,
@@ -144,5 +155,79 @@ describe('lesson discussion UI', () => {
         parentId: null,
       }),
     )
+  })
+
+  it('uses a compact reaction picker and sends the selected reaction', async () => {
+    const user = userEvent.setup()
+    render(<LessonDiscussion lessonId={comment.lessonId} />, { wrapper })
+
+    await user.click(await screen.findByRole('button', { name: 'Thêm reaction' }))
+    await user.click(screen.getByRole('button', { name: 'Yêu thích' }))
+
+    await waitFor(() => expect(mocks.setStudentReaction).toHaveBeenCalledWith(comment.id, 'LOVE'))
+  })
+
+  it('opens replies inline and preserves the nested reply relationship', async () => {
+    const user = userEvent.setup()
+    mocks.listLessonComments.mockResolvedValue({
+      items: [{ ...comment, replyCount: 1 }],
+      total: 1,
+      hasMore: false,
+      nextCursor: null,
+    })
+    mocks.listReplies.mockImplementation(async (parentId: string) => ({
+      items: parentId === comment.id ? [reply] : [],
+      total: parentId === comment.id ? 1 : 0,
+      hasMore: false,
+      nextCursor: null,
+    }))
+    render(<LessonDiscussion lessonId={comment.lessonId} />, { wrapper })
+
+    await user.click(await screen.findByRole('button', { name: 'Xem 1 phản hồi' }))
+    expect(await screen.findByText(reply.content)).toBeInTheDocument()
+    expect(mocks.listReplies).toHaveBeenCalledWith(
+      comment.id,
+      expect.objectContaining({ limit: 20 }),
+    )
+  })
+
+  it('opens the inline reply composer and creates a reply under the selected comment', async () => {
+    const user = userEvent.setup()
+    render(<LessonDiscussion lessonId={comment.lessonId} />, { wrapper })
+
+    await user.click((await screen.findAllByRole('button', { name: 'Trả lời' }))[0]!)
+    await user.type(screen.getByLabelText('Nội dung phản hồi'), 'Mình sẽ giải thích ví dụ này.')
+    await user.click(screen.getByRole('button', { name: 'Gửi phản hồi' }))
+
+    await waitFor(() =>
+      expect(mocks.createStudentComment).toHaveBeenCalledWith(comment.lessonId, {
+        content: 'Mình sẽ giải thích ví dụ này.',
+        isAnonymous: false,
+        parentId: comment.id,
+      }),
+    )
+  })
+
+  it('keeps edit and delete in the contextual menu', async () => {
+    const user = userEvent.setup()
+    const ownedComment = { ...comment, isMine: true, canEdit: true, canDelete: true }
+    mocks.listLessonComments.mockResolvedValue({
+      items: [ownedComment],
+      total: 1,
+      hasMore: false,
+      nextCursor: null,
+    })
+    render(<LessonDiscussion lessonId={comment.lessonId} />, { wrapper })
+
+    await user.click(await screen.findByRole('button', { name: 'Thao tác bình luận' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Chỉnh sửa' }))
+    expect(screen.getByRole('textbox', { name: 'Chỉnh sửa bình luận' })).toHaveValue(
+      comment.content,
+    )
+    await user.click(screen.getByRole('button', { name: 'Hủy' }))
+
+    await user.click(screen.getByRole('button', { name: 'Thao tác bình luận' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Xóa bình luận' }))
+    expect(await screen.findByText(/ẩn toàn bộ phản hồi bên dưới/)).toBeInTheDocument()
   })
 })

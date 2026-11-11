@@ -225,6 +225,17 @@ describe('LearningLessonPage', () => {
     expect(screen.queryByRole('link', { name: /Arbeitsblatt/ })).not.toBeInTheDocument()
   })
 
+  it('places previous, completion, and next controls before the discussion', async () => {
+    renderLesson()
+
+    const previous = await screen.findByRole('button', { name: 'Bài trước' })
+    const discussion = screen.getByRole('heading', { name: 'Thảo luận bài học' }).closest('section')
+    expect(discussion).not.toBeNull()
+    expect(previous.compareDocumentPosition(discussion!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(screen.getByRole('button', { name: 'Hoàn thành bài học' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Bài tiếp' })).toBeInTheDocument()
+  })
+
   it('shows the full-width lesson content without inventing empty exercise or answer sections', () => {
     renderLesson()
 

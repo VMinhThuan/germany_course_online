@@ -271,6 +271,7 @@ export function Popover({
   open,
   onOpenChange,
   title,
+  className,
 }: {
   trigger: ReactNode
   children: ReactNode
@@ -278,6 +279,7 @@ export function Popover({
   open?: boolean
   onOpenChange?: (open: boolean) => void
   title?: string
+  className?: string
 }) {
   return (
     <PopoverPrimitive.Root open={open} onOpenChange={onOpenChange}>
@@ -286,7 +288,10 @@ export function Popover({
         <PopoverPrimitive.Content
           align={align}
           sideOffset={8}
-          className="z-50 w-72 rounded-xl border border-border-subtle bg-card-surface p-4 text-sm text-ink-primary shadow-raised outline-none"
+          className={cn(
+            'z-50 w-72 rounded-xl border border-border-subtle bg-card-surface p-4 text-sm text-ink-primary shadow-raised outline-none',
+            className,
+          )}
         >
           {title && (
             <PopoverPrimitive.Title className="mb-2 font-semibold">{title}</PopoverPrimitive.Title>
@@ -510,13 +515,23 @@ export type MenuAction = {
   destructive?: boolean
 }
 
-export function DropdownMenu({ label, items }: { label: string; items: MenuAction[] }) {
+export function DropdownMenu({
+  label,
+  items,
+  trigger,
+}: {
+  label: string
+  items: MenuAction[]
+  trigger?: ReactNode
+}) {
   return (
     <DropdownMenuPrimitive.Root>
       <DropdownMenuPrimitive.Trigger asChild>
-        <Button variant="outline" endIcon={<ChevronDown aria-hidden="true" />}>
-          {label}
-        </Button>
+        {trigger ?? (
+          <Button variant="outline" endIcon={<ChevronDown aria-hidden="true" />}>
+            {label}
+          </Button>
+        )}
       </DropdownMenuPrimitive.Trigger>
       <DropdownMenuPrimitive.Portal>
         <DropdownMenuPrimitive.Content

@@ -1,27 +1,16 @@
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
-import { MessageCircle, Pencil, Reply, Smile, Trash2 } from 'lucide-react'
+import { MessageCircle, MoreHorizontal, Reply, UserRound } from 'lucide-react'
 import { ApiError } from '@/lib/api/client'
 import { lessonCommentsRepository } from '@/data/api/lesson-comments-repository'
+import { CommentReactionControl } from './comment-reaction-control'
 import type {
   ApiLessonCommentHistoryItem,
   ApiLessonCommentReactionType,
   ApiStudentLessonComment,
 } from '@/lib/api/types'
-import { BaseDialog, Button, Card, ErrorState } from '@/shared/ui'
+import { BaseDialog, Button, DropdownMenu, ErrorState } from '@/shared/ui'
 import { ConfirmDialog } from '@/shared/ui/dialogs'
-
-const reactionOptions: Array<{
-  type: ApiLessonCommentReactionType
-  emoji: string
-  label: string
-}> = [
-  { type: 'LIKE', emoji: '👍', label: 'Thích' },
-  { type: 'LOVE', emoji: '❤️', label: 'Yêu thích' },
-  { type: 'HAHA', emoji: '😂', label: 'Buồn cười' },
-  { type: 'WOW', emoji: '😮', label: 'Ngạc nhiên' },
-  { type: 'CLAP', emoji: '👏', label: 'Vỗ tay' },
-]
 
 function displayTime(value: string) {
   return new Date(value).toLocaleString('vi-VN', {
@@ -47,6 +36,8 @@ function StudentCommentComposer({
   const [isAnonymous, setIsAnonymous] = useState(false)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [focused, setFocused] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const queryClient = useQueryClient()
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -65,9 +56,11 @@ function StudentCommentComposer({
         parentId,
       })
       setContent('')
+      if (textareaRef.current) textareaRef.current.style.height = ''
       setIsAnonymous(false)
-      await queryClient.invalidateQueries({ queryKey: ['lesson-comments', lessonId] })
-      await queryClient.invalidateQueries({ queryKey: ['lesson-comment-replies'] })
+      await queryClient.invalidateQueries({
+        queryKey: parentId ? ['lesson-comment-replies', parentId] : ['lesson-comments', lessonId],
+      })
       onSent()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Chưa gửi được bình luận. Hãy thử lại.')
@@ -77,19 +70,29 @@ function StudentCommentComposer({
   }
 
   return (
-    <form onSubmit={(event) => void submit(event)} className="grid gap-3">
+    <form
+      onSubmit={(event) => void submit(event)}
+      className={`grid gap-3 ${compact ? 'rounded-xl bg-surface-muted/70 p-3 sm:p-4' : 'rounded-2xl border border-brand-pink/65 bg-surface-pink/70 p-3 sm:p-4'}`}
+    >
       <label className="grid gap-1.5 text-sm font-semibold text-ink-primary">
         <span className="sr-only">{parentId ? 'Viết phản hồi' : 'Viết bình luận'}</span>
         <textarea
+          ref={textareaRef}
           value={content}
-          onChange={(event) => setContent(event.target.value)}
+          onChange={(event) => {
+            event.currentTarget.style.height = 'auto'
+            event.currentTarget.style.height = `${event.currentTarget.scrollHeight}px`
+            setContent(event.currentTarget.value)
+          }}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           maxLength={2_000}
-          rows={compact ? 3 : 4}
+          rows={compact ? 2 : 3}
           placeholder={
             parentId ? 'Viết phản hồi của bạn…' : 'Chia sẻ câu hỏi hoặc trao đổi về bài học…'
           }
           aria-label={parentId ? 'Nội dung phản hồi' : 'Nội dung bình luận'}
-          className="min-h-24 w-full resize-y rounded-xl border border-border-subtle bg-white px-3 py-2.5 font-normal outline-none focus-visible:ring-2 focus-visible:ring-action-primary"
+          className="min-h-20 w-full resize-none overflow-hidden rounded-xl border border-border-subtle bg-white px-3 py-2.5 font-normal leading-6 outline-none focus-visible:ring-2 focus-visible:ring-action-primary"
         />
       </label>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -102,7 +105,9 @@ function StudentCommentComposer({
           />
           Đăng ẩn danh
         </label>
-        <span className="text-xs text-ink-muted">{content.length}/2.000</span>
+        {(focused || content.length > 0) && (
+          <span className="text-xs tabular-nums text-ink-muted">{content.length}/2.000</span>
+        )}
       </div>
       {isAnonymous && (
         <p className="rounded-xl bg-brand-blue/35 px-3 py-2 text-xs leading-5 text-ink-secondary">
@@ -219,9 +224,12 @@ function StudentCommentCard({
   })
   const nestedReplies = replies.data?.pages.flatMap((page) => page.items) ?? []
 
-  function refreshDiscussion() {
-    void queryClient.invalidateQueries({ queryKey: ['lesson-comments', lessonId] })
-    void queryClient.invalidateQueries({ queryKey: ['lesson-comment-replies'] })
+  function refreshCommentContainer() {
+    void queryClient.invalidateQueries({
+      queryKey: comment.parentId
+        ? ['lesson-comment-replies', comment.parentId]
+        : ['lesson-comments', lessonId],
+    })
   }
 
   async function saveEdit() {
@@ -238,7 +246,7 @@ function StudentCommentCard({
         expectedRevision: comment.revision,
       })
       setEditing(false)
-      refreshDiscussion()
+      refreshCommentContainer()
     } catch (cause) {
       setEditError(
         cause instanceof ApiError && cause.code === 'EDIT_WINDOW_EXPIRED'
@@ -259,7 +267,7 @@ function StudentCommentCard({
     try {
       if (isMine) await lessonCommentsRepository.removeStudentReaction(comment.id)
       else await lessonCommentsRepository.setStudentReaction(comment.id, reactionType)
-      refreshDiscussion()
+      refreshCommentContainer()
     } catch (cause) {
       setActionError(cause instanceof Error ? cause.message : 'Chưa lưu được reaction.')
     }
@@ -275,189 +283,201 @@ function StudentCommentCard({
     onConfirm: async () => {
       await lessonCommentsRepository.deleteStudentComment(comment.id)
       setDeleteOpen(false)
-      refreshDiscussion()
+      refreshCommentContainer()
     },
   }
 
   return (
-    <article className="grid gap-3" style={{ marginLeft: `${Math.min(level, 4) * 0.75}rem` }}>
-      <Card className="grid gap-3 border-brand-blue/70 p-4 sm:p-5">
-        <header className="flex flex-wrap items-start justify-between gap-2">
-          <div className="flex min-w-0 items-start gap-3">
-            <span
-              aria-hidden="true"
-              className={`grid size-10 shrink-0 place-items-center rounded-full text-sm font-bold ${comment.author.isAnonymous ? 'bg-surface-muted text-ink-secondary' : 'bg-brand-pink/50 text-ink-primary'}`}
-            >
-              {comment.author.role === 'ADMIN'
-                ? 'Q'
-                : comment.author.isAnonymous
-                  ? '?'
-                  : comment.author.displayName.slice(0, 1).toUpperCase()}
-            </span>
-            <div className="min-w-0">
-              <p className="truncate font-semibold">
-                {comment.author.displayName}
-                {comment.author.role === 'ADMIN' && (
-                  <span className="ml-2 rounded-full bg-brand-lime/60 px-2 py-0.5 text-xs font-semibold">
-                    Quản trị viên
-                  </span>
-                )}
-              </p>
-              <p className="mt-0.5 text-xs text-ink-muted">
-                {displayTime(comment.createdAt)}
-                {comment.editedAt && (
-                  <>
-                    {' · '}
-                    {comment.isModerated ? (
-                      <span className="font-medium text-ink-secondary">
-                        Đã được quản trị viên chỉnh sửa
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        className="underline underline-offset-2 hover:text-action-primary"
-                        onClick={() => setHistoryOpen(true)}
-                      >
-                        Đã chỉnh sửa
-                      </button>
-                    )}
-                  </>
-                )}
-              </p>
-            </div>
-          </div>
-          {comment.author.isAnonymous && (
-            <span className="rounded-full bg-surface-muted px-2.5 py-1 text-xs font-semibold text-ink-secondary">
-              Ẩn danh
-            </span>
-          )}
-        </header>
-
-        {editing ? (
-          <div className="grid gap-2">
-            <textarea
-              aria-label="Chỉnh sửa bình luận"
-              rows={4}
-              maxLength={2_000}
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              className="w-full rounded-xl border border-border-subtle bg-white px-3 py-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-action-primary"
-            />
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-xs text-ink-muted">{draft.length}/2.000</span>
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    setEditing(false)
-                    setDraft(comment.content)
-                    setEditError('')
-                  }}
-                >
-                  Hủy
-                </Button>
-                <Button size="sm" loading={savingEdit} onClick={() => void saveEdit()}>
-                  Lưu
-                </Button>
-              </div>
-            </div>
-            {editError && (
-              <p role="alert" className="text-sm text-danger-foreground">
-                {editError}
-              </p>
+    <article
+      className={`grid min-w-0 gap-2 ${level === 0 ? 'border-b border-border-subtle py-5 first:pt-1 last:border-b-0' : 'py-1'}`}
+      style={{ marginInlineStart: `${Math.min(level, 4) * 0.5}rem` }}
+    >
+      <header className="flex flex-wrap items-start justify-between gap-2">
+        <div className="flex min-w-0 items-start gap-3">
+          <span
+            aria-hidden="true"
+            className={`grid ${level > 0 ? 'size-8' : 'size-10'} shrink-0 place-items-center rounded-full text-sm font-bold ${comment.author.isAnonymous ? 'bg-surface-muted text-ink-secondary' : comment.author.role === 'ADMIN' ? 'bg-brand-blue text-action-primary' : 'bg-brand-pink/50 text-ink-primary'}`}
+          >
+            {comment.author.isAnonymous ? (
+              <UserRound aria-hidden="true" className="size-4" />
+            ) : comment.author.role === 'ADMIN' ? (
+              'Q'
+            ) : (
+              comment.author.displayName.slice(0, 1).toUpperCase()
             )}
+          </span>
+          <div className="min-w-0">
+            <p className="truncate font-semibold">
+              {comment.author.displayName}
+              {comment.author.role === 'ADMIN' && (
+                <span className="ml-2 rounded-full bg-brand-blue/60 px-2 py-0.5 text-xs font-semibold text-ink-primary">
+                  Quản trị viên
+                </span>
+              )}
+            </p>
+            <p className="mt-0.5 text-xs text-ink-muted">
+              {displayTime(comment.createdAt)}
+              {comment.editedAt && (
+                <>
+                  {' · '}
+                  {comment.isModerated ? (
+                    <span className="font-medium text-ink-secondary">
+                      Đã được quản trị viên chỉnh sửa
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="underline underline-offset-2 hover:text-action-primary"
+                      onClick={() => setHistoryOpen(true)}
+                    >
+                      Đã chỉnh sửa
+                    </button>
+                  )}
+                </>
+              )}
+            </p>
           </div>
-        ) : (
-          <p className="whitespace-pre-wrap break-words text-sm leading-6 text-ink-primary">
-            {comment.content}
-          </p>
+        </div>
+        {comment.author.isAnonymous && (
+          <span className="rounded-full bg-surface-muted px-2.5 py-1 text-xs font-medium text-ink-secondary">
+            Đăng ẩn danh
+          </span>
         )}
+      </header>
 
-        <div className="flex flex-wrap items-center gap-1.5 border-t border-border-subtle pt-3">
-          {reactionOptions.map((reaction) => {
-            const summary = comment.reactions.find((item) => item.reactionType === reaction.type)
-            const isMine = summary?.isMine ?? false
-            return (
-              <button
-                key={reaction.type}
-                type="button"
-                aria-label={`${isMine ? 'Bỏ reaction' : 'Thả reaction'} ${reaction.label}${summary ? `, ${summary.count} lượt` : ''}`}
-                aria-pressed={isMine}
-                onClick={() => void react(reaction.type, isMine)}
-                className={`inline-flex min-h-9 items-center gap-1 rounded-full border px-2.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary ${isMine ? 'border-action-primary bg-brand-blue/45' : 'border-border-subtle bg-white hover:bg-surface-muted'}`}
+      {editing ? (
+        <div className="grid gap-2">
+          <textarea
+            aria-label="Chỉnh sửa bình luận"
+            rows={4}
+            maxLength={2_000}
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            className="w-full rounded-xl border border-border-subtle bg-white px-3 py-2.5 text-sm leading-6 outline-none focus-visible:ring-2 focus-visible:ring-action-primary"
+          />
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs text-ink-muted">{draft.length}/2.000</span>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setEditing(false)
+                  setDraft(comment.content)
+                  setEditError('')
+                }}
               >
-                <span aria-hidden="true">{reaction.emoji}</span>
-                {summary && <span>{summary.count}</span>}
-              </button>
-            )
-          })}
+                Hủy
+              </Button>
+              <Button size="sm" loading={savingEdit} onClick={() => void saveEdit()}>
+                Lưu
+              </Button>
+            </div>
+          </div>
+          {editError && (
+            <p role="alert" className="text-sm text-danger-foreground">
+              {editError}
+            </p>
+          )}
+        </div>
+      ) : (
+        <p className="whitespace-pre-wrap break-words text-sm leading-6 text-ink-primary">
+          {comment.content}
+        </p>
+      )}
+
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <CommentReactionControl
+          reactions={comment.reactions}
+          activeReaction={
+            comment.reactions.find((reaction) => reaction.isMine)?.reactionType ?? null
+          }
+          onSelect={(reactionType) => {
+            const active = comment.reactions.find((reaction) => reaction.isMine)?.reactionType
+            void react(reactionType, active === reactionType)
+          }}
+        />
+        <Button
+          size="sm"
+          variant="ghost"
+          startIcon={<Reply aria-hidden="true" className="size-4" />}
+          onClick={() => setReplying((value) => !value)}
+        >
+          Trả lời
+        </Button>
+        {comment.replyCount > 0 && (
           <Button
             size="sm"
             variant="ghost"
-            startIcon={<Reply aria-hidden="true" className="size-4" />}
-            onClick={() => setReplying((value) => !value)}
+            startIcon={<MessageCircle aria-hidden="true" className="size-4" />}
+            aria-expanded={expanded}
+            onClick={() => setExpanded((value) => !value)}
           >
-            Trả lời
+            {expanded ? 'Ẩn phản hồi' : `Xem ${comment.replyCount} phản hồi`}
           </Button>
-          {comment.replyCount > 0 && (
-            <Button
-              size="sm"
-              variant="ghost"
-              startIcon={<MessageCircle aria-hidden="true" className="size-4" />}
-              onClick={() => setExpanded((value) => !value)}
-            >
-              {expanded ? 'Ẩn phản hồi' : `Xem ${comment.replyCount} phản hồi`}
-            </Button>
-          )}
-          {comment.canEdit && !editing && (
-            <Button
-              size="sm"
-              variant="ghost"
-              startIcon={<Pencil aria-hidden="true" className="size-4" />}
-              onClick={() => {
-                setDraft(comment.content)
-                setEditing(true)
-              }}
-            >
-              Chỉnh sửa
-            </Button>
-          )}
-          {comment.canDelete && (
-            <Button
-              size="sm"
-              variant="ghost"
-              startIcon={<Trash2 aria-hidden="true" className="size-4" />}
-              onClick={() => setDeleteOpen(true)}
-            >
-              Xóa
-            </Button>
-          )}
-        </div>
-        {actionError && (
-          <p role="alert" className="text-sm text-danger-foreground">
-            {actionError}
-          </p>
         )}
-      </Card>
-
-      {replying && (
-        <div className="rounded-2xl border border-border-subtle bg-white p-3 sm:p-4">
-          <StudentCommentComposer
-            lessonId={lessonId}
-            parentId={comment.id}
-            compact
-            onSent={() => {
-              setReplying(false)
-              setExpanded(true)
-            }}
-            onCancel={() => setReplying(false)}
+        {(comment.canEdit || comment.canDelete) && !editing && (
+          <DropdownMenu
+            label="Thao tác"
+            trigger={
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                aria-label="Thao tác bình luận"
+                className="size-9 min-h-9 rounded-full"
+              >
+                <MoreHorizontal aria-hidden="true" className="size-4" />
+              </Button>
+            }
+            items={[
+              ...(comment.canEdit
+                ? [
+                    {
+                      label: 'Chỉnh sửa',
+                      onSelect: () => {
+                        setDraft(comment.content)
+                        setEditing(true)
+                      },
+                    },
+                  ]
+                : []),
+              ...(comment.canDelete
+                ? [
+                    {
+                      label: 'Xóa bình luận',
+                      onSelect: () => setDeleteOpen(true),
+                      destructive: true,
+                    },
+                  ]
+                : []),
+            ]}
           />
-        </div>
+        )}
+      </div>
+      {actionError && (
+        <p role="alert" className="text-sm text-danger-foreground">
+          {actionError}
+        </p>
+      )}
+      {replying && (
+        <StudentCommentComposer
+          lessonId={lessonId}
+          parentId={comment.id}
+          compact
+          onSent={() => {
+            setReplying(false)
+            setExpanded(true)
+          }}
+          onCancel={() => setReplying(false)}
+        />
       )}
 
       {expanded && (
-        <section aria-label={`Phản hồi của ${comment.author.displayName}`} className="grid gap-3">
+        <section
+          aria-label={`Phản hồi của ${comment.author.displayName}`}
+          className="relative grid gap-2 border-l border-border-subtle pl-3 sm:pl-4"
+        >
           {replies.isPending ? (
             <p className="px-2 text-sm text-ink-secondary">Đang tải phản hồi…</p>
           ) : replies.isError ? (
@@ -500,12 +520,13 @@ function StudentCommentCard({
 }
 
 function LessonDiscussionContent({ lessonId }: { lessonId: string }) {
+  const [sort, setSort] = useState<'newest' | 'oldest'>('newest')
   const comments = useInfiniteQuery({
-    queryKey: ['lesson-comments', lessonId],
+    queryKey: ['lesson-comments', lessonId, sort],
     queryFn: ({ pageParam }) =>
       lessonCommentsRepository.listLessonComments(lessonId, {
         limit: 20,
-        sort: 'newest',
+        sort,
         ...(pageParam ? { cursor: pageParam } : {}),
       }),
     initialPageParam: '' as string,
@@ -514,6 +535,7 @@ function LessonDiscussionContent({ lessonId }: { lessonId: string }) {
     retry: false,
   })
   const items = comments.data?.pages.flatMap((page) => page.items) ?? []
+  const rootCommentCount = comments.data?.pages[0]?.total ?? 0
 
   if (
     comments.isError &&
@@ -523,25 +545,40 @@ function LessonDiscussionContent({ lessonId }: { lessonId: string }) {
     return null
 
   return (
-    <section aria-labelledby="lesson-discussion-heading" className="grid gap-4">
-      <div className="flex items-center gap-2">
-        <span className="grid size-10 place-items-center rounded-2xl bg-brand-pink/45 text-action-primary">
-          <Smile aria-hidden="true" className="size-5" />
-        </span>
-        <div>
-          <h2 id="lesson-discussion-heading" className="font-display text-xl font-bold">
-            Thảo luận bài học
-          </h2>
-          <p className="text-sm text-ink-secondary">
-            Trao đổi câu hỏi và chia sẻ kinh nghiệm cùng học viên.
-          </p>
+    <section aria-labelledby="lesson-discussion-heading" className="grid gap-4 scroll-mt-24">
+      <header className="flex flex-wrap items-end justify-between gap-3 border-b border-border-subtle pb-3">
+        <div className="flex items-start gap-2.5">
+          <MessageCircle aria-hidden="true" className="mt-1 size-5 shrink-0 text-action-primary" />
+          <div>
+            <h2
+              id="lesson-discussion-heading"
+              className="text-lg font-bold tracking-tight sm:text-xl"
+            >
+              Thảo luận bài học
+            </h2>
+            <p className="mt-0.5 text-sm text-ink-secondary">
+              Trao đổi câu hỏi và chia sẻ kinh nghiệm cùng học viên.
+            </p>
+          </div>
         </div>
-      </div>
-      <Card className="p-4 sm:p-5">
-        <StudentCommentComposer lessonId={lessonId} parentId={null} onSent={() => undefined} />
-      </Card>
+        <label className="flex min-h-9 items-center gap-2 text-sm text-ink-secondary">
+          <span>Sắp xếp</span>
+          <select
+            value={sort}
+            onChange={(event) => setSort(event.target.value as 'newest' | 'oldest')}
+            className="min-h-9 rounded-lg border border-border-subtle bg-white px-2.5 font-medium text-ink-primary outline-none focus-visible:ring-2 focus-visible:ring-action-primary"
+          >
+            <option value="newest">Mới nhất</option>
+            <option value="oldest">Cũ nhất</option>
+          </select>
+        </label>
+      </header>
+      <p className="-mt-2 text-xs text-ink-muted">
+        {comments.isSuccess ? `${rootCommentCount} bình luận gốc` : 'Thảo luận của bài học'}
+      </p>
+      <StudentCommentComposer lessonId={lessonId} parentId={null} onSent={() => undefined} />
       {comments.isPending ? (
-        <Card className="p-5 text-sm text-ink-secondary">Đang tải thảo luận…</Card>
+        <p className="py-4 text-sm text-ink-secondary">Đang tải thảo luận…</p>
       ) : comments.isError ? (
         <ErrorState
           title="Chưa tải được phần thảo luận"
@@ -550,7 +587,7 @@ function LessonDiscussionContent({ lessonId }: { lessonId: string }) {
         />
       ) : items.length ? (
         <>
-          <div className="grid gap-4">
+          <div className="grid">
             {items.map((comment) => (
               <StudentCommentCard
                 key={comment.id}
@@ -571,13 +608,13 @@ function LessonDiscussionContent({ lessonId }: { lessonId: string }) {
           )}
         </>
       ) : (
-        <Card className="grid justify-items-center gap-2 p-8 text-center">
+        <div className="grid justify-items-center gap-2 py-8 text-center">
           <MessageCircle aria-hidden="true" className="size-8 text-action-primary" />
           <p className="font-semibold">Chưa có bình luận</p>
           <p className="text-sm text-ink-secondary">
             Hãy bắt đầu cuộc thảo luận đầu tiên cho bài học này.
           </p>
-        </Card>
+        </div>
       )}
     </section>
   )

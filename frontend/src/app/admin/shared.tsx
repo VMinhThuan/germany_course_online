@@ -50,10 +50,12 @@ const navigation = [
 export function AdminLayout({
   title,
   description,
+  hidePageHeading = false,
   children,
 }: {
   title: string
   description?: string
+  hidePageHeading?: boolean
   children: ReactNode
 }) {
   const { logout, session } = useAuthSession()
@@ -160,26 +162,30 @@ export function AdminLayout({
           </div>
         </aside>
         <main className="min-w-0">
-          <div className="mb-6 flex flex-wrap items-end justify-between gap-3 border-b border-border-subtle pb-5">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.15em] text-action-primary">
-                Khu vực quản trị
-              </p>
-              <DecorativeHeading text={title} level={1} size="md" className="mt-1" />
-              {description && (
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">{description}</p>
+          {!hidePageHeading && (
+            <div className="mb-6 flex flex-wrap items-end justify-between gap-3 border-b border-border-subtle pb-5">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.15em] text-action-primary">
+                  Khu vực quản trị
+                </p>
+                <DecorativeHeading text={title} level={1} size="md" className="mt-1" />
+                {description && (
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">
+                    {description}
+                  </p>
+                )}
+              </div>
+              {location.pathname !== '/admin' && (
+                <Link
+                  to="/admin"
+                  className="inline-flex min-h-10 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-action-primary hover:bg-white"
+                >
+                  <ArrowLeft aria-hidden="true" className="size-4" />
+                  Tổng quan
+                </Link>
               )}
             </div>
-            {location.pathname !== '/admin' && (
-              <Link
-                to="/admin"
-                className="inline-flex min-h-10 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-action-primary hover:bg-white"
-              >
-                <ArrowLeft aria-hidden="true" className="size-4" />
-                Tổng quan
-              </Link>
-            )}
-          </div>
+          )}
           {children}
         </main>
       </div>

@@ -344,7 +344,6 @@ export function LearningLessonPage() {
                   />
                 )}
               </section>
-              <LessonDiscussion lessonId={lessonId} />
               <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)_minmax(0,1fr)] gap-2 border-t border-border-subtle pt-4">
                 <Button
                   variant="outline"
@@ -397,6 +396,7 @@ export function LearningLessonPage() {
                   onRetry={() => void markLessonComplete()}
                 />
               )}
+              <LessonDiscussion lessonId={lessonId} />
             </div>
             <aside
               aria-label="Nội dung khóa học"
