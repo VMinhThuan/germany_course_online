@@ -1,4 +1,4 @@
-import { createElement, type HTMLAttributes, type ReactNode } from 'react'
+import { createElement, type CSSProperties, type HTMLAttributes, type ReactNode } from 'react'
 import { createLetteringLayout, type LetteringLayout } from './lettering-engine'
 import type { HeadingLevel } from './heading'
 
@@ -83,7 +83,11 @@ export function DecorativeHeading({
       {layout ? (
         <span
           className="decorative-heading-art block max-w-full"
-          style={{ width: `min(${artworkWidth}px, calc(100vw - 6rem))` }}
+          style={
+            {
+              '--decorative-heading-artwork-width': `${artworkWidth}px`,
+            } as CSSProperties
+          }
         >
           <LetteringSvg layout={layout} />
         </span>

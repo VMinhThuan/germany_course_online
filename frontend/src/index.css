@@ -103,6 +103,7 @@
 
 .decorative-heading-art {
   flex: 0 1 auto;
+  width: min(var(--decorative-heading-artwork-width), calc(100vw - 6rem));
 }
 
 .decorative-heading-fallback {
