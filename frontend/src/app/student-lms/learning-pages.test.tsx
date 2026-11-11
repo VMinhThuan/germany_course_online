@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -14,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   completeExercise: vi.fn(),
   useCompleteLesson: vi.fn(),
   completeLesson: vi.fn(),
+  listLessonComments: vi.fn(),
 }))
 
 vi.mock('@/app/auth/auth-session', () => ({
@@ -27,6 +29,12 @@ vi.mock('@/data/student-demo/product-queries', () => ({
   useSaveLessonNote: mocks.useSaveLessonNote,
   useCompleteExercise: mocks.useCompleteExercise,
   useCompleteLesson: mocks.useCompleteLesson,
+}))
+
+vi.mock('@/data/api/lesson-comments-repository', () => ({
+  lessonCommentsRepository: {
+    listLessonComments: mocks.listLessonComments,
+  },
 }))
 
 vi.mock('./shared', () => ({
@@ -155,15 +163,20 @@ function LocationProbe() {
 }
 
 function renderLesson() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
   return render(
-    <NotificationProvider>
-      <MemoryRouter initialEntries={['/learn/lessons/lesson-2']}>
-        <LocationProbe />
-        <Routes>
-          <Route path="/learn/lessons/:lessonId" element={<LearningLessonPage />} />
-        </Routes>
-      </MemoryRouter>
-    </NotificationProvider>,
+    <QueryClientProvider client={queryClient}>
+      <NotificationProvider>
+        <MemoryRouter initialEntries={['/learn/lessons/lesson-2']}>
+          <LocationProbe />
+          <Routes>
+            <Route path="/learn/lessons/:lessonId" element={<LearningLessonPage />} />
+          </Routes>
+        </MemoryRouter>
+      </NotificationProvider>
+    </QueryClientProvider>,
   )
 }
 
@@ -181,6 +194,12 @@ describe('LearningLessonPage', () => {
       isError: false,
     })
     mocks.completeLesson.mockResolvedValue(undefined)
+    mocks.listLessonComments.mockResolvedValue({
+      items: [],
+      total: 0,
+      hasMore: false,
+      nextCursor: null,
+    })
     mocks.useCompleteLesson.mockReturnValue({
       mutateAsync: mocks.completeLesson,
       isPending: false,
@@ -192,6 +211,13 @@ describe('LearningLessonPage', () => {
     renderLesson()
 
     expect(screen.getByRole('heading', { level: 1, name: 'Không gian bài học' })).toBeVisible()
+    expect(await screen.findByRole('heading', { name: 'Thảo luận bài học' })).toBeVisible()
+    await waitFor(() =>
+      expect(mocks.listLessonComments).toHaveBeenCalledWith(
+        'lesson-2',
+        expect.objectContaining({ limit: 20, sort: 'newest' }),
+      ),
+    )
     expect(screen.getByRole('link', { name: /Video bài giảng/ })).toHaveAttribute(
       'href',
       '/learn/lessons/lesson-2',

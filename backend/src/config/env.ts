@@ -8,6 +8,10 @@ const truthy = z.preprocess(
   (value) => (value === undefined ? "false" : value),
   z.enum(["true", "false"]).transform((value) => value === "true"),
 );
+const enabledByDefault = z.preprocess(
+  (value) => (value === undefined ? "true" : value),
+  z.enum(["true", "false"]).transform((value) => value === "true"),
+);
 
 const environmentSchema = z.object({
   NODE_ENV: z
@@ -37,7 +41,7 @@ const environmentSchema = z.object({
     .default(900),
   SESSION_TTL_DAYS: z.coerce.number().int().min(1).max(365).default(30),
   APP_ORIGINS: z.string().trim().min(1),
-  LESSON_COMMENTS_ENABLED: truthy.default(false),
+  LESSON_COMMENTS_ENABLED: enabledByDefault,
   CRON_SECRET: z.preprocess(
     (value) => (value === "" ? undefined : value),
     z.string().min(32).optional(),

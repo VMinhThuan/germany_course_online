@@ -393,7 +393,7 @@ describe("BE-10 lesson comments and discussion management", () => {
     ).toBe(1);
   });
 
-  it("uses a safe feature flag default and leaves Admin moderation available", async () => {
+  it("supports explicitly disabling Student routes while keeping Admin moderation available", async () => {
     const disabled = createApp(
       { ...config, lessonCommentsEnabled: false },
       { logger: createLogger("test") },

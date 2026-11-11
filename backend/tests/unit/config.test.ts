@@ -12,6 +12,16 @@ const baseEnv = {
 };
 
 describe("parseEnvironment", () => {
+  it("enables lesson comments by default and supports an explicit off switch", () => {
+    expect(parseEnvironment(baseEnv).lessonCommentsEnabled).toBe(true);
+    expect(
+      parseEnvironment({
+        ...baseEnv,
+        LESSON_COMMENTS_ENABLED: "false",
+      }).lessonCommentsEnabled,
+    ).toBe(false);
+  });
+
   it("requires an explicit database name and strong JWT secret", () => {
     expect(() =>
       parseEnvironment({ ...baseEnv, MONGODB_DB_NAME: undefined }),

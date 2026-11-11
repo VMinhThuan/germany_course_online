@@ -584,6 +584,6 @@ function LessonDiscussionContent({ lessonId }: { lessonId: string }) {
 }
 
 export function LessonDiscussion({ lessonId }: { lessonId: string }) {
-  if (import.meta.env['VITE_LESSON_COMMENTS_ENABLED'] !== 'true') return null
+  if (import.meta.env['VITE_LESSON_COMMENTS_ENABLED'] === 'false') return null
   return <LessonDiscussionContent lessonId={lessonId} />
 }

@@ -118,6 +118,13 @@ describe('lesson discussion UI', () => {
     })
   })
 
+  it('hides the discussion only when explicitly disabled', () => {
+    vi.stubEnv('VITE_LESSON_COMMENTS_ENABLED', 'false')
+    render(<LessonDiscussion lessonId={comment.lessonId} />)
+    expect(screen.queryByRole('heading', { name: 'Thảo luận bài học' })).not.toBeInTheDocument()
+    expect(mocks.listLessonComments).not.toHaveBeenCalled()
+  })
+
   it('renders the anonymous public label and submits a student comment', async () => {
     const user = userEvent.setup()
     render(<LessonDiscussion lessonId={comment.lessonId} />, { wrapper })

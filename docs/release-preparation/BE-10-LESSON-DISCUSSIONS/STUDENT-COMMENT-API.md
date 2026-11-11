@@ -1,6 +1,6 @@
 # Student comment API
 
-All Student endpoints require an active session, an active account, and current entitlement to a published course, section and lesson. Inaccessible lessons return the existing not-found response. Set `LESSON_COMMENTS_ENABLED=true` to enable Student routes; the default is false.
+All Student endpoints require an active session, an active account, and current entitlement to a published course, section and lesson. Inaccessible lessons return the existing not-found response. Student routes are enabled by default; set `LESSON_COMMENTS_ENABLED=false` to disable them.
 
 | Method | Endpoint | Behavior |
 | --- | --- | --- |

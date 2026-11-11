@@ -2,7 +2,7 @@
 
 Lesson discussions are implemented across backend, Student UI, Admin moderation, OpenAPI, and tests.
 
-- Student access reuses the existing learning entitlement checks. Student routes and UI are off by default through `LESSON_COMMENTS_ENABLED=false` and `VITE_LESSON_COMMENTS_ENABLED=false`.
+- Student access reuses the existing learning entitlement checks. Student routes and UI are enabled by default; set `LESSON_COMMENTS_ENABLED=false` and `VITE_LESSON_COMMENTS_ENABLED=false` to pause Student discussions.
 - Student and Admin responses use separate DTOs. Student responses never include author IDs or contact details; Admin responses include the real author identity.
 - Replies support five total levels. Root comments and replies use cursor pagination.
 - Student edits use a server-enforced ten-minute deadline and revision checks. Every change is written to immutable edit-history records in the same transaction.

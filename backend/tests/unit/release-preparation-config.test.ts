@@ -19,6 +19,7 @@ describe("BE-06A environment examples and release authorization", () => {
     const backendConfig = parseEnvironment(backendExample);
     expect(backendConfig.nodeEnv).toBe("production");
     expect(backendConfig.databaseName).toBe("paniverse_lms_stage");
+    expect(backendConfig.lessonCommentsEnabled).toBe(true);
     expect(backendConfig.cookieSecure).toBe(true);
     expect(backendConfig.smtp).toBeUndefined();
     expect(backendConfig.mediaStorage).toBeUndefined();
@@ -33,7 +34,7 @@ describe("BE-06A environment examples and release authorization", () => {
     expect(frontendExample.VITE_API_BASE_URL).toBe(
       "https://api.staging.example.invalid/api/v1",
     );
-    expect(frontendExample.VITE_LESSON_COMMENTS_ENABLED).toBe("false");
+    expect(frontendExample.VITE_LESSON_COMMENTS_ENABLED).toBe("true");
   });
 
   it("normalizes MongoDB hosts without exposing credentials", () => {
