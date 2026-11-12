@@ -169,8 +169,7 @@ describe('lesson discussion UI', () => {
     await waitFor(() => expect(mocks.setStudentReaction).toHaveBeenCalledWith(comment.id, 'LOVE'))
   })
 
-  it('opens replies inline and preserves the nested reply relationship', async () => {
-    const user = userEvent.setup()
+  it('shows the latest replies inline and preserves the nested reply relationship', async () => {
     mocks.listLessonComments.mockResolvedValue({
       items: [{ ...comment, replyCount: 1 }],
       total: 1,
@@ -185,11 +184,10 @@ describe('lesson discussion UI', () => {
     }))
     render(<LessonDiscussion lessonId={comment.lessonId} />, { wrapper })
 
-    await user.click(await screen.findByRole('button', { name: 'Xem 1 phản hồi' }))
     expect(await screen.findByText(reply.content)).toBeInTheDocument()
     expect(mocks.listReplies).toHaveBeenCalledWith(
       comment.id,
-      expect.objectContaining({ limit: 20 }),
+      expect.objectContaining({ limit: 4, sort: 'newest' }),
     )
   })
 

@@ -25,7 +25,7 @@ export type LessonCommentReactionType =
   (typeof LESSON_COMMENT_REACTIONS)[number];
 export type CommentSort = "newest" | "oldest";
 
-type PageInput = { limit: number; cursor?: string };
+type PageInput = { limit: number; cursor?: string; sort?: CommentSort };
 type CommentRecord = {
   _id: Types.ObjectId;
   lessonId: Types.ObjectId;
@@ -699,6 +699,9 @@ export class LessonCommentService {
       if (!hasVisibleDescendant) throw notFound();
     }
     const cursor = this.decodeCursor(input.cursor);
+    const sort = input.sort ?? "oldest";
+    const cursorOperator = sort === "newest" ? "$lt" : "$gt";
+    const direction = sort === "newest" ? -1 : 1;
     const deletedChildren = await LessonComment.find({
       lessonId: comment.lessonId,
       parentId: comment._id,
@@ -723,15 +726,18 @@ export class LessonCommentService {
       filter.$and = [
         {
           $or: [
-            { createdAt: { $gt: cursor.createdAt } },
-            { createdAt: cursor.createdAt, _id: { $gt: cursor.id } },
+            { createdAt: { [cursorOperator]: cursor.createdAt } },
+            {
+              createdAt: cursor.createdAt,
+              _id: { [cursorOperator]: cursor.id },
+            },
           ],
         },
       ];
     }
     const [rows, total] = await Promise.all([
       LessonComment.find(filter)
-        .sort({ createdAt: 1, _id: 1 })
+        .sort({ createdAt: direction, _id: direction })
         .limit(input.limit + 1)
         .lean(),
       LessonComment.countDocuments(replyFilter),

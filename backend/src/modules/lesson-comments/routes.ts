@@ -76,7 +76,7 @@ export function createLessonCommentRouter(
     async (_req, res) => {
       const { params, query } = res.locals.validated as {
         params: { commentId: string };
-        query: { limit: number; cursor?: string };
+        query: { limit: number; cursor?: string; sort: "newest" | "oldest" };
       };
       success(
         res,

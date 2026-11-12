@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import { MessageCircle, MoreHorizontal, Reply, UserRound } from 'lucide-react'
 import { ApiError } from '@/lib/api/client'
@@ -214,16 +214,38 @@ function StudentCommentCard({
     queryKey: ['lesson-comment-replies', comment.id],
     queryFn: ({ pageParam }) =>
       lessonCommentsRepository.listReplies(comment.id, {
-        limit: 20,
+        limit: pageParam ? 20 : 4,
+        sort: 'newest',
         ...(pageParam ? { cursor: pageParam } : {}),
       }),
     initialPageParam: '' as string,
     getNextPageParam: (page) => page.nextCursor ?? undefined,
-    enabled: expanded,
+    enabled: comment.replyCount > 0,
     retry: false,
   })
-  const nestedReplies = replies.data?.pages.flatMap((page) => page.items) ?? []
+  const {
+    fetchNextPage: fetchNextRepliesPage,
+    hasNextPage: hasNextReplyPage,
+    isFetchingNextPage: isFetchingNextReplyPage,
+    isFetchNextPageError: fetchNextReplyPageError,
+  } = replies
+  const nestedReplies = replies.data?.pages.flatMap((page) => page.items).reverse() ?? []
+  const visibleReplies = expanded ? nestedReplies : nestedReplies.slice(-4)
   const threadLocked = comment.isThreadLocked
+  const isAdminComment = comment.author.role === 'ADMIN'
+
+  useEffect(() => {
+    if (!expanded || !hasNextReplyPage || isFetchingNextReplyPage || fetchNextReplyPageError) {
+      return
+    }
+    void fetchNextRepliesPage()
+  }, [
+    expanded,
+    fetchNextRepliesPage,
+    hasNextReplyPage,
+    isFetchingNextReplyPage,
+    fetchNextReplyPageError,
+  ])
 
   function refreshCommentContainer() {
     void queryClient.invalidateQueries({
@@ -290,7 +312,7 @@ function StudentCommentCard({
 
   return (
     <article
-      className={`grid min-w-0 gap-2 ${level === 0 ? 'border-b border-border-subtle py-5 first:pt-1 last:border-b-0' : 'py-1'}`}
+      className={`grid min-w-0 gap-2 ${level === 0 ? 'border-b border-border-subtle py-5 first:pt-1 last:border-b-0' : 'py-1'} ${isAdminComment ? 'rounded-r-xl border-l-2 border-action-primary bg-surface-blue/35 px-3 py-3' : ''}`}
       style={{ marginInlineStart: `${Math.min(level, 4) * 0.5}rem` }}
     >
       <header className="flex flex-wrap items-start justify-between gap-2">
@@ -308,10 +330,10 @@ function StudentCommentCard({
             )}
           </span>
           <div className="min-w-0">
-            <p className="truncate font-semibold">
+            <p className={`truncate font-semibold ${isAdminComment ? 'text-action-primary' : ''}`}>
               {comment.author.displayName}
               {comment.author.role === 'ADMIN' && (
-                <span className="ml-2 rounded-full bg-brand-blue/60 px-2 py-0.5 text-xs font-semibold text-ink-primary">
+                <span className="ml-2 rounded-full bg-brand-blue px-2 py-0.5 text-xs font-bold text-action-primary">
                   Quản trị viên
                 </span>
               )}
@@ -418,17 +440,6 @@ function StudentCommentCard({
         >
           Trả lời
         </Button>
-        {comment.replyCount > 0 && (
-          <Button
-            size="sm"
-            variant="ghost"
-            startIcon={<MessageCircle aria-hidden="true" className="size-4" />}
-            aria-expanded={expanded}
-            onClick={() => setExpanded((value) => !value)}
-          >
-            {expanded ? 'Ẩn phản hồi' : `Xem ${comment.replyCount} phản hồi`}
-          </Button>
-        )}
         {(comment.canEdit || comment.canDelete) && !editing && (
           <DropdownMenu
             label="Thao tác"
@@ -487,14 +498,14 @@ function StudentCommentCard({
         />
       )}
 
-      {expanded && (
+      {comment.replyCount > 0 && (
         <section
           aria-label={`Phản hồi của ${comment.author.displayName}`}
           className="relative grid gap-2 border-l border-border-subtle pl-3 sm:pl-4"
         >
           {replies.isPending ? (
             <p className="px-2 text-sm text-ink-secondary">Đang tải phản hồi…</p>
-          ) : replies.isError ? (
+          ) : replies.isError && !replies.data ? (
             <ErrorState
               title="Chưa tải được phản hồi"
               description="Kiểm tra kết nối rồi thử lại."
@@ -502,7 +513,7 @@ function StudentCommentCard({
             />
           ) : nestedReplies.length ? (
             <>
-              {nestedReplies.map((reply) => (
+              {visibleReplies.map((reply) => (
                 <StudentCommentCard
                   key={reply.id}
                   lessonId={lessonId}
@@ -510,14 +521,31 @@ function StudentCommentCard({
                   level={level + 1}
                 />
               ))}
-              {replies.hasNextPage && (
+              {!expanded && (replies.hasNextPage || nestedReplies.length > 4) && (
                 <Button
                   size="sm"
-                  variant="outline"
-                  loading={replies.isFetchingNextPage}
-                  onClick={() => void replies.fetchNextPage()}
+                  variant="ghost"
+                  aria-expanded={false}
+                  onClick={() => setExpanded(true)}
                 >
-                  Tải thêm phản hồi
+                  Hiển thị đầy đủ
+                </Button>
+              )}
+              {expanded && replies.hasNextPage && !replies.isFetchNextPageError && (
+                <p role="status" className="px-2 text-xs text-ink-muted">
+                  Đang tải đầy đủ nhánh thảo luận…
+                </p>
+              )}
+              {expanded && replies.isFetchNextPageError && (
+                <ErrorState
+                  title="Chưa tải hết nhánh thảo luận"
+                  description="Kiểm tra kết nối rồi thử tải tiếp."
+                  onRetry={() => void replies.fetchNextPage()}
+                />
+              )}
+              {expanded && !replies.hasNextPage && nestedReplies.length > 4 && (
+                <Button size="sm" variant="ghost" onClick={() => setExpanded(false)}>
+                  Thu gọn
                 </Button>
               )}
             </>

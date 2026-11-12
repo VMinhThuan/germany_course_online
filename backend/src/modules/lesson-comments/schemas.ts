@@ -17,6 +17,7 @@ export const listCommentsQuery = z.object({
 export const repliesQuery = z.object({
   limit: z.coerce.number().int().min(1).max(30).default(20),
   cursor: cursor.optional(),
+  sort: z.enum(["newest", "oldest"]).default("oldest"),
 });
 export const createCommentBody = z
   .object({

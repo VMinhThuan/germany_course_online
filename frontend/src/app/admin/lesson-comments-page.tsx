@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link } from 'react-router'
 import {
   ArrowLeft,
   BookOpenText,
@@ -24,7 +25,7 @@ import type {
   ApiPage,
 } from '@/lib/api/types'
 import { DecorativeHeading } from '@/domains/shared/decorative-heading'
-import { Button, Card, DropdownMenu, PageHeader, Pagination, Popover } from '@/shared/ui'
+import { Button, DropdownMenu, PageHeader, Pagination, Popover } from '@/shared/ui'
 import { BaseDialog, ConfirmDialog } from '@/shared/ui/dialogs'
 import { AdminField, AdminLoadError, AdminLoading, AdminSearchSelect, AdminSelect } from './shared'
 import { CommentReactionControl } from '@/domains/learning/comment-reaction-control'
@@ -509,19 +510,28 @@ export function AdminLessonCommentsPage() {
 
   return (
     <div className="grid min-w-0 gap-4 sm:gap-5">
-      <Card className="p-4 sm:p-5">
-        <PageHeader
-          eyebrow="Khu vực quản trị"
-          title="Quản lý bình luận"
-          heading={<DecorativeHeading text="Quản lý bình luận" level={1} size="md" />}
-          actions={
+      <PageHeader
+        eyebrow="Khu vực quản trị"
+        title="Quản lý bình luận"
+        heading={
+          <DecorativeHeading text="Quản lý bình luận" level={1} size="md" className="mt-1" />
+        }
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
             <Button onClick={() => setCreateOpen(true)} startIcon={<Plus aria-hidden="true" />}>
               Bình luận mới
             </Button>
-          }
-          className="items-center gap-4"
-        />
-      </Card>
+            <Link
+              to="/admin"
+              className="inline-flex min-h-10 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-action-primary hover:bg-white"
+            >
+              <ArrowLeft aria-hidden="true" className="size-4" />
+              Tổng quan
+            </Link>
+          </div>
+        }
+        className="items-center gap-4 border-b border-border-subtle pb-5"
+      />
 
       <section
         aria-label="Thống kê bình luận"
@@ -1166,42 +1176,55 @@ function AdminCommentDetail({
     ? detail.thread
     : [...detail.thread, detail.comment]
   const tree = buildAdminThreadTree(comments)
+  const [expandedCommentIds, setExpandedCommentIds] = useState<Set<string>>(() => new Set())
 
-  function renderNode(node: AdminThreadTreeNode): ReactNode {
+  function toggleReplies(commentId: string) {
+    setExpandedCommentIds((current) => {
+      const next = new Set(current)
+      if (next.has(commentId)) next.delete(commentId)
+      else next.add(commentId)
+      return next
+    })
+  }
+
+  function renderNode(node: AdminThreadTreeNode, level = 0): ReactNode {
     const item = node.comment
     const isDeleted = Boolean(item.deletedAt)
     const isEditing = editingId === item.id
     const isReplying = replyToId === item.id
+    const isExpanded = expandedCommentIds.has(item.id)
+    const visibleChildren = isExpanded ? node.children : node.children.slice(-4)
+    const isAdmin = item.author?.role === 'ADMIN'
 
     return (
-      <li key={item.id} className="grid min-w-0 gap-3">
+      <li key={item.id} className="grid min-w-0 gap-1">
         <article
           aria-current={item.id === selectedCommentId ? 'true' : undefined}
-          className={`grid min-w-0 gap-3 rounded-2xl border p-3.5 transition-colors sm:p-4 ${item.id === selectedCommentId ? 'border-action-primary bg-brand-blue/20 shadow-sm' : 'border-border-subtle bg-white'}`}
+          className={`relative grid min-w-0 gap-2 border-b border-border-subtle py-3 ${item.id === selectedCommentId ? 'rounded-xl bg-brand-blue/20 px-3' : ''} ${isAdmin ? 'rounded-r-xl border-l-2 border-l-action-primary bg-surface-blue/35 pl-3 pr-2' : ''} ${level === 0 ? 'first:pt-1' : ''}`}
         >
-          <header className="flex min-w-0 items-start justify-between gap-3">
+          <header className="flex min-w-0 items-start justify-between gap-2">
             <button
               type="button"
               onClick={() => onSelectThreadComment(item)}
               aria-current={item.id === selectedCommentId ? 'true' : undefined}
-              className="flex min-w-0 items-center gap-3 rounded-lg text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-focus"
+              className="flex min-w-0 items-center gap-2.5 rounded-lg text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-focus"
             >
               <span
                 aria-hidden="true"
-                className={`grid size-10 shrink-0 place-items-center rounded-full font-semibold ${item.isAnonymous ? 'bg-surface-muted text-ink-secondary' : 'bg-surface-blue text-action-primary'}`}
+                className={`grid ${level === 0 ? 'size-8' : 'size-7'} shrink-0 place-items-center rounded-full text-xs font-bold ${item.isAnonymous ? 'bg-surface-muted text-ink-secondary' : isAdmin ? 'bg-brand-blue text-action-primary' : 'bg-brand-pink/50 text-ink-primary'}`}
               >
-                {(item.author?.fullName ?? '?').slice(0, 1).toUpperCase()}
+                {isAdmin ? 'Q' : (item.author?.fullName ?? '?').slice(0, 1).toUpperCase()}
               </span>
               <span className="min-w-0">
-                <span className="flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold">
+                <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm font-semibold">
                   <span className="truncate">{item.author?.fullName ?? 'Tài khoản đã xóa'}</span>
-                  {item.author?.role === 'ADMIN' && (
-                    <span className="rounded-full bg-brand-blue/60 px-2 py-0.5 text-xs font-semibold text-ink-primary">
+                  {isAdmin && (
+                    <span className="rounded-full bg-brand-blue/70 px-2 py-0.5 text-[11px] font-bold text-ink-primary">
                       Quản trị viên
                     </span>
                   )}
                 </span>
-                <span className="mt-0.5 block text-xs text-ink-muted">
+                <span className="mt-0.5 block text-[11px] leading-4 text-ink-muted">
                   {dateTime(item.createdAt)}
                   {item.editedAt && ` · Đã chỉnh sửa ${dateTime(item.editedAt)}`}
                 </span>
@@ -1216,7 +1239,7 @@ function AdminCommentDetail({
                   variant="ghost"
                   size="icon"
                   aria-label={`Thao tác với bình luận của ${item.author?.fullName ?? 'tài khoản đã xóa'}`}
-                  className="size-9 min-h-9 shrink-0 rounded-full"
+                  className="size-8 min-h-8 shrink-0 rounded-full"
                 >
                   <MoreHorizontal aria-hidden="true" className="size-4" />
                 </Button>
@@ -1243,20 +1266,20 @@ function AdminCommentDetail({
           </header>
 
           {item.isAnonymous && (
-            <p className="w-fit rounded-full bg-surface-muted px-2.5 py-1 text-xs font-medium text-ink-secondary">
+            <p className="w-fit rounded-full bg-surface-muted px-2 py-0.5 text-[11px] font-medium text-ink-secondary">
               Đăng ẩn danh
             </p>
           )}
 
           {isEditing ? (
-            <div className="grid gap-3 rounded-xl border border-border-subtle bg-surface-muted/50 p-3">
+            <div className="grid gap-2 rounded-xl border border-border-subtle bg-surface-muted/50 p-3">
               <label className="grid gap-1.5 text-sm font-semibold">
                 Nội dung bình luận
                 <textarea
                   aria-label="Chỉnh sửa bình luận"
                   value={draft}
                   onChange={(event) => onDraftChange(event.target.value)}
-                  rows={4}
+                  rows={3}
                   maxLength={2_000}
                   className="w-full resize-y rounded-xl border border-border-subtle bg-white px-3 py-2.5 font-normal leading-6 outline-none focus-visible:ring-2 focus-visible:ring-action-primary"
                 />
@@ -1295,7 +1318,7 @@ function AdminCommentDetail({
             </div>
           ) : isDeleted ? (
             <div className="grid gap-1">
-              <p className="rounded-lg bg-surface-muted px-3 py-2 text-sm leading-6 text-ink-secondary">
+              <p className="rounded-lg bg-surface-muted px-3 py-1.5 text-sm leading-5 text-ink-secondary">
                 Bình luận này đã được gỡ. Các phản hồi còn lại được giữ để tham khảo.
               </p>
               {item.deletionReason && (
@@ -1303,7 +1326,9 @@ function AdminCommentDetail({
               )}
             </div>
           ) : (
-            <p className="whitespace-pre-wrap break-words text-sm leading-6 text-ink-primary">
+            <p
+              className={`whitespace-pre-wrap break-words text-sm leading-5 ${isAdmin ? 'font-medium text-ink-primary' : 'text-ink-primary'}`}
+            >
               {item.content}
             </p>
           )}
@@ -1314,7 +1339,7 @@ function AdminCommentDetail({
             </span>
           )}
 
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-border-subtle pt-2">
+          <div className="flex flex-wrap items-center gap-x-1 gap-y-0.5">
             <CommentReactionControl
               reactions={item.reactions}
               activeReaction={item.myReaction}
@@ -1331,9 +1356,7 @@ function AdminCommentDetail({
               Trả lời
             </Button>
             {item.replyCount > 0 && (
-              <span className="text-xs text-ink-secondary">
-                {item.replyCount} phản hồi · {item.reactionCount} reaction
-              </span>
+              <span className="text-[11px] text-ink-muted">{item.replyCount} phản hồi</span>
             )}
           </div>
 
@@ -1347,12 +1370,24 @@ function AdminCommentDetail({
           )}
         </article>
 
-        {node.children.length > 0 && (
+        {visibleChildren.length > 0 && (
           <ol
             aria-label={`Phản hồi của ${item.author?.fullName ?? 'tài khoản đã xóa'}`}
-            className="ml-3 grid min-w-0 gap-3 border-l-2 border-border-subtle py-1 pl-3 sm:ml-5 sm:pl-5"
+            className="ml-3 grid min-w-0 gap-1 border-l border-border-subtle pl-3 sm:ml-5 sm:pl-4"
           >
-            {node.children.map((child) => renderNode(child))}
+            {visibleChildren.map((child) => renderNode(child, level + 1))}
+            {node.children.length > 4 && (
+              <li className="list-none py-1">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-expanded={isExpanded}
+                  onClick={() => toggleReplies(item.id)}
+                >
+                  {isExpanded ? 'Thu gọn' : 'Hiển thị đầy đủ'}
+                </Button>
+              </li>
+            )}
           </ol>
         )}
       </li>
@@ -1360,15 +1395,14 @@ function AdminCommentDetail({
   }
 
   return (
-    <section aria-label="Nhánh thảo luận" className="grid min-w-0 gap-4 p-4 sm:p-5">
-      <div className="flex items-center justify-between gap-3 border-b border-border-subtle pb-3">
+    <section aria-label="Nhánh thảo luận" className="grid min-w-0 gap-2 p-3 sm:p-4">
+      <div className="flex items-center justify-between gap-3 border-b border-border-subtle pb-2">
         <div>
           <h2 className="text-sm font-bold">Nhánh thảo luận</h2>
-          <p className="text-xs text-ink-secondary">
+          <p className="text-[11px] text-ink-secondary">
             {detail.threadTotal.toLocaleString('vi-VN')} bình luận trong đoạn này
           </p>
         </div>
-        <span aria-hidden="true" className="h-8 w-1 rounded-full bg-action-primary" />
       </div>
       {replyError && (
         <p
@@ -1385,7 +1419,7 @@ function AdminCommentDetail({
         </p>
       )}
       {tree.length > 0 ? (
-        <ol aria-label="Cây bình luận" className="grid min-w-0 gap-4">
+        <ol aria-label="Cây bình luận" className="grid min-w-0 gap-1">
           {tree.map((node) => renderNode(node))}
         </ol>
       ) : (

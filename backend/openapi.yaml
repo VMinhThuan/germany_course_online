@@ -9739,9 +9739,10 @@ paths:
         - { name: commentId, in: path, required: true, schema: { $ref: "#/components/schemas/ObjectId" } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 30, default: 20 } }
         - { name: cursor, in: query, schema: { type: string, maxLength: 512 } }
+        - { name: sort, in: query, schema: { type: string, enum: [newest, oldest], default: oldest } }
       responses:
         "200":
-          description: Chronological direct replies with anonymous identity redaction.
+          description: Cursor-paginated direct replies. Newest-first pages are available so clients can preview recent replies.
           content: { application/json: { schema: { allOf: [{ $ref: "#/components/schemas/SuccessEnvelope" }, { properties: { data: { $ref: "#/components/schemas/StudentLessonCommentPage" } } }] } } }
         "401": { $ref: "#/components/responses/UnauthorizedError" }
         "404": { $ref: "#/components/responses/NotFoundError" }
@@ -9749,7 +9750,7 @@ paths:
         access: STUDENT
         backendModule: lesson-comments
         relatedCollections: [lesson_comments, lesson_comment_reactions, lessons, enrollments]
-        query: limit,cursor
+        query: limit,cursor,sort
         requestBody: none
         responseData: StudentLessonCommentPage
         idempotency: Read only

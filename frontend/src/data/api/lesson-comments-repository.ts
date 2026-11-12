@@ -30,7 +30,10 @@ export const lessonCommentsRepository = {
       `/learn/lessons/${pathId(lessonId)}/comments${queryString(input)}`,
     )
   },
-  listReplies(commentId: string, input: { limit?: number; cursor?: string } = {}) {
+  listReplies(
+    commentId: string,
+    input: { limit?: number; cursor?: string; sort?: 'newest' | 'oldest' } = {},
+  ) {
     return apiRequest<ApiLessonCommentCursorPage<ApiStudentLessonComment>>(
       `/learn/comments/${pathId(commentId)}/replies${queryString(input)}`,
     )
