@@ -142,13 +142,15 @@ describe('Admin lesson comment management page', () => {
     })
   })
 
-  it('shows author identity to Admin and clearly marks anonymous posts', async () => {
+  it('shows anonymous comments in the thread without exposing contact details', async () => {
     render(<AdminLessonCommentsPage />, { wrapper })
 
-    expect(await screen.findByText(/an@example\.test/)).toBeInTheDocument()
-    expect(await screen.findByText('Đăng ẩn danh')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Nhánh thảo luận' })).toBeInTheDocument()
+    expect(screen.getAllByText('Nguyễn An').length).toBeGreaterThan(0)
+    expect(screen.queryByText(/an@example\.test/)).not.toBeInTheDocument()
+    expect((await screen.findAllByText('Đăng ẩn danh')).length).toBeGreaterThan(0)
     await waitFor(() => expect(mocks.getAdminComment).toHaveBeenCalledWith(comment.id))
-    expect(await screen.findByText('Được đăng ẩn danh với học viên')).toBeInTheDocument()
+    expect(screen.queryByText('Được đăng ẩn danh với học viên')).not.toBeInTheDocument()
     expect(screen.getAllByText('Một câu hỏi ẩn danh.').length).toBeGreaterThan(0)
     expect(screen.queryByLabelText('Lesson ID')).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Quản lý bình luận' })).toBeInTheDocument()
@@ -177,7 +179,12 @@ describe('Admin lesson comment management page', () => {
         parentId: null,
       }),
     )
-    expect(await screen.findByText('Được đăng ẩn danh với học viên')).toBeInTheDocument()
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('dialog', { name: 'Đăng bình luận quản trị viên' }),
+      ).not.toBeInTheDocument(),
+    )
+    expect(await screen.findByRole('heading', { name: 'Nhánh thảo luận' })).toBeInTheDocument()
   })
 
   it('keeps advanced filters collapsed until requested and resolves authors by name or email', async () => {
@@ -200,14 +207,16 @@ describe('Admin lesson comment management page', () => {
     ).toBeInTheDocument()
   })
 
-  it('shows thread details beside the inbox and returns from the detail view on mobile', async () => {
+  it('shows the discussion tree beside the inbox and returns from it on mobile', async () => {
     const user = userEvent.setup()
     render(<AdminLessonCommentsPage />, { wrapper })
 
     const inboxItem = await screen.findByRole('button', { name: /Mở bình luận của Nguyễn An/ })
     await user.click(inboxItem)
     expect(await screen.findByRole('button', { name: 'Trở lại hộp thư' })).toBeInTheDocument()
-    expect(await screen.findByText('Kapitel 1')).toBeInTheDocument()
+    expect(await screen.findByText('Chi tiết đoạn bình luận')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Nhánh thảo luận' })).toBeInTheDocument()
+    expect(screen.getAllByText('Một câu hỏi ẩn danh.').length).toBeGreaterThan(0)
     await user.click(screen.getByRole('button', { name: 'Trở lại hộp thư' }))
     expect(screen.getByRole('heading', { name: 'Hộp thư' })).toBeInTheDocument()
   })
