@@ -310,17 +310,18 @@ export function AdminLessonCommentsPage() {
   const [sort, setSort] = useState<'newest' | 'oldest'>('newest')
   const [page, setPage] = useState(1)
   const [selectedId, setSelectedId] = useState('')
+  const [focusedThreadCommentId, setFocusedThreadCommentId] = useState('')
   const [selectionCleared, setSelectionCleared] = useState(false)
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false)
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
-  const [createReply, setCreateReply] = useState(false)
-  const [editing, setEditing] = useState(false)
+  const [replyToId, setReplyToId] = useState('')
+  const [editingId, setEditingId] = useState('')
   const [draft, setDraft] = useState('')
   const [editReason, setEditReason] = useState('')
   const [editError, setEditError] = useState('')
-  const [deleteOpen, setDeleteOpen] = useState(false)
-  const [historyOpen, setHistoryOpen] = useState(false)
+  const [deleteCommentId, setDeleteCommentId] = useState('')
+  const [historyCommentId, setHistoryCommentId] = useState('')
   const [actionError, setActionError] = useState('')
 
   useEffect(() => {
@@ -328,6 +329,7 @@ export function AdminLessonCommentsPage() {
       setSearch(searchDraft.trim())
       setPage(1)
       setSelectedId('')
+      setFocusedThreadCommentId('')
       setSelectionCleared(false)
       setMobileDetailOpen(false)
     }, 300)
@@ -404,10 +406,17 @@ export function AdminLessonCommentsPage() {
     enabled: Boolean(activeSelectedId),
     retry: false,
   })
+  const history = useQuery({
+    queryKey: ['admin', 'lesson-comment-history', historyCommentId],
+    queryFn: () => lessonCommentsRepository.adminHistory(historyCommentId),
+    enabled: Boolean(historyCommentId),
+    retry: false,
+  })
 
   function resetSelectionForFilter() {
     setPage(1)
     setSelectedId('')
+    setFocusedThreadCommentId('')
     setSelectionCleared(false)
     setMobileDetailOpen(false)
   }
@@ -415,35 +424,35 @@ export function AdminLessonCommentsPage() {
   function refresh() {
     void queryClient.invalidateQueries({ queryKey: ['admin', 'lesson-comments'] })
     void queryClient.invalidateQueries({ queryKey: ['admin', 'lesson-comments-summary'] })
-    if (activeSelectedId) {
-      void queryClient.invalidateQueries({
-        queryKey: ['admin', 'lesson-comment', activeSelectedId],
-      })
-    }
+    void queryClient.invalidateQueries({ queryKey: ['admin', 'lesson-comment'] })
+    void queryClient.invalidateQueries({ queryKey: ['admin', 'lesson-comment-history'] })
   }
 
   const saveEdit = useMutation({
-    mutationFn: () =>
-      lessonCommentsRepository.editAdminComment(activeSelectedId, {
+    mutationFn: (comment: ApiAdminLessonComment) =>
+      lessonCommentsRepository.editAdminComment(comment.id, {
         content: draft.trim(),
-        expectedRevision: detail.data!.comment.revision,
+        expectedRevision: comment.revision,
         ...(editReason.trim() ? { reason: editReason.trim() } : {}),
       }),
     onSuccess: () => {
-      setEditing(false)
+      setEditingId('')
       setEditReason('')
       setEditError('')
+      setActionError('')
       refresh()
     },
     onError: (cause) =>
       setEditError(cause instanceof Error ? cause.message : 'Chưa lưu được nội dung.'),
   })
   const addReply = useMutation({
-    mutationFn: (input: { content: string; parentId: string }) =>
-      lessonCommentsRepository.createAdminComment(detail.data!.comment.lessonId, input),
+    mutationFn: (input: { content: string; parentId: string; lessonId: string }) =>
+      lessonCommentsRepository.createAdminComment(input.lessonId, input),
     onSuccess: (comment) => {
-      setCreateReply(false)
-      setSelectedId(comment.id)
+      setReplyToId('')
+      setActionError('')
+      setSelectedId(comment.rootId)
+      setFocusedThreadCommentId(comment.id)
       setSelectionCleared(false)
       setMobileDetailOpen(true)
       refresh()
@@ -452,23 +461,28 @@ export function AdminLessonCommentsPage() {
       setActionError(cause instanceof Error ? cause.message : 'Chưa gửi được phản hồi.'),
   })
   const setReaction = useMutation({
-    mutationFn: async (reactionType: ApiLessonCommentReactionType) =>
-      detail.data?.comment.myReaction === reactionType
-        ? lessonCommentsRepository.removeAdminReaction(activeSelectedId)
-        : lessonCommentsRepository.setAdminReaction(activeSelectedId, reactionType),
-    onSuccess: refresh,
+    mutationFn: async (input: {
+      commentId: string
+      reactionType: ApiLessonCommentReactionType
+      currentReaction: ApiLessonCommentReactionType | null
+    }) =>
+      input.currentReaction === input.reactionType
+        ? lessonCommentsRepository.removeAdminReaction(input.commentId)
+        : lessonCommentsRepository.setAdminReaction(input.commentId, input.reactionType),
+    onSuccess: () => {
+      setActionError('')
+      refresh()
+    },
     onError: (cause) =>
       setActionError(cause instanceof Error ? cause.message : 'Chưa lưu được reaction.'),
   })
   const removeComment = useMutation({
-    mutationFn: () => lessonCommentsRepository.deleteAdminComment(activeSelectedId),
-    onSuccess: () => {
-      setDeleteOpen(false)
-      setSelectedId('')
-      setSelectionCleared(true)
-      setMobileDetailOpen(false)
-      setCreateReply(false)
-      setEditing(false)
+    mutationFn: (commentId: string) => lessonCommentsRepository.deleteAdminComment(commentId),
+    onSuccess: (_result, commentId) => {
+      setActionError('')
+      setDeleteCommentId('')
+      setEditingId((value) => (value === commentId ? '' : value))
+      setReplyToId((value) => (value === commentId ? '' : value))
       refresh()
     },
     onError: (cause) =>
@@ -483,7 +497,7 @@ export function AdminLessonCommentsPage() {
     confirmLabel: 'Xóa bình luận',
     destructive: true,
     onConfirm: async () => {
-      await removeComment.mutateAsync()
+      if (deleteCommentId) await removeComment.mutateAsync(deleteCommentId)
     },
   }
 
@@ -857,6 +871,7 @@ export function AdminLessonCommentsPage() {
                               aria-label={`Mở bình luận của ${item.author?.fullName ?? 'tài khoản đã xóa'}: ${item.content.slice(0, 100)}`}
                               onClick={() => {
                                 setSelectedId(item.id)
+                                setFocusedThreadCommentId(item.id)
                                 setSelectionCleared(false)
                                 setMobileDetailOpen(true)
                               }}
@@ -915,6 +930,7 @@ export function AdminLessonCommentsPage() {
                   onPageChange={(nextPage) => {
                     setPage(nextPage)
                     setSelectedId('')
+                    setFocusedThreadCommentId('')
                     setSelectionCleared(false)
                     setMobileDetailOpen(false)
                   }}
@@ -931,7 +947,7 @@ export function AdminLessonCommentsPage() {
         </section>
 
         <section
-          aria-label="Chi tiết bình luận đã chọn"
+          aria-label="Chi tiết đoạn bình luận"
           className={`min-w-0 ${mobileDetailOpen ? 'block' : 'hidden'} xl:block`}
         >
           <div className="min-w-0 overflow-hidden rounded-2xl border border-border-subtle bg-white xl:sticky xl:top-24 xl:max-h-[calc(100dvh-8rem)] xl:overflow-y-auto">
@@ -946,7 +962,7 @@ export function AdminLessonCommentsPage() {
                 Trở lại hộp thư
               </Button>
               <p className="text-xs font-bold uppercase tracking-[0.12em] text-action-primary">
-                Chi tiết bình luận
+                Chi tiết đoạn bình luận
               </p>
               {activeSelectedId && detail.data && (
                 <p className="mt-1 text-sm text-ink-secondary">
@@ -961,7 +977,7 @@ export function AdminLessonCommentsPage() {
                 <MessageCircle aria-hidden="true" className="size-8 text-ink-muted" />
                 <p className="font-semibold">Chọn một bình luận để xem chi tiết</p>
                 <p className="max-w-sm text-sm text-ink-secondary">
-                  Danh tính tác giả, nhánh trao đổi và các thao tác kiểm duyệt sẽ hiện tại đây.
+                  Cây thảo luận và thao tác kiểm duyệt theo từng bình luận sẽ hiện tại đây.
                 </p>
               </div>
             ) : detail.isPending ? (
@@ -975,44 +991,64 @@ export function AdminLessonCommentsPage() {
             ) : (
               <AdminCommentDetail
                 detail={detail.data}
-                editing={editing}
+                selectedCommentId={focusedThreadCommentId || activeSelectedId}
+                editingId={editingId}
                 draft={draft}
                 editReason={editReason}
                 editError={editError}
                 savingEdit={saveEdit.isPending}
-                creatingReply={createReply}
+                replyToId={replyToId}
                 savingReply={addReply.isPending}
                 replyError={actionError}
                 reactionPending={setReaction.isPending}
                 onDraftChange={setDraft}
                 onReasonChange={setEditReason}
-                onSaveEdit={() => saveEdit.mutate()}
-                onCancelEdit={() => {
-                  setEditing(false)
-                  setDraft(detail.data.comment.content)
+                onSaveEdit={(comment) => saveEdit.mutate(comment)}
+                onCancelEdit={(comment) => {
+                  setEditingId('')
+                  setDraft(comment.content)
                   setEditReason('')
                   setEditError('')
                 }}
-                onStartEdit={() => {
-                  setDraft(detail.data.comment.content)
-                  setEditing(true)
-                  setCreateReply(false)
-                }}
-                onReply={() => {
+                onStartEdit={(comment) => {
+                  setDraft(comment.content)
+                  setEditReason('')
+                  setEditError('')
                   setActionError('')
-                  setCreateReply((value) => !value)
-                  setEditing(false)
+                  setEditingId(comment.id)
+                  setReplyToId('')
                 }}
-                onSubmitReply={(content) =>
-                  addReply.mutateAsync({ content, parentId: detail.data.comment.id })
+                onReply={(comment) => {
+                  setActionError('')
+                  setReplyToId((value) => (value === comment.id ? '' : comment.id))
+                  setEditingId('')
+                }}
+                onSubmitReply={(comment, content) =>
+                  addReply.mutateAsync({
+                    content,
+                    parentId: comment.id,
+                    lessonId: comment.lessonId,
+                  })
                 }
-                onCancelReply={() => setCreateReply(false)}
-                onReaction={(reaction) => setReaction.mutate(reaction)}
-                onDelete={() => setDeleteOpen(true)}
-                onHistory={() => setHistoryOpen(true)}
+                onCancelReply={(comment) =>
+                  setReplyToId((value) => (value === comment.id ? '' : value))
+                }
+                onReaction={(comment, reactionType) => {
+                  setActionError('')
+                  setReaction.mutate({
+                    commentId: comment.id,
+                    reactionType,
+                    currentReaction: comment.myReaction,
+                  })
+                }}
+                onDelete={(comment) => {
+                  setActionError('')
+                  setDeleteCommentId(comment.id)
+                }}
+                onHistory={(comment) => setHistoryCommentId(comment.id)}
                 onSelectThreadComment={(comment) => {
-                  setSelectedId(comment.id)
-                  setSelectionCleared(false)
+                  setFocusedThreadCommentId(comment.id)
+                  setMobileDetailOpen(true)
                 }}
               />
             )}
@@ -1025,6 +1061,7 @@ export function AdminLessonCommentsPage() {
         onOpenChange={setCreateOpen}
         onCreated={(comment) => {
           setSelectedId(comment.id)
+          setFocusedThreadCommentId(comment.id)
           setSelectionCleared(false)
           setMobileDetailOpen(true)
           refresh()
@@ -1032,23 +1069,53 @@ export function AdminLessonCommentsPage() {
       />
 
       <AdminHistoryDialog
-        open={historyOpen}
-        onOpenChange={setHistoryOpen}
-        items={detail.data?.history ?? []}
+        open={Boolean(historyCommentId)}
+        onOpenChange={(open) => {
+          if (!open) setHistoryCommentId('')
+        }}
+        items={history.data ?? []}
+        loading={history.isPending}
+        error={history.isError ? history.error.message : ''}
       />
-      <ConfirmDialog open={deleteOpen} request={deleteRequest} onOpenChange={setDeleteOpen} />
+      <ConfirmDialog
+        open={Boolean(deleteCommentId)}
+        request={deleteRequest}
+        onOpenChange={(open) => {
+          if (!open) setDeleteCommentId('')
+        }}
+      />
     </div>
   )
 }
 
+type AdminThreadTreeNode = {
+  comment: ApiAdminLessonComment
+  children: AdminThreadTreeNode[]
+}
+
+function buildAdminThreadTree(comments: readonly ApiAdminLessonComment[]) {
+  const nodes = comments.map((comment) => ({ comment, children: [] as AdminThreadTreeNode[] }))
+  const byId = new Map(nodes.map((node) => [node.comment.id, node]))
+  const roots: AdminThreadTreeNode[] = []
+
+  for (const node of nodes) {
+    const parent = node.comment.parentId ? byId.get(node.comment.parentId) : undefined
+    if (parent) parent.children.push(node)
+    else roots.push(node)
+  }
+
+  return roots
+}
+
 function AdminCommentDetail({
   detail,
-  editing,
+  selectedCommentId,
+  editingId,
   draft,
   editReason,
   editError,
   savingEdit,
-  creatingReply,
+  replyToId,
   savingReply,
   replyError,
   reactionPending,
@@ -1072,278 +1139,261 @@ function AdminCommentDetail({
     threadHasMore: boolean
     history: ApiLessonCommentHistoryItem[]
   }
-  editing: boolean
+  selectedCommentId: string
+  editingId: string
   draft: string
   editReason: string
   editError: string
   savingEdit: boolean
-  creatingReply: boolean
+  replyToId: string
   savingReply: boolean
   replyError: string
   reactionPending: boolean
   onDraftChange: (value: string) => void
   onReasonChange: (value: string) => void
-  onSaveEdit: () => void
-  onCancelEdit: () => void
-  onStartEdit: () => void
-  onReply: () => void
-  onSubmitReply: (content: string) => Promise<unknown>
-  onCancelReply: () => void
-  onReaction: (reaction: ApiLessonCommentReactionType) => void
-  onDelete: () => void
-  onHistory: () => void
+  onSaveEdit: (comment: ApiAdminLessonComment) => void
+  onCancelEdit: (comment: ApiAdminLessonComment) => void
+  onStartEdit: (comment: ApiAdminLessonComment) => void
+  onReply: (comment: ApiAdminLessonComment) => void
+  onSubmitReply: (comment: ApiAdminLessonComment, content: string) => Promise<unknown>
+  onCancelReply: (comment: ApiAdminLessonComment) => void
+  onReaction: (comment: ApiAdminLessonComment, reaction: ApiLessonCommentReactionType) => void
+  onDelete: (comment: ApiAdminLessonComment) => void
+  onHistory: (comment: ApiAdminLessonComment) => void
   onSelectThreadComment: (comment: ApiAdminLessonComment) => void
 }) {
-  const comment = detail.comment
-  const isDeleted = Boolean(comment.deletedAt)
-  const visibleThread = detail.thread.slice(0, 100)
-  const threadItems =
-    visibleThread.some((item) => item.id === comment.id) ||
-    visibleThread.length >= detail.thread.length
-      ? visibleThread
-      : [...visibleThread, comment]
+  const comments = detail.thread.some((item) => item.id === detail.comment.id)
+    ? detail.thread
+    : [...detail.thread, detail.comment]
+  const tree = buildAdminThreadTree(comments)
 
-  return (
-    <div className="grid min-w-0 gap-5 p-4 sm:p-5">
-      <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(15rem,0.48fr)]">
-        <div className="grid min-w-0 content-start gap-4">
-          <section aria-labelledby="selected-comment-content" className="grid gap-3">
-            <div className="flex min-w-0 items-start justify-between gap-3">
-              <div className="flex min-w-0 items-start gap-3">
-                <span
-                  aria-hidden="true"
-                  className="grid size-10 shrink-0 place-items-center rounded-full bg-surface-blue font-semibold text-action-primary"
-                >
-                  {(comment.author?.fullName ?? '?').slice(0, 1).toUpperCase()}
-                </span>
-                <div className="min-w-0">
-                  <h2 id="selected-comment-content" className="truncate font-semibold">
-                    {comment.author?.fullName ?? 'Tài khoản đã xóa'}
-                  </h2>
-                  <p className="break-all text-xs text-ink-secondary">
-                    {comment.author?.email ?? 'Không còn email'} ·{' '}
-                    {comment.author?.role ?? 'Không rõ vai trò'}
-                  </p>
-                </div>
-              </div>
-              <DropdownMenu
-                label="Thao tác"
-                trigger={
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Thao tác kiểm duyệt"
-                    className="size-9 min-h-9 rounded-full"
-                  >
-                    <MoreHorizontal aria-hidden="true" />
-                  </Button>
-                }
-                items={[
-                  {
-                    label: 'Chỉnh sửa',
-                    onSelect: onStartEdit,
-                    disabled: isDeleted || editing,
-                  },
-                  {
-                    label: `Lịch sử chỉnh sửa (${detail.history.length})`,
-                    onSelect: onHistory,
-                    disabled: detail.history.length === 0,
-                  },
-                  {
-                    label: 'Xóa bình luận',
-                    onSelect: onDelete,
-                    disabled: isDeleted,
-                    destructive: true,
-                  },
-                ]}
-              />
-            </div>
-            {comment.isAnonymous && (
-              <p className="w-fit rounded-full bg-surface-muted px-2.5 py-1 text-xs font-medium text-ink-secondary">
-                Được đăng ẩn danh với học viên
-              </p>
-            )}
-            <p className="text-xs text-ink-muted">
-              <span className="font-medium text-ink-secondary">
-                {comment.author?.role === 'ADMIN' ? 'Quản trị viên' : 'Học viên'}
-              </span>
-              {' · '}Tạo {dateTime(comment.createdAt)}
-              {comment.editedAt && ` · Đã sửa ${dateTime(comment.editedAt)}`}
-              {comment.deletedAt && ` · Đã xóa ${dateTime(comment.deletedAt)}`}
-            </p>
-            <nav
-              aria-label="Vị trí bài học"
-              className="flex flex-wrap items-center gap-x-1.5 text-xs text-ink-secondary"
+  function renderNode(node: AdminThreadTreeNode): ReactNode {
+    const item = node.comment
+    const isDeleted = Boolean(item.deletedAt)
+    const isEditing = editingId === item.id
+    const isReplying = replyToId === item.id
+
+    return (
+      <li key={item.id} className="grid min-w-0 gap-3">
+        <article
+          aria-current={item.id === selectedCommentId ? 'true' : undefined}
+          className={`grid min-w-0 gap-3 rounded-2xl border p-3.5 transition-colors sm:p-4 ${item.id === selectedCommentId ? 'border-action-primary bg-brand-blue/20 shadow-sm' : 'border-border-subtle bg-white'}`}
+        >
+          <header className="flex min-w-0 items-start justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => onSelectThreadComment(item)}
+              aria-current={item.id === selectedCommentId ? 'true' : undefined}
+              className="flex min-w-0 items-center gap-3 rounded-lg text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-focus"
             >
-              <span>{comment.context.courseTitle ?? 'Khóa học không còn khả dụng'}</span>
-              <span aria-hidden="true">/</span>
-              <span>{comment.context.sectionTitle ?? 'Chương'}</span>
-              <span aria-hidden="true">/</span>
-              <span className="font-semibold text-ink-primary">
-                {comment.context.lessonTitle ?? 'Bài học không còn khả dụng'}
+              <span
+                aria-hidden="true"
+                className={`grid size-10 shrink-0 place-items-center rounded-full font-semibold ${item.isAnonymous ? 'bg-surface-muted text-ink-secondary' : 'bg-surface-blue text-action-primary'}`}
+              >
+                {(item.author?.fullName ?? '?').slice(0, 1).toUpperCase()}
               </span>
-            </nav>
+              <span className="min-w-0">
+                <span className="flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold">
+                  <span className="truncate">{item.author?.fullName ?? 'Tài khoản đã xóa'}</span>
+                  {item.author?.role === 'ADMIN' && (
+                    <span className="rounded-full bg-brand-blue/60 px-2 py-0.5 text-xs font-semibold text-ink-primary">
+                      Quản trị viên
+                    </span>
+                  )}
+                </span>
+                <span className="mt-0.5 block text-xs text-ink-muted">
+                  {dateTime(item.createdAt)}
+                  {item.editedAt && ` · Đã chỉnh sửa ${dateTime(item.editedAt)}`}
+                </span>
+              </span>
+            </button>
+            <DropdownMenu
+              label="Thao tác"
+              modal={false}
+              trigger={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Thao tác với bình luận của ${item.author?.fullName ?? 'tài khoản đã xóa'}`}
+                  className="size-9 min-h-9 shrink-0 rounded-full"
+                >
+                  <MoreHorizontal aria-hidden="true" className="size-4" />
+                </Button>
+              }
+              items={[
+                {
+                  label: 'Chỉnh sửa',
+                  onSelect: () => onStartEdit(item),
+                  disabled: isDeleted || isEditing,
+                },
+                {
+                  label: 'Lịch sử chỉnh sửa',
+                  onSelect: () => onHistory(item),
+                  disabled: !item.editedAt && !item.moderationEditedAt,
+                },
+                {
+                  label: 'Xóa bình luận',
+                  onSelect: () => onDelete(item),
+                  disabled: isDeleted,
+                  destructive: true,
+                },
+              ]}
+            />
+          </header>
 
-            {editing ? (
-              <div className="grid gap-3 border-y border-border-subtle py-4">
-                <label className="grid gap-1.5 text-sm font-semibold">
-                  Nội dung bình luận
-                  <textarea
-                    aria-label="Chỉnh sửa bình luận"
-                    value={draft}
-                    onChange={(event) => onDraftChange(event.target.value)}
-                    rows={5}
-                    maxLength={2_000}
-                    className="w-full resize-y rounded-xl border border-border-subtle bg-white px-3 py-2.5 font-normal leading-6 outline-none focus-visible:ring-2 focus-visible:ring-action-primary"
-                  />
-                </label>
-                <div className="flex items-center justify-between gap-2 text-xs text-ink-muted">
-                  <span className="tabular-nums">{draft.length}/2.000</span>
-                  <span>expectedRevision: {comment.revision}</span>
-                </div>
-                <label className="grid gap-1.5 text-sm font-semibold">
-                  Lý do kiểm duyệt <span className="font-normal text-ink-muted">(tùy chọn)</span>
-                  <input
-                    value={editReason}
-                    onChange={(event) => onReasonChange(event.target.value)}
-                    maxLength={300}
-                    className="min-h-10 rounded-xl border border-border-subtle px-3 font-normal outline-none focus-visible:ring-2 focus-visible:ring-action-primary"
-                  />
-                </label>
-                {editError && (
-                  <p role="alert" className="text-sm text-danger-foreground">
-                    {editError}
-                  </p>
-                )}
-                <div className="flex justify-end gap-2">
-                  <Button variant="outline" size="sm" onClick={onCancelEdit}>
-                    Hủy
-                  </Button>
-                  <Button
-                    size="sm"
-                    loading={savingEdit}
-                    disabled={!draft.trim()}
-                    onClick={onSaveEdit}
-                  >
-                    Lưu nội dung
-                  </Button>
-                </div>
+          {item.isAnonymous && (
+            <p className="w-fit rounded-full bg-surface-muted px-2.5 py-1 text-xs font-medium text-ink-secondary">
+              Đăng ẩn danh
+            </p>
+          )}
+
+          {isEditing ? (
+            <div className="grid gap-3 rounded-xl border border-border-subtle bg-surface-muted/50 p-3">
+              <label className="grid gap-1.5 text-sm font-semibold">
+                Nội dung bình luận
+                <textarea
+                  aria-label="Chỉnh sửa bình luận"
+                  value={draft}
+                  onChange={(event) => onDraftChange(event.target.value)}
+                  rows={4}
+                  maxLength={2_000}
+                  className="w-full resize-y rounded-xl border border-border-subtle bg-white px-3 py-2.5 font-normal leading-6 outline-none focus-visible:ring-2 focus-visible:ring-action-primary"
+                />
+              </label>
+              <div className="flex items-center justify-between gap-2 text-xs text-ink-muted">
+                <span className="tabular-nums">{draft.length}/2.000</span>
+                <span>Phiên bản {item.revision}</span>
               </div>
-            ) : (
-              <p
-                className={`whitespace-pre-wrap break-words border-y border-border-subtle py-4 text-[15px] leading-6 ${isDeleted ? 'text-ink-secondary line-through' : 'text-ink-primary'}`}
-              >
-                {comment.content}
-              </p>
-            )}
-
-            {comment.deletionReason && (
-              <p className="text-xs text-ink-secondary">Lý do xóa: {comment.deletionReason}</p>
-            )}
-          </section>
-
-          <section aria-label="Thao tác bình luận" className="grid gap-3">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <CommentReactionControl
-                reactions={comment.reactions}
-                activeReaction={comment.myReaction}
-                disabled={isDeleted || reactionPending}
-                onSelect={onReaction}
-              />
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={isDeleted}
-                onClick={onReply}
-                aria-expanded={creatingReply}
-              >
-                Trả lời
-              </Button>
+              <label className="grid gap-1.5 text-sm font-semibold">
+                Lý do kiểm duyệt <span className="font-normal text-ink-muted">(tùy chọn)</span>
+                <input
+                  value={editReason}
+                  onChange={(event) => onReasonChange(event.target.value)}
+                  maxLength={300}
+                  className="min-h-10 rounded-xl border border-border-subtle bg-white px-3 font-normal outline-none focus-visible:ring-2 focus-visible:ring-action-primary"
+                />
+              </label>
+              {editError && (
+                <p role="alert" className="text-sm text-danger-foreground">
+                  {editError}
+                </p>
+              )}
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={() => onCancelEdit(item)}>
+                  Hủy
+                </Button>
+                <Button
+                  size="sm"
+                  loading={savingEdit}
+                  disabled={!draft.trim()}
+                  onClick={() => onSaveEdit(item)}
+                >
+                  Lưu nội dung
+                </Button>
+              </div>
             </div>
-            {creatingReply && (
-              <AdminReplyComposer
-                onCancel={onCancelReply}
-                onSubmit={onSubmitReply}
-                saving={savingReply}
-                error={replyError}
-              />
-            )}
-            {!creatingReply && replyError && (
-              <p role="alert" className="text-sm text-danger-foreground">
-                {replyError}
+          ) : isDeleted ? (
+            <div className="grid gap-1">
+              <p className="rounded-lg bg-surface-muted px-3 py-2 text-sm leading-6 text-ink-secondary">
+                Bình luận này đã được gỡ. Các phản hồi còn lại được giữ để tham khảo.
               </p>
+              {item.deletionReason && (
+                <p className="px-1 text-xs text-ink-secondary">Lý do xóa: {item.deletionReason}</p>
+              )}
+            </div>
+          ) : (
+            <p className="whitespace-pre-wrap break-words text-sm leading-6 text-ink-primary">
+              {item.content}
+            </p>
+          )}
+
+          {isDeleted && (
+            <span className="w-fit rounded-full bg-surface-muted px-2.5 py-1 text-xs font-medium text-ink-secondary">
+              Đã xóa {dateTime(item.deletedAt)}
+            </span>
+          )}
+
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-border-subtle pt-2">
+            <CommentReactionControl
+              reactions={item.reactions}
+              activeReaction={item.myReaction}
+              disabled={isDeleted || reactionPending}
+              onSelect={(reaction) => onReaction(item, reaction)}
+            />
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={isDeleted}
+              onClick={() => onReply(item)}
+              aria-expanded={isReplying}
+            >
+              Trả lời
+            </Button>
+            {item.replyCount > 0 && (
+              <span className="text-xs text-ink-secondary">
+                {item.replyCount} phản hồi · {item.reactionCount} reaction
+              </span>
             )}
-          </section>
-        </div>
-
-        <aside aria-label="Nhánh thảo luận" className="grid min-w-0 content-start gap-2">
-          <div className="flex items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold">Nhánh thảo luận</h3>
-            <span className="text-xs tabular-nums text-ink-muted">{detail.threadTotal}</span>
           </div>
-          {detail.threadHasMore && (
-            <p className="text-xs leading-5 text-ink-muted">
-              Danh sách API bị giới hạn. Dùng bộ lọc để tìm phản hồi cụ thể nếu không thấy trong
-              nhánh này.
-            </p>
-          )}
-          {detail.thread.length > 100 && (
-            <p className="text-xs leading-5 text-ink-muted">
-              Hiển thị 100 mục đầu để giữ phần chi tiết gọn.
-            </p>
-          )}
-          <div className="max-h-80 overflow-y-auto border-l border-border-subtle pl-2">
-            <ul className="grid gap-1">
-              {threadItems.map((item) => (
-                <li key={item.id}>
-                  <ThreadCommentButton
-                    item={item}
-                    selected={item.id === comment.id}
-                    onClick={() => onSelectThreadComment(item)}
-                  />
-                </li>
-              ))}
-            </ul>
-          </div>
-        </aside>
-      </div>
-    </div>
-  )
-}
 
-function ThreadCommentButton({
-  item,
-  selected,
-  onClick,
-}: {
-  item: ApiAdminLessonComment
-  selected: boolean
-  onClick: () => void
-}) {
-  const depth = Math.min(item.depth, 4)
+          {isReplying && !isDeleted && (
+            <AdminReplyComposer
+              onCancel={() => onCancelReply(item)}
+              onSubmit={(content) => onSubmitReply(item, content)}
+              saving={savingReply}
+              error={replyError}
+            />
+          )}
+        </article>
+
+        {node.children.length > 0 && (
+          <ol
+            aria-label={`Phản hồi của ${item.author?.fullName ?? 'tài khoản đã xóa'}`}
+            className="ml-3 grid min-w-0 gap-3 border-l-2 border-border-subtle py-1 pl-3 sm:ml-5 sm:pl-5"
+          >
+            {node.children.map((child) => renderNode(child))}
+          </ol>
+        )}
+      </li>
+    )
+  }
+
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-current={selected ? 'true' : undefined}
-      className={`grid w-full min-w-0 gap-1 rounded-lg border-l-2 px-2 py-2 text-left text-sm focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-action-focus ${selected ? 'border-action-primary bg-brand-blue/30' : 'border-transparent hover:bg-surface-muted'}`}
-      style={{ marginInlineStart: `${depth * 0.5}rem`, maxWidth: `calc(100% - ${depth * 0.5}rem)` }}
-    >
-      <span className="flex min-w-0 items-center gap-2 font-medium">
-        <span className="truncate">{item.author?.fullName ?? 'Tài khoản đã xóa'}</span>
-        {item.isAnonymous && (
-          <span className="shrink-0 text-[10px] text-ink-secondary">Ẩn danh</span>
-        )}
-        {item.deletedAt && (
-          <span className="shrink-0 text-[10px] text-danger-foreground">Đã xóa</span>
-        )}
-      </span>
-      <span className="line-clamp-2 whitespace-pre-wrap break-words text-xs leading-5 text-ink-secondary">
-        {item.content}
-      </span>
-      <span className="text-[10px] text-ink-secondary">{dateTime(item.createdAt)}</span>
-    </button>
+    <section aria-label="Nhánh thảo luận" className="grid min-w-0 gap-4 p-4 sm:p-5">
+      <div className="flex items-center justify-between gap-3 border-b border-border-subtle pb-3">
+        <div>
+          <h2 className="text-sm font-bold">Nhánh thảo luận</h2>
+          <p className="text-xs text-ink-secondary">
+            {detail.threadTotal.toLocaleString('vi-VN')} bình luận trong đoạn này
+          </p>
+        </div>
+        <span aria-hidden="true" className="h-8 w-1 rounded-full bg-action-primary" />
+      </div>
+      {replyError && (
+        <p
+          role="alert"
+          className="rounded-lg bg-danger-surface px-3 py-2 text-sm text-danger-foreground"
+        >
+          {replyError}
+        </p>
+      )}
+      {detail.threadHasMore && (
+        <p role="status" className="text-xs leading-5 text-ink-muted">
+          Đang hiển thị {detail.thread.length} trong {detail.threadTotal} bình luận. Nhánh này đã
+          chạm giới hạn tải hiện tại.
+        </p>
+      )}
+      {tree.length > 0 ? (
+        <ol aria-label="Cây bình luận" className="grid min-w-0 gap-4">
+          {tree.map((node) => renderNode(node))}
+        </ol>
+      ) : (
+        <p className="rounded-xl bg-surface-muted px-4 py-6 text-sm text-ink-secondary">
+          Chưa có bình luận trong nhánh này.
+        </p>
+      )}
+    </section>
   )
 }
 
@@ -1412,10 +1462,14 @@ function AdminHistoryDialog({
   open,
   onOpenChange,
   items,
+  loading,
+  error,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   items: ApiLessonCommentHistoryItem[]
+  loading: boolean
+  error: string
 }) {
   return (
     <BaseDialog
@@ -1430,7 +1484,13 @@ function AdminHistoryDialog({
         </Button>
       }
     >
-      {items.length ? (
+      {loading ? (
+        <AdminLoading />
+      ) : error ? (
+        <p role="alert" className="text-sm text-danger-foreground">
+          {error}
+        </p>
+      ) : items.length ? (
         <ol className="grid gap-4">
           {items.map((item, index) => (
             <li
