@@ -13,18 +13,27 @@ async function login(page: Page) {
   await expect(page).not.toHaveURL(/\/login/)
 }
 
-test('public preview and Admin configuration use the live backend', async ({ page, browser }) => {
+test('public preview and Admin configuration use the live backend', async ({
+  page,
+  browser,
+}, testInfo) => {
   await page.goto(`/courses/${courseSlug}`)
   await expect(page.getByRole('heading', { name: 'Khóa học E2E tiếng Đức A1' })).toBeVisible()
   await expect(page.getByText('Học thử miễn phí', { exact: true }).first()).toBeVisible()
   await expect(page.getByText('Nội dung đầy đủ · cần quyền truy cập')).toBeVisible()
 
-  await page.screenshot({ path: '/private/tmp/germany-course-preview-desktop.png', fullPage: true })
+  await page.screenshot({
+    path: testInfo.outputPath('germany-course-preview-desktop.png'),
+    fullPage: true,
+  })
 
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 } })
   await mobile.goto(`/courses/${courseSlug}`)
   await expect(mobile.getByRole('heading', { name: 'Khóa học E2E tiếng Đức A1' })).toBeVisible()
-  await mobile.screenshot({ path: '/private/tmp/germany-course-preview-mobile.png', fullPage: true })
+  await mobile.screenshot({
+    path: testInfo.outputPath('germany-course-preview-mobile.png'),
+    fullPage: true,
+  })
   await mobile.close()
 
   await page.getByRole('link', { name: 'Học thử miễn phí' }).first().click()
@@ -51,5 +60,8 @@ test('public preview and Admin configuration use the live backend', async ({ pag
   await page.getByRole('button', { name: 'Lưu thay đổi' }).click()
   await expect(page.getByText('Đã lưu thông tin khóa học.')).toBeVisible()
   await expect(previewInput).toHaveValue('1')
-  await page.screenshot({ path: '/private/tmp/germany-course-admin-preview-desktop.png', fullPage: true })
+  await page.screenshot({
+    path: testInfo.outputPath('germany-course-admin-preview-desktop.png'),
+    fullPage: true,
+  })
 })
