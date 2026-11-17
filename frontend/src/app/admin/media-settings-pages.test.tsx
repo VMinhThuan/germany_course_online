@@ -242,7 +242,7 @@ describe('admin media library', () => {
     await screen.findByLabelText('Tìm kiếm')
     await user.click(screen.getByRole('button', { name: 'Tải tệp lên' }))
     const dialog = await screen.findByRole('dialog', { name: 'Tải tệp lên thư viện' })
-    await user.selectOptions(within(dialog).getByLabelText('Thư mục lưu'), 'lesson-pdf')
+    await selectAdminOption(user, 'Thư mục lưu', 'Tài liệu PDF', dialog)
     fireEvent.change(screen.getByLabelText('Tệp'), {
       target: { files: [new File(['not a pdf'], 'lesson.pdf', { type: 'text/plain' })] },
     })

@@ -103,6 +103,11 @@ async function adminPage(browser: Browser) {
   return page
 }
 
+async function selectAdminOption(page: Page, label: string, optionName: string | RegExp) {
+  await page.getByRole('combobox', { name: label }).click()
+  await page.getByRole('option', { name: optionName }).click()
+}
+
 test.beforeEach(async ({ request }) => {
   await resetFixtures(request)
 })
@@ -287,7 +292,7 @@ test('purchase pricing, coupon reservation, cancellation and Admin reconciliatio
   const adminCancel = admin.getByRole('button', { name: 'Hủy đơn sau đối soát' })
   await expect(adminCancel).toBeDisabled()
   await admin.getByLabel('Lý do bắt buộc').fill('Đối soát fixture xác nhận không có tiền vào.')
-  await admin.getByLabel('Kết quả đối soát bên ngoài').selectOption('NO_FUNDS_RECEIVED')
+  await selectAdminOption(admin, 'Kết quả đối soát bên ngoài', 'Không nhận được tiền')
   await adminCancel.click()
   await admin
     .getByRole('alertdialog')
@@ -515,7 +520,7 @@ test('Admin renewal plan, enrollment lifecycle and partial settings changes use 
   const admin = await browser.newPage()
   const adminToken = await login(admin, 'admin.be04@example.test')
   await admin.goto('/admin/renewal-plans')
-  await admin.getByLabel('Khóa học').selectOption(ids.courseB)
+  await selectAdminOption(admin, 'Khóa học', /BE05-CMS-A1/)
   await admin.getByLabel('Tên gói').fill('Gói gia hạn BE-05 tạo từ UI')
   await admin.getByLabel('Số tháng').fill('6')
   await admin.getByLabel('Giá (VND nguyên)').fill('650000')
@@ -670,7 +675,7 @@ test('Admin creates and publishes a valid CMS tree; learner completion keeps its
   await expect(sectionLink).toBeVisible()
   await sectionLink.click()
   const sectionId = new URL(page.url()).pathname.split('/').at(-1)!
-  await page.getByLabel('Trạng thái').selectOption('PUBLISHED')
+  await selectAdminOption(page, 'Trạng thái', 'Đang hiển thị')
   await page.getByRole('button', { name: 'Lưu thay đổi' }).click()
   await expect(page.getByText('Đã lưu chương.', { exact: true }).first()).toBeVisible()
 
@@ -691,7 +696,7 @@ test('Admin creates and publishes a valid CMS tree; learner completion keeps its
   )
   const lessonId = new URL(page.url()).pathname.split('/').at(-1)!
   await page.getByLabel('Nội dung ghi chú cho học viên').fill('Hallo zusammen.\n\nWie geht es dir?')
-  await page.getByLabel('Trạng thái').selectOption('PUBLISHED')
+  await selectAdminOption(page, 'Trạng thái', 'Đang hiển thị')
   const invalidLessonFields = await page
     .locator('form')
     .first()
@@ -736,12 +741,12 @@ test('Admin creates and publishes a valid CMS tree; learner completion keeps its
   expect(fileExerciseId).toMatch(/^[0-9a-f]{24}$/)
   await fileExerciseLink.click()
   await page.getByLabel('Hướng dẫn').fill('Hoàn thành tệp tổng hợp theo hướng dẫn.')
-  await page.getByLabel('Trạng thái').selectOption('PUBLISHED')
+  await selectAdminOption(page, 'Trạng thái', 'Đang hiển thị')
   await page.getByRole('button', { name: 'Lưu bài tập' }).click()
   await expect(page.getByText('Đã lưu bài tập.')).toBeVisible()
 
   await page.goto(`/admin/courses/${courseId}/sections/${sectionId}/lessons/${lessonId}`)
-  await page.getByLabel('Loại bài tập').selectOption('QUIZ')
+  await selectAdminOption(page, 'Loại bài tập', 'Trắc nghiệm')
   await page.getByLabel('Tên bài tập').fill('Quiz bắt buộc BE-05')
   await page.getByLabel('Hướng dẫn cho học viên').fill('Chọn đáp án phù hợp với ngữ cảnh.')
   await page.getByRole('button', { name: 'Tạo bài tập và mở câu hỏi' }).click()
@@ -763,7 +768,7 @@ test('Admin creates and publishes a valid CMS tree; learner completion keeps its
   await page.getByRole('button', { name: 'Lưu bài trắc nghiệm' }).click()
   await expect(page.getByText('Đã lưu bài trắc nghiệm.')).toBeVisible()
   await page.getByLabel('Hướng dẫn').fill('Chọn đáp án phù hợp với ngữ cảnh.')
-  await page.getByLabel('Trạng thái').selectOption('PUBLISHED')
+  await selectAdminOption(page, 'Trạng thái', 'Đang hiển thị')
   await page.getByRole('button', { name: 'Lưu bài tập' }).click()
   await expect(page.getByText('Đã lưu bài tập.')).toBeVisible()
   await page.goto(`/admin/courses/${courseId}`)
@@ -775,14 +780,7 @@ test('Admin creates and publishes a valid CMS tree; learner completion keeps its
 
   await page.goto('/admin/enrollments')
   await page.getByLabel('Student User ID').fill(ids.studentB)
-  const grantCourse = page.getByLabel('Khóa học')
-  await expect(grantCourse).toContainText('BE05-CMS-A1')
-  const grantCourseValue = await grantCourse.locator('option').evaluateAll((options) => {
-    const match = options.find((option) => option.textContent?.includes('BE05-CMS-A1'))
-    return match instanceof HTMLOptionElement ? match.value : ''
-  })
-  expect(grantCourseValue).not.toBe('')
-  await grantCourse.selectOption(grantCourseValue)
+  await selectAdminOption(page, 'Khóa học', /BE05-CMS-A1/)
   await page.getByLabel('Lý do bắt buộc').fill('Cấp quyền học cho kiểm thử tổng hợp BE-05.')
   await page.getByRole('button', { name: 'Cấp enrollment' }).click()
   await expect(page).toHaveURL(/\/admin\/enrollments\/[0-9a-f]{24}$/)

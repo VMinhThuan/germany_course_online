@@ -207,8 +207,14 @@ describe('Admin lesson comment management page', () => {
     await user.click(await screen.findByRole('button', { name: /Bộ lọc nâng cao/ }))
     const dialog = await screen.findByRole('dialog', { name: 'Bộ lọc nâng cao' })
     await user.type(within(dialog).getByLabelText('Tìm tên hoặc email học viên'), 'nguyen')
+    await waitFor(() =>
+      expect(mocks.listStudents).toHaveBeenCalledWith({ page: 1, pageSize: 50, q: 'nguyen' }),
+    )
+    const authorSelect = within(dialog).getByRole('combobox', { name: 'Người đăng' })
+    await waitFor(() => expect(authorSelect).toBeEnabled())
+    await user.click(authorSelect)
     expect(
-      await within(dialog).findByRole('option', { name: /Nguyễn An · an@example.test/ }),
+      await screen.findByRole('option', { name: /Nguyễn An · an@example.test/ }),
     ).toBeInTheDocument()
   })
 

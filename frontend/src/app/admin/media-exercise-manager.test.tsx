@@ -227,7 +227,8 @@ describe('AdminExerciseMediaManager', () => {
     const file = new File(['mock audio'], 'dialog.mp3', { type: 'audio/mpeg' })
 
     await user.click(await screen.findByRole('button', { name: 'Thêm tệp' }))
-    await user.selectOptions(screen.getByLabelText('Loại tệp'), 'QUESTION_AUDIO')
+    await user.click(screen.getByRole('combobox', { name: 'Loại tệp' }))
+    await user.click(await screen.findByRole('option', { name: 'Âm thanh bài tập' }))
     await user.upload(screen.getByLabelText('Tệp tải lên'), file)
     await user.click(screen.getByRole('button', { name: 'Tải lên và gắn 1 tệp' }))
 

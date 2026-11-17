@@ -10,6 +10,22 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
   }
 }
 
+if (typeof Element !== 'undefined') {
+  const elementPrototype = Element.prototype
+  if (!elementPrototype.scrollIntoView) {
+    elementPrototype.scrollIntoView = () => undefined
+  }
+  if (!elementPrototype.hasPointerCapture) {
+    elementPrototype.hasPointerCapture = () => false
+  }
+  if (!elementPrototype.setPointerCapture) {
+    elementPrototype.setPointerCapture = () => undefined
+  }
+  if (!elementPrototype.releasePointerCapture) {
+    elementPrototype.releasePointerCapture = () => undefined
+  }
+}
+
 afterEach(() => {
   cleanup()
 })
