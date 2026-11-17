@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AdminLessonCommentsPage } from './lesson-comments-page'
 
@@ -77,7 +78,11 @@ const comment = {
 
 function wrapper({ children }: { children: React.ReactNode }) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  return (
+    <MemoryRouter initialEntries={['/admin/lesson-comments']}>
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    </MemoryRouter>
+  )
 }
 
 describe('Admin lesson comment management page', () => {

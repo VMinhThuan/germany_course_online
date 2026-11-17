@@ -1,4 +1,4 @@
-import { ArrowRight, BookOpenText, Clock3, ImageOff, Target } from 'lucide-react'
+import { ArrowRight, BookOpenText, Clock3, ImageOff, LockKeyhole, Target } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import {
@@ -379,11 +379,15 @@ export function CourseSectionAccordion({
   preview = false,
   previewLabel = 'Học thử theo yêu cầu',
   action,
+  onLocked,
+  onPreviewLesson,
 }: {
   section: CourseSectionModel
   preview?: boolean
   previewLabel?: string
   action?: (lessonId: string) => void
+  onLocked?: () => void
+  onPreviewLesson?: (lessonId: string) => void
 }) {
   return (
     <Accordion type="single" collapsible className="min-w-0 border-b border-border-subtle">
@@ -407,11 +411,16 @@ export function CourseSectionAccordion({
               <li key={lesson.id}>
                 <button
                   type="button"
-                  onClick={() => action?.(lesson.id)}
-                  className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg px-3 text-left hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-action-focus"
+                  onClick={() => {
+                    if (action) return action(lesson.id)
+                    if (preview && onPreviewLesson) return onPreviewLesson(lesson.id)
+                    onLocked?.()
+                  }}
+                  className="flex min-h-11 w-full items-center justify-between gap-3 rounded-control px-3 text-left hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-action-focus"
                 >
                   <span className="min-w-0 truncate text-ink-primary">{lesson.title}</span>
-                  <span className="shrink-0 text-xs text-ink-secondary">
+                  <span className="flex shrink-0 items-center gap-2 text-xs text-ink-secondary">
+                    {!preview && <LockKeyhole aria-label="Nội dung trả phí" className="size-3.5" />}
                     {lesson.estimatedMinutes
                       ? `${lesson.estimatedMinutes} phút`
                       : lesson.lessonType}
@@ -433,6 +442,8 @@ export function CourseOutline({
   previewHref,
   previewLabel = 'Học thử theo yêu cầu',
   onLessonSelect,
+  onLockedSectionSelect,
+  onPreviewLessonSelect,
 }: {
   sections: readonly CourseSectionModel[]
   previewManifest?: MockPreviewManifest
@@ -440,6 +451,8 @@ export function CourseOutline({
   previewHref?: string
   previewLabel?: string
   onLessonSelect?: (lessonId: string) => void
+  onLockedSectionSelect?: (sectionId: string) => void
+  onPreviewLessonSelect?: (sectionId: string, lessonId: string) => void
 }) {
   if (sections.length === 0)
     return <DomainState kind="empty" title="Chương trình đang được chuẩn bị" />
@@ -452,13 +465,24 @@ export function CourseOutline({
             previewLabel={previewLabel}
             preview={Boolean(
               (previewManifest && isMockPreviewSection(section, previewManifest)) ||
-              (section.sectionType === 'CHAPTER' && previewSectionIds?.includes(section.id)),
+              (section.sectionType === 'CHAPTER' &&
+                (previewSectionIds?.includes(section.id) || section.isPreview)),
             )}
             {...(onLessonSelect ? { action: onLessonSelect } : {})}
+            {...(onLockedSectionSelect
+              ? { onLocked: () => onLockedSectionSelect(section.id) }
+              : {})}
+            {...(onPreviewLessonSelect
+              ? {
+                  onPreviewLesson: (lessonId: string) =>
+                    onPreviewLessonSelect(section.id, lessonId),
+                }
+              : {})}
           />
           {previewHref &&
             section.sectionType === 'CHAPTER' &&
-            (previewSectionIds?.includes(section.id) ||
+            (section.isPreview ||
+              previewSectionIds?.includes(section.id) ||
               (previewManifest && isMockPreviewSection(section, previewManifest))) && (
               <LinkButton
                 to={`${previewHref}?sectionId=${encodeURIComponent(section.id)}`}
@@ -470,6 +494,7 @@ export function CourseOutline({
             )}
           {previewHref &&
             !(
+              section.isPreview ||
               previewSectionIds?.includes(section.id) ||
               (previewManifest && isMockPreviewSection(section, previewManifest))
             ) && (

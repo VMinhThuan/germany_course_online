@@ -14,7 +14,9 @@ export interface OrderSummaryViewModel {
   itemTitle: string
   amountVnd: MoneyAmount
   createdAt: string
+  expiresAt?: string | null
   paymentStatus: PaymentStatus
+  rejectionReason?: string
 }
 
 export interface RenewalPlanViewModel {

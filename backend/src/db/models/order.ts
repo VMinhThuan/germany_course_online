@@ -82,7 +82,7 @@ const orderSchema = new Schema(
     },
     status: {
       type: String,
-      enum: ["PENDING", "PAID", "FAILED", "CANCELLED", "EXPIRED"],
+      enum: ["PENDING", "PAID", "FAILED", "CANCELLED", "REJECTED", "EXPIRED"],
       required: true,
       default: "PENDING",
     },
@@ -135,6 +135,10 @@ orderSchema.index(
 orderSchema.index(
   { status: 1, paymentSubmittedAt: 1, createdAt: 1 },
   { name: "ix_orders_admin_review_queue" },
+);
+orderSchema.index(
+  { status: 1, paymentSubmittedAt: 1, expiresAt: 1 },
+  { name: "ix_orders_pending_expiration" },
 );
 orderSchema.index(
   { courseId: 1, userId: 1, createdAt: -1 },

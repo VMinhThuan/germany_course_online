@@ -55,9 +55,28 @@ const environmentSchema = z.object({
       value === "" || value === undefined ? undefined : Number(value),
     z.number().int().min(1).max(65_535).optional(),
   ),
+  SMTP_SECURE: truthy,
   SMTP_USER: optionalText,
   SMTP_PASSWORD: optionalText,
   SMTP_FROM: optionalText,
+  ADMIN_NOTIFICATION_EMAIL: optionalText.pipe(z.string().email().optional()),
+  VIETQR_BANK_BIN: optionalText.pipe(
+    z
+      .string()
+      .regex(/^\d{6}$/)
+      .optional(),
+  ),
+  VIETQR_ACCOUNT_NO: optionalText.pipe(
+    z
+      .string()
+      .regex(/^\d{4,32}$/)
+      .optional(),
+  ),
+  VIETQR_ACCOUNT_NAME: optionalText.pipe(z.string().trim().max(160).optional()),
+  VIETQR_TEMPLATE: z.preprocess(
+    (value) => (value === "" || value === undefined ? "compact2" : value),
+    z.string().regex(/^[A-Za-z0-9_-]{1,32}$/),
+  ),
   MEDIA_S3_ENDPOINT: optionalText.pipe(z.string().url().optional()),
   MEDIA_S3_BUCKET: optionalText,
   MEDIA_S3_REGION: optionalText,
@@ -140,9 +159,19 @@ export type AppConfig = {
     | {
         host: string;
         port: number;
+        secure: boolean;
         user: string | undefined;
         password: string | undefined;
         from: string;
+      }
+    | undefined;
+  adminNotificationEmail?: string;
+  vietQr?:
+    | {
+        bankBin: string;
+        accountNumber: string;
+        accountName?: string;
+        template: string;
       }
     | undefined;
   mediaStorage:
@@ -302,6 +331,14 @@ export function parseEnvironment(
     );
   }
 
+  const vietQrValues = [env.VIETQR_BANK_BIN, env.VIETQR_ACCOUNT_NO];
+  const anyVietQr = vietQrValues.some((value) => value !== undefined);
+  if (anyVietQr && vietQrValues.some((value) => value === undefined)) {
+    throw new Error(
+      "Invalid environment configuration: VIETQR_BANK_BIN and VIETQR_ACCOUNT_NO are required together",
+    );
+  }
+
   const mediaValues = [
     env.MEDIA_S3_ENDPOINT,
     env.MEDIA_S3_BUCKET,
@@ -403,9 +440,23 @@ export function parseEnvironment(
       ? {
           host: env.SMTP_HOST!,
           port: env.SMTP_PORT!,
+          secure: env.SMTP_SECURE,
           user: env.SMTP_USER,
           password: env.SMTP_PASSWORD,
           from: env.SMTP_FROM!,
+        }
+      : undefined,
+    ...(env.ADMIN_NOTIFICATION_EMAIL
+      ? { adminNotificationEmail: env.ADMIN_NOTIFICATION_EMAIL }
+      : {}),
+    vietQr: anyVietQr
+      ? {
+          bankBin: env.VIETQR_BANK_BIN!,
+          accountNumber: env.VIETQR_ACCOUNT_NO!,
+          ...(env.VIETQR_ACCOUNT_NAME
+            ? { accountName: env.VIETQR_ACCOUNT_NAME }
+            : {}),
+          template: env.VIETQR_TEMPLATE,
         }
       : undefined,
     mediaStorage: anyMedia

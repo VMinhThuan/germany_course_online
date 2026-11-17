@@ -11,6 +11,7 @@ export type NotificationEmail = {
   to: string[];
   subject: string;
   text: string;
+  html?: string;
 };
 
 export type EmailDeliveryResult = { messageId?: string };
@@ -76,19 +77,23 @@ class SmtpEmailService implements EmailService {
       to: message.to,
       subject: message.subject,
       text: message.text,
+      ...(message.html ? { html: message.html } : {}),
     });
     return { messageId: result.messageId };
   }
 }
 
 export function createSmtpTransportOptions(
-  smtp: NonNullable<AppConfig["smtp"]>,
+  smtp: Omit<NonNullable<AppConfig["smtp"]>, "secure"> & {
+    secure?: boolean;
+  },
 ) {
+  const secure = smtp.secure ?? smtp.port === 465;
   return {
     host: smtp.host,
     port: smtp.port,
-    secure: smtp.port === 465,
-    requireTLS: smtp.port !== 465,
+    secure,
+    requireTLS: secure ? false : true,
     connectionTimeout: 10_000,
     greetingTimeout: 10_000,
     socketTimeout: 30_000,

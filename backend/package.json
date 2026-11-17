@@ -23,6 +23,7 @@
     "media:migrate": "tsx scripts/media-migration/cli.ts",
     "db:course-import": "tsx scripts/course-import/cli.ts",
     "db:seed-a11-quizzes": "tsx scripts/seed-a11-quizzes.ts",
+    "db:seed-a11-preview": "tsx scripts/seed-a11-preview.ts",
     "typecheck:course-import": "tsc --noEmit -p scripts/course-import/tsconfig.json",
     "check": "node scripts/check.mjs"
   },

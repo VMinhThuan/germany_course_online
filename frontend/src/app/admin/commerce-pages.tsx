@@ -6,7 +6,7 @@ import { adminRepository } from '@/data/api/admin-repository'
 import type { ApiRenewalPlan } from '@/lib/api/types'
 import { formatDateTimeInTimezone, formatVnd } from '@/shared/lib/format'
 import { useDialogs } from '@/shared/ui/dialogs'
-import { Button, EmptyState, Pagination } from '@/shared/ui'
+import { Button, EmptyState, Pagination, StatusBadge } from '@/shared/ui'
 import {
   AdminCard,
   AdminField,
@@ -23,6 +23,7 @@ export function AdminOrdersPage({ orderId }: { orderId?: string }) {
   const dialogs = useDialogs()
   const [page, setPage] = useState(1)
   const [status, setStatus] = useState('')
+  const [search, setSearch] = useState('')
   const [transferSubmitted, setTransferSubmitted] = useState('')
   const [note, setNote] = useState('')
   const [reason, setReason] = useState('')
@@ -31,13 +32,14 @@ export function AdminOrdersPage({ orderId }: { orderId?: string }) {
   >('NO_FUNDS_RECEIVED')
   const [success, setSuccess] = useState('')
   const list = useQuery({
-    queryKey: ['admin', 'orders', status, transferSubmitted, page],
+    queryKey: ['admin', 'orders', status, transferSubmitted, search, page],
     queryFn: () =>
       adminRepository.listOrders({
         page,
         pageSize: 20,
         ...(status ? { status } : {}),
         ...(transferSubmitted ? { paymentSubmitted: transferSubmitted === 'true' } : {}),
+        ...(search.trim() ? { q: search.trim() } : {}),
       }),
     enabled: !orderId,
     retry: false,
@@ -63,6 +65,9 @@ export function AdminOrdersPage({ orderId }: { orderId?: string }) {
       }
     }) => adminRepository.cancelOrder(id, input),
   )
+  const reject = useAdminMutation(({ id, reason }: { id: string; reason: string }) =>
+    adminRepository.rejectOrder(id, reason),
+  )
 
   if (orderId) {
     if (detail.isPending) return <AdminLoading />
@@ -73,7 +78,15 @@ export function AdminOrdersPage({ orderId }: { orderId?: string }) {
           retry={() => void detail.refetch()}
         />
       )
-    const { order, student, course, couponReservation, existingEnrollment } = detail.data
+    const {
+      order,
+      student,
+      course,
+      couponReservation,
+      existingEnrollment,
+      paymentInstructions,
+      paymentConfirmations,
+    } = detail.data
     function approveFunds() {
       if (order.status !== 'PENDING' || !order.paymentSubmittedAt) return
       dialogs.confirm({
@@ -113,6 +126,24 @@ export function AdminOrdersPage({ orderId }: { orderId?: string }) {
               input: { reason: reason.trim(), reconciliationOutcome: reconciliation },
             })
             setSuccess('Đã cập nhật hủy đơn theo kết quả đối soát bạn xác nhận.')
+          } catch {
+            /* API error below */
+          }
+        },
+      })
+    }
+    function rejectOrder() {
+      if (order.status !== 'PENDING' || !reason.trim()) return
+      dialogs.confirm({
+        title: 'Từ chối giao dịch này?',
+        description:
+          'Chỉ thực hiện sau khi kiểm tra giao dịch và nhập lý do. Học viên sẽ không được cấp quyền học.',
+        confirmLabel: 'Từ chối giao dịch',
+        destructive: true,
+        onConfirm: async () => {
+          try {
+            await reject.mutateAsync({ id: order.id, reason: reason.trim() })
+            setSuccess('Đã từ chối giao dịch; học viên sẽ nhận được thông báo.')
           } catch {
             /* API error below */
           }
@@ -204,6 +235,54 @@ export function AdminOrdersPage({ orderId }: { orderId?: string }) {
               Kết quả đối soát: {order.reconciliationOutcome ?? '—'}
             </p>
           </AdminCard>
+          <AdminCard title="Thông tin chuyển khoản">
+            {paymentInstructions ? (
+              <div className="grid gap-3 text-sm">
+                {paymentInstructions.qrUrl && (
+                  <img
+                    src={paymentInstructions.qrUrl}
+                    alt="VietQR của đơn hàng"
+                    className="max-w-64 rounded-control border border-border-subtle"
+                  />
+                )}
+                <p>
+                  Ngân hàng: <strong>{paymentInstructions.bankName}</strong>
+                </p>
+                <p>
+                  Số tài khoản: <strong>{paymentInstructions.accountNumber}</strong>
+                </p>
+                <p>
+                  Nội dung: <strong>{order.orderCode}</strong>
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-ink-secondary">Chưa có cấu hình thanh toán.</p>
+            )}
+            {paymentConfirmations && paymentConfirmations.length > 0 && (
+              <AdminCard
+                title="Lịch sử báo chuyển khoản"
+                description="Mỗi lần gửi lại được lưu thành một attempt riêng; chỉ attempt PENDING mới có thể duyệt."
+              >
+                <div className="grid gap-2 text-sm">
+                  {paymentConfirmations.map((confirmation) => (
+                    <div
+                      key={confirmation.id}
+                      className="grid gap-1 rounded-xl border border-border-subtle p-3 sm:grid-cols-[auto_1fr_auto] sm:items-center"
+                    >
+                      <strong>Attempt #{confirmation.attemptNumber}</strong>
+                      <span className="text-ink-secondary">
+                        Gửi lúc {formatDateTimeInTimezone(confirmation.submittedAt)}
+                        {confirmation.rejectionReason ? ` · ${confirmation.rejectionReason}` : ''}
+                      </span>
+                      <span className="text-xs font-bold uppercase tracking-wide text-ink-secondary">
+                        {confirmation.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </AdminCard>
+            )}
+          </AdminCard>
         </div>
         <div className="grid content-start gap-5">
           <AdminCard
@@ -211,7 +290,7 @@ export function AdminOrdersPage({ orderId }: { orderId?: string }) {
             description="Chỉ duyệt sau khi đối soát ngoài ngân hàng. Đây là thao tác cấp quyền học hoặc gia hạn."
           >
             {!order.paymentSubmittedAt && order.status === 'PENDING' && (
-              <p className="rounded-xl bg-warning-surface p-3 text-sm leading-6 text-warning-foreground">
+              <p className="rounded-control bg-warning-surface p-3 text-sm leading-6 text-warning-foreground">
                 Học viên chưa báo chuyển khoản. Chờ báo hoặc xác minh theo quy trình nội bộ.
               </p>
             )}
@@ -268,6 +347,22 @@ export function AdminOrdersPage({ orderId }: { orderId?: string }) {
               </Button>
               <AdminFeedback error={cancel.error} success={success} />
             </form>
+            <div className="grid gap-3 border-t border-border-subtle pt-4">
+              <p className="text-sm leading-6 text-ink-secondary">
+                Từ chối giao dịch sẽ giữ nguyên lịch sử đơn, không cấp Enrollment và ghi lý do vào
+                audit log.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={order.status !== 'PENDING' || !reason.trim()}
+                loading={reject.isPending}
+                onClick={rejectOrder}
+              >
+                Từ chối giao dịch
+              </Button>
+              <AdminFeedback error={reject.error} />
+            </div>
           </AdminCard>
         </div>
       </div>
@@ -279,7 +374,16 @@ export function AdminOrdersPage({ orderId }: { orderId?: string }) {
       title="Đơn hàng"
       description="Xem riêng trạng thái đơn và việc học viên đã báo chuyển khoản hay chưa."
     >
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <AdminField
+          label="Tìm mã đơn / học viên"
+          value={search}
+          onChange={(value) => {
+            setSearch(value)
+            setPage(1)
+          }}
+          placeholder="Mã đơn, tên hoặc email"
+        />
         <AdminSelect
           label="Trạng thái đơn"
           value={status}
@@ -289,7 +393,7 @@ export function AdminOrdersPage({ orderId }: { orderId?: string }) {
           }}
           options={[
             { value: '', label: 'Tất cả' },
-            ...['PENDING', 'PAID', 'CANCELLED', 'FAILED', 'EXPIRED'].map((value) => ({
+            ...['PENDING', 'PAID', 'REJECTED', 'CANCELLED', 'FAILED', 'EXPIRED'].map((value) => ({
               value,
               label: value,
             })),
@@ -314,7 +418,7 @@ export function AdminOrdersPage({ orderId }: { orderId?: string }) {
       ) : list.isError ? (
         <AdminLoadError error={list.error} retry={() => void list.refetch()} />
       ) : list.data?.items.length ? (
-        <div className="overflow-x-auto rounded-xl border border-border-subtle">
+        <div className="overflow-x-auto rounded-control border border-border-subtle bg-card-surface">
           <table className="w-full min-w-[780px] text-left text-sm">
             <thead className="bg-surface-muted text-xs uppercase text-ink-secondary">
               <tr>
@@ -329,16 +433,46 @@ export function AdminOrdersPage({ orderId }: { orderId?: string }) {
             </thead>
             <tbody>
               {list.data.items.map(({ order, student, course }) => (
-                <tr key={order.id} className="border-t border-border-subtle bg-white">
+                <tr key={order.id} className="border-t border-border-subtle bg-card-surface">
                   <td className="p-3 font-semibold">{order.orderCode}</td>
                   <td className="p-3">{student?.email ?? '—'}</td>
                   <td className="p-3">{course.title}</td>
                   <td className="p-3">{formatVnd(order.totalAmount)}</td>
-                  <td className="p-3">{order.status}</td>
                   <td className="p-3">
-                    {order.paymentSubmittedAt
-                      ? `Đã báo ${formatDateTimeInTimezone(order.paymentSubmittedAt)}`
-                      : 'Chưa báo'}
+                    <StatusBadge
+                      status={
+                        order.status === 'PAID'
+                          ? 'success'
+                          : order.status === 'PENDING'
+                            ? 'warning'
+                            : order.status === 'REJECTED' || order.status === 'FAILED'
+                              ? 'danger'
+                              : 'neutral'
+                      }
+                      label={
+                        order.status === 'PENDING'
+                          ? 'Đang chờ'
+                          : order.status === 'PAID'
+                            ? 'Đã thanh toán'
+                            : order.status === 'REJECTED'
+                              ? 'Đã từ chối'
+                              : order.status === 'CANCELLED'
+                                ? 'Đã hủy'
+                                : order.status === 'FAILED'
+                                  ? 'Thất bại'
+                                  : 'Đã hết hạn'
+                      }
+                    />
+                  </td>
+                  <td className="p-3">
+                    <StatusBadge
+                      status={order.paymentSubmittedAt ? 'info' : 'neutral'}
+                      label={
+                        order.paymentSubmittedAt
+                          ? `Đã báo · ${formatDateTimeInTimezone(order.paymentSubmittedAt)}`
+                          : 'Chưa báo'
+                      }
+                    />
                   </td>
                   <td className="p-3">
                     <Link

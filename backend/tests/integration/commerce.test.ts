@@ -12,6 +12,7 @@ import {
   EnrollmentAdjustment,
   Lesson,
   Order,
+  PaymentConfirmation,
   SiteSettings,
   User,
   UserSession,
@@ -268,6 +269,7 @@ describe("BE-03A purchase, manual approval, enrollment, and email outbox", () =>
         templateType: "TRANSFER_SUBMITTED_ADMIN",
       }),
     ).toBe(1);
+    expect(emailService.notificationDeliveries).toHaveLength(1);
     expect(await Enrollment.countDocuments({ userId: student.userId })).toBe(0);
     const stillLocked = await as(
       student,
@@ -304,7 +306,7 @@ describe("BE-03A purchase, manual approval, enrollment, and email outbox", () =>
         ? { frontendBaseUrl: config.allowedOrigins[0] }
         : {}),
     });
-    expect(await transferWorker.runOnce()).toBe(1);
+    expect(await transferWorker.runOnce()).toBe(0);
     expect(emailService.notificationDeliveries[0]?.to).toContain(admin.email);
     expect(emailService.notificationDeliveries[0]?.text).toContain(
       created.body.data.order.orderCode,
@@ -315,6 +317,7 @@ describe("BE-03A purchase, manual approval, enrollment, and email outbox", () =>
     course.accessDurationMonths = 24;
     await course.save();
 
+    emailService.notificationFailuresRemaining = 1;
     const approvals = await Promise.all([
       as(admin, "post", `/api/v1/admin/orders/${orderId}/approve`).send({
         reviewNote: "Bank statement matched.",
@@ -383,8 +386,6 @@ describe("BE-03A purchase, manual approval, enrollment, and email outbox", () =>
       (await as(student, "get", "/api/v1/orders")).body.data.items,
     ).toHaveLength(1);
 
-    emailService.notificationFailuresRemaining = 1;
-    expect(await transferWorker.runOnce()).toBe(1);
     let studentOutbox = await EmailLog.findOne({
       templateType: "ORDER_APPROVED_STUDENT",
     }).lean();
@@ -490,6 +491,58 @@ describe("BE-03A purchase, manual approval, enrollment, and email outbox", () =>
       "/api/v1/admin/site-settings",
     ).send({ payment: { enabled: false } });
     expect(studentSettingsPatch.status).toBe(403);
+  });
+
+  it("sends rejection and resubmission notifications immediately while preserving attempts", async () => {
+    await setupPaymentSettings();
+    const course = await createCourse();
+    const created = await as(student, "post", "/api/v1/orders").send({
+      courseId: course._id.toString(),
+      orderType: "PURCHASE",
+    });
+    const orderId = created.body.data.order.id as string;
+
+    const firstConfirmation = await as(
+      student,
+      "post",
+      `/api/v1/orders/${orderId}/confirm-transfer`,
+    ).send({});
+    expect(firstConfirmation.status).toBe(200);
+    expect(emailService.notificationDeliveries).toHaveLength(1);
+    expect(emailService.notificationDeliveries[0]?.to).toContain(admin.email);
+
+    const rejected = await as(
+      admin,
+      "post",
+      `/api/v1/admin/orders/${orderId}/reject`,
+    ).send({ reason: "Không tìm thấy giao dịch tương ứng." });
+    expect(rejected.status).toBe(200);
+    expect(rejected.body.data.order.status).toBe("REJECTED");
+    expect(emailService.notificationDeliveries).toHaveLength(2);
+    expect(emailService.notificationDeliveries[1]?.to).toContain(student.email);
+    expect(emailService.notificationDeliveries[1]?.html).toContain(
+      `/student/orders/${orderId}`,
+    );
+
+    const resubmitted = await as(
+      student,
+      "post",
+      `/api/v1/orders/${orderId}/confirm-transfer`,
+    ).send({});
+    expect(resubmitted.status).toBe(200);
+    expect(resubmitted.body.data.order.status).toBe("PENDING");
+    expect(emailService.notificationDeliveries).toHaveLength(3);
+    expect(await PaymentConfirmation.countDocuments({ orderId })).toBe(2);
+
+    const approved = await as(
+      admin,
+      "post",
+      `/api/v1/admin/orders/${orderId}/approve`,
+    ).send({});
+    expect(approved.status).toBe(200);
+    expect(approved.body.data.order.status).toBe("PAID");
+    expect(approved.body.data.enrollment).toBeTruthy();
+    expect(emailService.notificationDeliveries).toHaveLength(4);
   });
 
   it("rolls back order, enrollment, adjustment, audit, and email when approval outbox insertion conflicts", async () => {
@@ -671,6 +724,7 @@ describe("BE-03A purchase, manual approval, enrollment, and email outbox", () =>
       orderType: "PURCHASE",
     });
     const orderId = created.body.data.order.id as string;
+    emailService.notificationFailuresRemaining = 5;
     await as(
       student,
       "post",
@@ -695,12 +749,17 @@ describe("BE-03A purchase, manual approval, enrollment, and email outbox", () =>
       )?.status,
     ).toBe("PENDING");
 
-    emailService.notificationFailuresRemaining = 5;
     let now = new Date(Date.now() + 5_000);
     const worker = new EmailOutboxWorker(emailService, { now: () => now });
-    for (let attempt = 0; attempt < 5; attempt += 1) {
+    let job = await EmailLog.findOne({
+      templateType: "TRANSFER_SUBMITTED_ADMIN",
+    }).lean();
+    expect(job?.status).toBe("PENDING");
+    expect(job?.attempts).toBe(1);
+    now = new Date((job?.availableAt.getTime() ?? now.getTime()) + 1);
+    for (let attempt = 1; attempt < 5; attempt += 1) {
       expect(await worker.runOnce(1)).toBe(1);
-      const job = await EmailLog.findOne({
+      job = await EmailLog.findOne({
         templateType: "TRANSFER_SUBMITTED_ADMIN",
       }).lean();
       if (attempt < 4) {

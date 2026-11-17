@@ -23,6 +23,13 @@ describe('auth return destination sanitation', () => {
     expect(getReturnToFromSearch('returnTo=https%3A%2F%2Fevil.example')).toBe('/student')
   })
 
+  it('allows the internal admin order route without allowing external redirects', () => {
+    expect(sanitizeReturnTo('/admin/orders/507f1f77bcf86cd799439011')).toBe(
+      '/admin/orders/507f1f77bcf86cd799439011',
+    )
+    expect(sanitizeReturnTo('/admin/orders/https://evil.example')).toBe('/student')
+  })
+
   it.each([
     '/learn/courses/course-a11-demo',
     '/learn/courses/course-a11-demo/sections/section-greetings',

@@ -62,6 +62,7 @@ const course: ApiAdminCourse = {
   introVideoAssetId: null,
   price: '1000000',
   accessDurationMonths: 12,
+  previewChapterCount: 1,
   sortOrder: 0,
   status: 'PUBLISHED',
   createdAt: '2026-11-05T00:00:00.000Z',

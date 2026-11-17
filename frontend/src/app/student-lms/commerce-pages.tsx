@@ -1,5 +1,16 @@
-import { useState, type FormEvent } from 'react'
-import { ArrowRight, CheckCircle2, CircleAlert, CreditCard, QrCode, XCircle } from 'lucide-react'
+import { useEffect, useState, type FormEvent } from 'react'
+import {
+  ArrowRight,
+  Check,
+  CheckCircle2,
+  CircleAlert,
+  Copy,
+  CreditCard,
+  Download,
+  QrCode,
+  RefreshCw,
+  XCircle,
+} from 'lucide-react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { useAuthSession } from '@/app/auth/auth-session'
 import {
@@ -17,7 +28,19 @@ import type { CouponValidationViewModel } from '@/domains/commerce/models'
 import { AccessStatePanel, EnrollmentStatusCard } from '@/domains'
 import { DomainState } from '@/domains/shared/presentation'
 import { useDialogs } from '@/shared/ui/dialogs'
-import { Badge, Button, Card, ErrorState, LinkButton, Pagination, SectionHeader } from '@/shared/ui'
+import {
+  Badge,
+  Button,
+  Card,
+  ErrorState,
+  FormField,
+  InlineAlert,
+  LinkButton,
+  Pagination,
+  SectionHeader,
+  TextInput,
+  useNotifications,
+} from '@/shared/ui'
 import { formatDateTimeInTimezone, formatVnd } from '@/shared/lib/format'
 import { ProductError, ProductLoading, ProductNotFound, ProductPage } from './shared'
 
@@ -168,19 +191,22 @@ export function CheckoutPage() {
                 className="flex flex-col gap-3 sm:flex-row"
                 onSubmit={(event) => void applyCoupon(event)}
               >
-                <label className="grid flex-1 gap-1 text-sm font-semibold">
-                  Mã coupon
-                  <input
-                    className="min-h-11 rounded-xl border border-border-subtle bg-white px-3 font-normal outline-none focus-visible:ring-2 focus-visible:ring-action-primary"
-                    value={couponCode}
-                    onChange={(event) => {
-                      setCouponCode(event.target.value)
-                      setAcceptedCoupon(undefined)
-                      setCouponResult(undefined)
-                    }}
-                    autoComplete="off"
-                  />
-                </label>
+                <FormField id="checkout-coupon-code" label="Mã coupon" className="min-w-0 flex-1">
+                  {(describedBy, invalid) => (
+                    <TextInput
+                      id="checkout-coupon-code"
+                      value={couponCode}
+                      onChange={(event) => {
+                        setCouponCode(event.target.value)
+                        setAcceptedCoupon(undefined)
+                        setCouponResult(undefined)
+                      }}
+                      autoComplete="off"
+                      aria-invalid={invalid || undefined}
+                      aria-describedby={describedBy}
+                    />
+                  )}
+                </FormField>
                 <Button
                   type="submit"
                   variant="outline"
@@ -256,42 +282,86 @@ function OrderState({ order }: { order: NonNullable<ReturnType<typeof useProduct
   const reported = order.transferReported
   if (status === 'PAID')
     return (
-      <div
-        role="status"
-        className="rounded-2xl border border-success-foreground/20 bg-success-surface p-4 text-success-foreground"
-      >
-        <p className="flex items-center gap-2 font-bold">
-          <CheckCircle2 aria-hidden="true" className="size-5" />
-          Đã thanh toán và được xác nhận
-        </p>
-        <p className="mt-1 text-sm leading-6">
-          Enrollment do backend cấp hoặc gia hạn. Tải lại quyền học để tiếp tục.
-        </p>
-      </div>
+      <InlineAlert tone="success" title="Đã thanh toán và được xác nhận" role="status">
+        <span className="inline-flex items-center gap-2">
+          <CheckCircle2 aria-hidden="true" className="size-4" />
+          Enrollment đã được backend cấp hoặc gia hạn. Tải lại quyền học để tiếp tục.
+        </span>
+      </InlineAlert>
     )
-  if (status === 'CANCELLED' || status === 'FAILED' || status === 'EXPIRED')
+  if (
+    status === 'CANCELLED' ||
+    status === 'REJECTED' ||
+    status === 'FAILED' ||
+    status === 'EXPIRED'
+  )
     return (
-      <div role="status" className="rounded-2xl border border-border-subtle bg-surface-muted p-4">
-        <p className="flex items-center gap-2 font-bold">
-          <XCircle aria-hidden="true" className="size-5" />
-          Đơn {status}
-        </p>
-        <p className="mt-1 text-sm leading-6 text-ink-secondary">Đơn này không cấp quyền học.</p>
-      </div>
+      <InlineAlert tone="danger" title={`Đơn ${status}`} role="status">
+        <span className="inline-flex items-center gap-2">
+          <XCircle aria-hidden="true" className="size-4" />
+          <span>
+            {status === 'REJECTED'
+              ? 'Admin chưa xác nhận giao dịch. Bạn có thể kiểm tra lại và gửi lại báo chuyển khoản.'
+              : 'Đơn này không cấp quyền học.'}
+            {order.order.rejectionReason ? ` Lý do: ${order.order.rejectionReason}` : ''}
+          </span>
+        </span>
+      </InlineAlert>
     )
   return (
-    <div
+    <InlineAlert
+      tone="warning"
+      title={reported ? 'Đã báo chuyển khoản · chờ Admin đối soát' : 'Đang chờ chuyển khoản'}
       role="status"
-      className="rounded-2xl border border-warning-foreground/20 bg-warning-surface p-4 text-warning-foreground"
     >
-      <p className="flex items-center gap-2 font-bold">
-        <CircleAlert aria-hidden="true" className="size-5" />
-        {reported ? 'Đã báo chuyển khoản · chờ Admin đối soát' : 'Đang chờ chuyển khoản'}
-      </p>
-      <p className="mt-1 text-sm leading-6">
+      <span className="inline-flex items-center gap-2">
+        <CircleAlert aria-hidden="true" className="size-4" />
         Nhấn xác nhận chỉ gửi thông báo tới Admin; đơn vẫn PENDING và chưa cấp quyền học.
-      </p>
-    </div>
+      </span>
+    </InlineAlert>
+  )
+}
+
+function formatRemaining(milliseconds: number) {
+  const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000))
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+}
+
+function CopyButton({ value, label }: { value: string; label: string }) {
+  const notifications = useNotifications()
+  const [copied, setCopied] = useState(false)
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className="min-h-8 shrink-0 px-2"
+      aria-label={`Sao chép ${label}`}
+      onClick={() => {
+        if (!navigator.clipboard) {
+          notifications.error(`Không thể sao chép ${label}`)
+          return
+        }
+        void navigator.clipboard
+          .writeText(value)
+          .then(() => {
+            setCopied(true)
+            notifications.success(`Đã sao chép ${label}`)
+            window.setTimeout(() => setCopied(false), 1500)
+          })
+          .catch(() => notifications.error(`Không thể sao chép ${label}`))
+      }}
+    >
+      {copied ? (
+        <Check aria-hidden="true" className="size-4" />
+      ) : (
+        <Copy aria-hidden="true" className="size-4" />
+      )}
+      <span className="sr-only">{copied ? 'Đã sao chép' : 'Sao chép'}</span>
+    </Button>
   )
 }
 
@@ -301,6 +371,16 @@ function PaymentInstructions({
   order: NonNullable<ReturnType<typeof useProductOrder>['data']>
 }) {
   const instructions = order.paymentInstructions
+  const expiresAt = order.order.expiresAt
+  const [now, setNow] = useState(() => Date.now())
+  const [qrFailed, setQrFailed] = useState(false)
+  const [qrRetry, setQrRetry] = useState(0)
+  useEffect(() => {
+    if (order.transferReported || !expiresAt) return
+    const timer = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [expiresAt, order.transferReported])
+  const remaining = expiresAt ? new Date(expiresAt).getTime() - now : null
   if (!instructions)
     return (
       <Card className="grid gap-2 border-dashed p-5">
@@ -322,13 +402,49 @@ function PaymentInstructions({
         <QrCode aria-hidden="true" className="size-5 text-action-primary" />
         <h2 className="font-display text-lg font-bold">Hướng dẫn chuyển khoản</h2>
       </div>
-      {instructions.qrUrl && (
+      {expiresAt && !order.transferReported && remaining !== null && remaining > 0 && (
+        <InlineAlert tone="warning" title="Thời gian giữ đơn còn lại">
+          <span className="font-mono text-lg font-bold">{formatRemaining(remaining)}</span>
+        </InlineAlert>
+      )}
+      {order.transferReported && (
+        <InlineAlert tone="info" title="Đang chờ Admin đối soát">
+          Hệ thống đã ghi nhận báo chuyển khoản. Countdown giữ đơn không còn chạy trong lúc chờ
+          duyệt.
+        </InlineAlert>
+      )}
+      {expiresAt && !order.transferReported && remaining !== null && remaining <= 0 && (
+        <InlineAlert tone="danger" title="Đơn đã hết hạn">
+          Hãy tạo đơn mới để nhận mã QR và mã chuyển khoản mới.
+        </InlineAlert>
+      )}
+      {instructions.qrUrl && !qrFailed && (
         <img
+          key={`${instructions.qrUrl}-${qrRetry}`}
           src={instructions.qrUrl}
-          alt="Mã QR tĩnh do Admin cấu hình"
-          className="mx-auto max-h-64 max-w-full rounded-xl border border-border-subtle object-contain"
+          alt="Mã QR VietQR cho đơn hàng"
+          className="mx-auto max-h-64 max-w-full rounded-control border border-border-subtle object-contain"
           loading="lazy"
+          onError={() => setQrFailed(true)}
         />
+      )}
+      {instructions.qrUrl && qrFailed && (
+        <InlineAlert tone="danger" title="Không tải được mã QR">
+          Bạn vẫn có thể chuyển khoản thủ công theo thông tin bên dưới.
+          <div className="mt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              startIcon={<RefreshCw aria-hidden="true" className="size-4" />}
+              onClick={() => {
+                setQrFailed(false)
+                setQrRetry((value) => value + 1)
+              }}
+            >
+              Thử tải lại QR
+            </Button>
+          </div>
+        </InlineAlert>
       )}
       <dl className="grid gap-2 text-sm">
         <div className="flex justify-between gap-3">
@@ -337,7 +453,10 @@ function PaymentInstructions({
         </div>
         <div className="flex justify-between gap-3">
           <dt>Số tài khoản</dt>
-          <dd className="text-right font-semibold">{instructions.accountNumber}</dd>
+          <dd className="flex items-center justify-end gap-1 text-right font-semibold">
+            {instructions.accountNumber}
+            <CopyButton value={instructions.accountNumber} label="số tài khoản" />
+          </dd>
         </div>
         <div className="flex justify-between gap-3">
           <dt>Chủ tài khoản</dt>
@@ -345,13 +464,17 @@ function PaymentInstructions({
         </div>
         <div className="flex justify-between gap-3">
           <dt>Số tiền</dt>
-          <dd className="text-right font-extrabold text-action-primary">
+          <dd className="flex items-center justify-end gap-1 text-right font-extrabold text-action-primary">
             {formatVnd(order.totalAmountVnd)}
+            <CopyButton value={order.totalAmountVnd} label="số tiền" />
           </dd>
         </div>
         <div className="flex justify-between gap-3">
           <dt>Nội dung</dt>
-          <dd className="text-right font-mono font-bold">{order.order.orderCode}</dd>
+          <dd className="flex items-center justify-end gap-1 text-right font-mono font-bold">
+            {order.order.orderCode}
+            <CopyButton value={order.order.orderCode} label="mã đơn" />
+          </dd>
         </div>
       </dl>
       <p className="whitespace-pre-line rounded-xl bg-surface-muted p-3 text-sm leading-6 text-ink-secondary">
@@ -360,6 +483,17 @@ function PaymentInstructions({
       <p className="text-xs leading-5 text-ink-muted">
         QR là ảnh tĩnh. Hãy kiểm tra số tiền và mã đơn ở trên trước khi chuyển khoản.
       </p>
+      {instructions.qrUrl && (
+        <a
+          href={instructions.qrUrl}
+          download={`vietqr-${order.order.orderCode}.png`}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-2 text-sm font-semibold text-action-primary hover:underline"
+        >
+          <Download aria-hidden="true" className="size-4" /> Tải ảnh QR
+        </a>
+      )}
     </Card>
   )
 }
@@ -397,8 +531,10 @@ export function OrderPendingPage() {
             </div>
           </Card>
           <OrderState order={order.data} />
-          {order.data.order.status === 'PENDING' && <PaymentInstructions order={order.data} />}
-          {order.data.order.status === 'PENDING' && (
+          {(order.data.order.status === 'PENDING' || order.data.order.status === 'REJECTED') && (
+            <PaymentInstructions order={order.data} />
+          )}
+          {(order.data.order.status === 'PENDING' || order.data.order.status === 'REJECTED') && (
             <Card className="grid gap-3 p-5">
               <h2 className="font-display text-lg font-bold">Bạn đã chuyển khoản?</h2>
               <p className="text-sm leading-6 text-ink-secondary">
@@ -407,7 +543,10 @@ export function OrderPendingPage() {
               </p>
               <Button
                 loading={confirmTransfer.isPending}
-                disabled={confirmTransfer.isPending || order.data.transferReported}
+                disabled={
+                  confirmTransfer.isPending ||
+                  (order.data.transferReported && order.data.order.status === 'PENDING')
+                }
                 onClick={() =>
                   void confirmTransfer
                     .mutateAsync(id)
@@ -415,7 +554,11 @@ export function OrderPendingPage() {
                     .catch(() => undefined)
                 }
               >
-                {order.data.transferReported ? 'Đã gửi báo chuyển khoản' : 'Tôi đã chuyển khoản'}
+                {order.data.order.status === 'REJECTED'
+                  ? 'Gửi lại báo chuyển khoản'
+                  : order.data.transferReported
+                    ? 'Đã gửi báo chuyển khoản'
+                    : 'Tôi đã chuyển khoản'}
               </Button>
               {confirmTransfer.isError && (
                 <ErrorState
@@ -433,7 +576,7 @@ export function OrderPendingPage() {
                   }
                 />
               )}
-              {!order.data.transferReported && (
+              {order.data.order.status === 'PENDING' && !order.data.transferReported && (
                 <Button
                   variant="outline"
                   disabled={cancelOrder.isPending}

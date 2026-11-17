@@ -40,6 +40,7 @@ export interface ApiCourseSummary {
   thumbnailUrl: string | null
   price: string
   accessDurationMonths: number
+  previewChapterCount?: number
   status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
   chapterCount: number
   lessonCount: number
@@ -58,9 +59,21 @@ export interface ApiPublicSection {
   id: string
   title: string
   description?: string
+  sectionType: 'CHAPTER' | 'EXAM_PREP'
   sortOrder: number
+  isPreview: boolean
   lessonCount: number
   lessons: ApiPublicLesson[]
+}
+
+export interface ApiPreviewLesson {
+  courseSlug: string
+  sectionId: string
+  lessonId: string
+  title: string
+  paragraphs: string[]
+  video: ApiLessonVideo | null
+  media: ApiPublicMedia[]
 }
 
 export interface ApiCourseDetail {
@@ -71,6 +84,7 @@ export interface ApiCourseDetail {
   level: string
   price: string
   accessDurationMonths: number
+  previewChapterCount: number
   description: string
   objectives: string[]
   requirements: string[]
@@ -307,7 +321,7 @@ export interface ApiOrder {
   id: string
   orderCode: string
   orderType: 'PURCHASE' | 'RENEWAL'
-  status: 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRED'
+  status: 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED' | 'REJECTED' | 'EXPIRED'
   courseId: string
   renewalPlanId: string | null
   renewalPlanTitleSnapshot: string | null
@@ -325,6 +339,7 @@ export interface ApiOrder {
   expiresAt: string | null
   cancelledAt: string | null
   cancellationReason: string | null
+  rejectionReason: string | null
   reconciliationOutcome: 'NO_FUNDS_RECEIVED' | 'REFUND_CONFIRMED_EXTERNALLY' | null
   createdAt: string
 }
@@ -380,6 +395,7 @@ export interface ApiAdminCourse {
   introVideoAssetId: string | null
   price: string
   accessDurationMonths: number
+  previewChapterCount: number
   sortOrder: number
   status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
   createdAt: string
@@ -480,7 +496,7 @@ export interface ApiAdminStudentDetail {
     id: string
     orderCode: string
     orderType: 'PURCHASE' | 'RENEWAL'
-    status: 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRED'
+    status: 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED' | 'REJECTED' | 'EXPIRED'
     courseId: string
     courseTitle: string
     totalAmount: string
@@ -537,6 +553,18 @@ export interface ApiAdminOrderSummary {
     activatedAt: string | null
     expiresAt: string | null
   } | null
+  paymentInstructions?: ApiPaymentInstructions | null
+  paymentConfirmations?: ApiPaymentConfirmation[]
+}
+
+export interface ApiPaymentConfirmation {
+  id: string
+  attemptNumber: number
+  submittedAt: string
+  status: 'PENDING' | 'APPROVED' | 'REJECTED'
+  reviewedById: string | null
+  reviewedAt: string | null
+  rejectionReason: string | null
 }
 
 export interface ApiAdminOrderDetail extends ApiAdminOrderSummary {

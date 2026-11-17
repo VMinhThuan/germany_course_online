@@ -121,6 +121,7 @@ export function AdminCoursesPage() {
   const [requirements, setRequirements] = useState('')
   const [price, setPrice] = useState('')
   const [duration, setDuration] = useState('12')
+  const [previewChapterCount, setPreviewChapterCount] = useState('0')
   const [createOpen, setCreateOpen] = useState(false)
   const [bannerFile, setBannerFile] = useState<File | null>(null)
   const [bannerProgress, setBannerProgress] = useState<number | null>(null)
@@ -179,6 +180,7 @@ export function AdminCoursesPage() {
       requirements: splitLines(requirements),
       price: price.trim(),
       accessDurationMonths: Number(duration),
+      previewChapterCount: Number(previewChapterCount),
       sortOrder: courses.data?.length ?? 0,
     }
     let bannerAssetId: string | undefined
@@ -198,6 +200,7 @@ export function AdminCoursesPage() {
       setRequirements('')
       setPrice('')
       setDuration('12')
+      setPreviewChapterCount('0')
       setBannerFile(null)
       notifications.success('Đã tạo khóa học nháp.')
     } catch {
@@ -240,6 +243,12 @@ export function AdminCoursesPage() {
       label: 'Thời hạn',
       sortValue: (course) => course.accessDurationMonths,
       render: (course) => `${course.accessDurationMonths} tháng`,
+    },
+    {
+      key: 'preview',
+      label: 'Học thử',
+      sortValue: (course) => course.previewChapterCount,
+      render: (course) => `${course.previewChapterCount} chương`,
     },
     {
       key: 'status',
@@ -393,7 +402,20 @@ export function AdminCoursesPage() {
               max={120}
               required
             />
+            <AdminField
+              label="Số chương học thử miễn phí"
+              value={previewChapterCount}
+              onChange={setPreviewChapterCount}
+              type="number"
+              min={0}
+              step={1}
+              required
+            />
           </div>
+          <p className="-mt-1 text-xs leading-5 text-ink-secondary">
+            Số chương đầu tiên mà học viên có thể trải nghiệm miễn phí trước khi đăng ký khóa học.
+            Khóa học mới chưa có chương nên bắt đầu với 0.
+          </p>
           <AdminField
             label="Mô tả ngắn"
             value={shortDescription}

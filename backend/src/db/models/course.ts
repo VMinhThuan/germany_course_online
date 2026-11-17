@@ -47,6 +47,13 @@ const courseSchema = new Schema(
       min: 1,
       validate: Number.isInteger,
     },
+    previewChapterCount: {
+      type: Number,
+      required: true,
+      default: 0,
+      min: 0,
+      validate: Number.isInteger,
+    },
     status: {
       type: String,
       enum: ["DRAFT", "PUBLISHED", "ARCHIVED"],

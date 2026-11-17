@@ -18,6 +18,7 @@ export interface CourseSummaryModel {
   thumbnailUrl?: string
   priceVnd?: MoneyAmount
   accessDurationMonths?: number
+  previewChapterCount?: number
   previewAvailable?: boolean
   status: CourseStatus
   chapterCount?: number
@@ -44,6 +45,7 @@ export interface CourseSectionModel {
   sectionType: SectionType
   contentStatus: ContentStatus
   sortOrder: number
+  isPreview?: boolean
   lessons: readonly LessonSummaryModel[]
 }
 

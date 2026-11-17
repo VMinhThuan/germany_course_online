@@ -8,6 +8,7 @@ import { CommerceService } from "./service.js";
 import {
   adminOrderQuerySchema,
   adminOrderCancelSchema,
+  adminOrderRejectSchema,
   checkoutQuoteQuerySchema,
   courseIdParamsSchema,
   couponValidateSchema,
@@ -235,6 +236,30 @@ export function createCommerceRouter(
             req.auth.sub,
             res.locals.validated.params.orderId,
             res.locals.validated.body,
+            req.ip ?? null,
+          ),
+        );
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  router.post(
+    "/admin/orders/:orderId/reject",
+    validateRequest({
+      params: orderIdParamsSchema,
+      body: adminOrderRejectSchema,
+    }),
+    async (req, res, next) => {
+      try {
+        if (!req.auth) throw unauthorized();
+        success(
+          res,
+          await commerce.rejectOrder(
+            req.auth.sub,
+            res.locals.validated.params.orderId,
+            res.locals.validated.body.reason,
             req.ip ?? null,
           ),
         );

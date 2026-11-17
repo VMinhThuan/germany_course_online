@@ -28,6 +28,7 @@ export function courseDto(value: Doc) {
     introVideoAssetId: id(value.introVideoAssetId),
     price: decimal(value.price),
     accessDurationMonths: Number(value.accessDurationMonths),
+    previewChapterCount: Number(value.previewChapterCount ?? 0),
     sortOrder: Number(value.sortOrder ?? 0),
     status: String(value.status),
     createdAt: iso(value.createdAt),

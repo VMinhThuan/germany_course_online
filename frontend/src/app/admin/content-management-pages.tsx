@@ -1984,6 +1984,13 @@ export function AdminCourseEditorPage({ courseId }: { courseId: string }) {
     queryFn: () => adminRepository.getCourse(courseId),
     retry: false,
   })
+  const sections = useQuery({
+    queryKey: ['admin', 'course-sections', courseId],
+    queryFn: () =>
+      loadAllPages((page) => adminRepository.listSections(courseId, { page, pageSize: 100 })),
+    enabled: Boolean(courseId),
+    retry: false,
+  })
   const update = useAdminMutation((input: Record<string, unknown>) =>
     adminRepository.updateCourse(courseId, input),
   )
@@ -2016,6 +2023,20 @@ export function AdminCourseEditorPage({ courseId }: { courseId: string }) {
     setSuccess('')
     let uploadedBannerAssetId: string | undefined
     try {
+      const previewCount = Number(form.previewChapterCount ?? 0)
+      const activeChapterCount = (sections.data ?? []).filter(
+        (section) => section.sectionType === 'CHAPTER' && section.status !== 'HIDDEN',
+      ).length
+      if (!Number.isInteger(previewCount) || previewCount < 0) {
+        notifications.error('Số chương học thử phải là số nguyên không âm.')
+        return
+      }
+      if (previewCount > activeChapterCount) {
+        notifications.error(
+          `Số chương học thử không được vượt quá ${activeChapterCount} chương CHAPTER còn hiệu lực.`,
+        )
+        return
+      }
       if (bannerFile)
         uploadedBannerAssetId = await uploadCourseBanner(bannerFile, setBannerProgress)
       await update.mutateAsync({
@@ -2028,6 +2049,7 @@ export function AdminCourseEditorPage({ courseId }: { courseId: string }) {
         level: form.level,
         price: form.price,
         accessDurationMonths: form.accessDurationMonths,
+        previewChapterCount: previewCount,
         sortOrder: form.sortOrder,
         bannerAssetId: uploadedBannerAssetId ?? form.bannerAssetId ?? null,
       })
@@ -2137,7 +2159,28 @@ export function AdminCourseEditorPage({ courseId }: { courseId: string }) {
               max={120}
               required
             />
+            <AdminField
+              label="Số chương học thử miễn phí"
+              value={String(form.previewChapterCount ?? 0)}
+              onChange={(value) =>
+                setForm((old) => ({ ...old, previewChapterCount: Number(value) }))
+              }
+              type="number"
+              min={0}
+              {...(sections.data
+                ? {
+                    max: sections.data.filter(
+                      (section) => section.sectionType === 'CHAPTER' && section.status !== 'HIDDEN',
+                    ).length,
+                  }
+                : {})}
+              step={1}
+              required
+            />
           </div>
+          <p className="-mt-1 text-xs leading-5 text-ink-secondary">
+            Số chương đầu tiên mà học viên có thể trải nghiệm miễn phí trước khi đăng ký khóa học.
+          </p>
           <AdminField
             label="Mô tả ngắn"
             value={form.shortDescription ?? ''}

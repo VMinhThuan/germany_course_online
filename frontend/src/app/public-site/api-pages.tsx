@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { ArrowLeft, ArrowRight, Check } from 'lucide-react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { ArrowLeft, ArrowRight, Check, LockKeyhole } from 'lucide-react'
+import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { useAuthSession } from '@/app/auth/auth-session'
 import { CoursePricingSection } from '@/features/homepage/sections/CoursePricingSection'
 import { PhotographicHero } from '@/features/homepage/sections/PhotographicHero'
@@ -15,13 +15,15 @@ import {
   usePublicCourse,
   usePublicCourseCatalog,
   usePublicCourseCatalogPage,
+  usePreviewExperience,
+  usePublicPreviewManifest,
   usePublicSiteSettings,
 } from '@/data/public-demo'
 import { CourseOutline, CourseGrid } from '@/domains/catalog'
 import { DomainState } from '@/domains/shared/presentation'
 import { DecorativeHeading } from '@/domains/shared/decorative-heading'
 import { PublicShell } from '@/shared/layouts/shells'
-import { Button, Card, Container, Pagination } from '@/shared/ui'
+import { Badge, BaseDialog, Button, Card, Container, LinkButton, Pagination } from '@/shared/ui'
 import { formatVnd } from '@/shared/lib/format'
 import { setBrandPageTitle } from '@/config/brand'
 import '@/features/homepage/homepage.css'
@@ -179,6 +181,8 @@ export function ApiCourseDetailPage() {
   const navigate = useNavigate()
   const { session } = useAuthSession()
   const courseQuery = usePublicCourse(slug)
+  const previewManifest = usePublicPreviewManifest(slug)
+  const [lockedSectionId, setLockedSectionId] = useState<string | null>(null)
   usePageTitle(courseQuery.data?.title ?? 'Chi tiết khóa học')
 
   if (courseQuery.isPending)
@@ -224,11 +228,6 @@ export function ApiCourseDetailPage() {
   const checkout = `/checkout/${encodeURIComponent(course.id)}`
   const openCheckout = () =>
     navigate(session ? checkout : `/login?returnTo=${encodeURIComponent(checkout)}`)
-  const openLesson = (lessonId: string) => {
-    const destination = `/learn/lessons/${encodeURIComponent(lessonId)}`
-    navigate(session ? destination : `/login?returnTo=${encodeURIComponent(destination)}`)
-  }
-
   return (
     <PublicLayout>
       <Container className="space-y-8 pt-5 pb-8 sm:pt-6 sm:pb-12">
@@ -337,8 +336,166 @@ export function ApiCourseDetailPage() {
               Các chương và bài học được sắp xếp theo từng bước để bạn dễ theo dõi.
             </p>
           </div>
-          <CourseOutline sections={course.sections} onLessonSelect={openLesson} />
+          <CourseOutline
+            sections={course.sections}
+            previewLabel="Học thử miễn phí"
+            {...(previewManifest.data?.sectionIds
+              ? { previewSectionIds: previewManifest.data.sectionIds }
+              : {})}
+            previewHref={`/courses/${encodeURIComponent(slug)}/preview`}
+            onPreviewLessonSelect={(sectionId, lessonId) =>
+              navigate(
+                `/courses/${encodeURIComponent(slug)}/preview?sectionId=${encodeURIComponent(sectionId)}&lessonId=${encodeURIComponent(lessonId)}`,
+              )
+            }
+            onLockedSectionSelect={setLockedSectionId}
+          />
         </section>
+      </Container>
+      {lockedSectionId && (
+        <BaseDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setLockedSectionId(null)
+          }}
+          title="Chương này cần đăng ký"
+          description="Nội dung đầy đủ được mở sau khi đơn hàng được Admin xác nhận."
+          tone="info"
+          footer={
+            <>
+              <Button onClick={openCheckout} endIcon={<ArrowRight aria-hidden="true" />}>
+                Đăng ký khóa học
+              </Button>
+              {!session && (
+                <LinkButton
+                  to={`/login?returnTo=${encodeURIComponent(checkout)}`}
+                  variant="outline"
+                >
+                  Đăng nhập
+                </LinkButton>
+              )}
+            </>
+          }
+        >
+          <div className="grid gap-3 rounded-control bg-surface-blue p-4 text-sm leading-6 text-ink-secondary">
+            <div className="flex items-center gap-2 font-semibold text-ink-primary">
+              <LockKeyhole aria-hidden="true" className="size-5 text-action-primary" />
+              <span>
+                {(course.previewChapterCount ?? 0) > 0
+                  ? `Học thử ${course.previewChapterCount ?? 0} chương đầu miễn phí`
+                  : 'Khóa học này không có chương học thử'}
+              </span>
+            </div>
+            <p>Đăng ký để mở toàn bộ chương, bài học và tài liệu của khóa học.</p>
+          </div>
+        </BaseDialog>
+      )}
+    </PublicLayout>
+  )
+}
+
+export function ApiCoursePreviewPage() {
+  const { slug = '' } = useParams()
+  const location = useLocation()
+  const params = new URLSearchParams(location.search)
+  const experience = usePreviewExperience(
+    slug,
+    params.get('sectionId') ?? undefined,
+    params.get('lessonId') ?? undefined,
+  )
+  const preview = experience.data?.kind === 'available' ? experience.data : null
+  const previewCount =
+    experience.data?.kind === 'available'
+      ? experience.data.sections.length
+      : experience.data && 'manifest' in experience.data
+        ? experience.data.manifest.sectionIds.length
+        : experience.data && experience.data.kind !== 'course-not-found'
+          ? (experience.data.course.previewChapterCount ?? 0)
+          : 0
+  usePageTitle(preview ? `${preview.course.title} · Học thử` : 'Học thử miễn phí')
+  return (
+    <PublicLayout>
+      <Container className="space-y-6 pt-5 pb-10 sm:pt-6 sm:pb-14">
+        <Link
+          to={`/courses/${encodeURIComponent(slug)}`}
+          className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-action-primary"
+        >
+          <ArrowLeft aria-hidden="true" className="size-4" /> Quay lại chi tiết khóa học
+        </Link>
+        {experience.isPending && <DomainState kind="loading" title="Đang tải bài học thử" />}
+        {experience.isError && (
+          <PageFailure
+            title="Không tải được bài học thử"
+            onRetry={() => void experience.refetch()}
+          />
+        )}
+        {experience.data &&
+          experience.data.kind !== 'available' &&
+          experience.data.kind !== 'course-not-found' && (
+            <Card className="grid gap-4 p-6">
+              <p className="text-sm font-bold uppercase tracking-[0.14em] text-action-primary">
+                Học thử miễn phí
+              </p>
+              <h1 className="font-display text-3xl font-extrabold">
+                {experience.data.course.title}
+              </h1>
+              <p className="leading-7 text-ink-secondary">
+                {previewCount > 0
+                  ? `${previewCount} chương đầu được mở miễn phí. Chương đang chọn chưa được cấu hình để học thử.`
+                  : 'Khóa học này chưa được cấu hình chương học thử. Hãy đăng ký để mở toàn bộ nội dung.'}
+              </p>
+              <Link
+                to={`/courses/${encodeURIComponent(slug)}`}
+                className="font-semibold text-action-primary"
+              >
+                Xem chương trình và đăng ký{' '}
+                <ArrowRight aria-hidden="true" className="inline size-4" />
+              </Link>
+            </Card>
+          )}
+        {preview && (
+          <div className="grid gap-5 lg:grid-cols-[16rem_minmax(0,1fr)]">
+            <Card className="h-fit p-4">
+              <Badge tone="preview" className="mb-3 w-fit">
+                {preview.sections.length} chương miễn phí
+              </Badge>
+              <div className="grid gap-1">
+                {preview.sections.map((section) => (
+                  <Link
+                    key={section.id}
+                    to={`/courses/${encodeURIComponent(slug)}/preview?sectionId=${encodeURIComponent(section.id)}`}
+                    className={`rounded-control px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-action-focus ${section.id === preview.section.id ? 'bg-surface-blue text-action-primary' : 'hover:bg-surface-muted'}`}
+                  >
+                    {section.title}
+                  </Link>
+                ))}
+              </div>
+            </Card>
+            <Card className="grid gap-5 p-6 sm:p-8">
+              <div>
+                <p className="text-sm font-bold uppercase tracking-[0.14em] text-action-primary">
+                  {preview.section.title}
+                </p>
+                <h1 className="mt-2 font-display text-3xl font-extrabold">
+                  {preview.lesson.title}
+                </h1>
+                <p className="mt-2 text-sm text-ink-secondary">
+                  Nội dung học thử · không cần đăng nhập
+                </p>
+              </div>
+              <div className="grid gap-4 leading-7 text-ink-secondary">
+                {preview.content.paragraphs.map((paragraph) => (
+                  <p key={paragraph}>{paragraph}</p>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-3 border-t border-border-subtle pt-4">
+                <LinkButton to={`/courses/${encodeURIComponent(slug)}`}>
+                  Đăng ký để mở toàn bộ khóa học <ArrowRight aria-hidden="true" />
+                </LinkButton>
+              </div>
+            </Card>
+          </div>
+        )}
       </Container>
     </PublicLayout>
   )

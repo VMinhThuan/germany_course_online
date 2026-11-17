@@ -47,7 +47,14 @@ export const QuizAttemptStatus = ['IN_PROGRESS', 'SUBMITTED'] as const
 export type QuizAttemptStatus = (typeof QuizAttemptStatus)[number]
 export const OrderType = ['PURCHASE', 'RENEWAL'] as const
 export type OrderType = (typeof OrderType)[number]
-export const OrderStatus = ['PENDING', 'PAID', 'FAILED', 'CANCELLED', 'EXPIRED'] as const
+export const OrderStatus = [
+  'PENDING',
+  'PAID',
+  'FAILED',
+  'CANCELLED',
+  'REJECTED',
+  'EXPIRED',
+] as const
 export type OrderStatus = (typeof OrderStatus)[number]
 export const PaymentStatus = ['PENDING', 'SUCCESS', 'FAILED'] as const
 export type PaymentStatus = (typeof PaymentStatus)[number]

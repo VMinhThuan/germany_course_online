@@ -7,8 +7,8 @@ export function getPreviewSections(
 ): readonly PublicPreviewSection[] | null {
   if (
     manifest.courseSlug !== course.slug ||
-    manifest.sectionIds.length !== 3 ||
-    new Set(manifest.sectionIds).size !== 3
+    manifest.sectionIds.length === 0 ||
+    new Set(manifest.sectionIds).size !== manifest.sectionIds.length
   ) {
     return null
   }

@@ -3,7 +3,7 @@ import type { MediaViewModel } from '@/domains/media/models'
 
 export interface PublicPreviewManifest {
   courseSlug: string
-  sectionIds: readonly [string, string, string]
+  sectionIds: readonly string[]
   notice: string
 }
 

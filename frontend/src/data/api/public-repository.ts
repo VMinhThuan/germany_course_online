@@ -4,6 +4,7 @@ import type {
   ApiCourseSummary,
   ApiPage,
   ApiPublicSiteSettings,
+  ApiPreviewLesson,
 } from '@/lib/api/types'
 import type { CourseDetailModel, CourseSummaryModel } from '@/domains/catalog/models'
 import type { PublicCourseRepository } from '@/data/public-demo/types'
@@ -19,6 +20,9 @@ function mapSummary(course: ApiCourseSummary): CourseSummaryModel {
     ...(course.thumbnailUrl ? { thumbnailUrl: course.thumbnailUrl } : {}),
     priceVnd: course.price,
     accessDurationMonths: course.accessDurationMonths,
+    ...(course.previewChapterCount !== undefined
+      ? { previewChapterCount: course.previewChapterCount }
+      : {}),
     status: course.status,
     chapterCount: course.chapterCount,
     lessonCount: course.lessonCount,
@@ -37,8 +41,9 @@ function mapDetail(course: ApiCourseDetail): CourseDetailModel {
       thumbnailUrl: course.thumbnail?.url ?? course.banner?.url ?? null,
       price: course.price,
       accessDurationMonths: course.accessDurationMonths,
+      previewChapterCount: course.previewChapterCount,
       status: 'PUBLISHED',
-      chapterCount: course.sections.length,
+      chapterCount: course.sections.filter((section) => section.sectionType === 'CHAPTER').length,
       lessonCount: course.sections.reduce((sum, section) => sum + section.lessons.length, 0),
     }),
     description: course.description,
@@ -49,9 +54,10 @@ function mapDetail(course: ApiCourseDetail): CourseDetailModel {
       courseId: course.id,
       title: section.title,
       ...(section.description ? { description: section.description } : {}),
-      sectionType: 'CHAPTER',
+      sectionType: section.sectionType,
       contentStatus: 'PUBLISHED',
       sortOrder: section.sortOrder,
+      isPreview: section.isPreview,
       lessons: section.lessons.map((lesson) => ({
         id: lesson.id,
         title: lesson.title,
@@ -91,11 +97,32 @@ export const apiPublicRepository: PublicCourseRepository & {
       throw error
     }
   },
-  async getPreviewManifest() {
-    return null
+  async getPreviewManifest(slug) {
+    const course = await apiRequest<ApiCourseDetail>(`/courses/${encodeURIComponent(slug)}`, {
+      auth: false,
+    })
+    const sectionIds = course.sections
+      .filter((section) => section.isPreview)
+      .map((section) => section.id)
+    if (sectionIds.length === 0) return null
+    return {
+      courseSlug: slug,
+      sectionIds,
+      notice: `${sectionIds.length} chương đầu được mở miễn phí. Các chương còn lại cần đăng ký khóa học.`,
+    }
   },
-  async getPreviewLesson() {
-    return null
+  async getPreviewLesson(slug, sectionId, lessonId) {
+    return apiRequest<ApiPreviewLesson>(
+      `/courses/${encodeURIComponent(slug)}/preview/lessons/${encodeURIComponent(lessonId)}?sectionId=${encodeURIComponent(sectionId)}`,
+      { auth: false },
+    ).then((lesson) => ({
+      courseSlug: lesson.courseSlug,
+      sectionId: lesson.sectionId,
+      lessonId: lesson.lessonId,
+      paragraphs: lesson.paragraphs,
+      keyPhrases: [],
+      media: [],
+    }))
   },
   async getPublicSiteSettings() {
     return apiRequest<ApiPublicSiteSettings>('/site-settings/public', { auth: false })

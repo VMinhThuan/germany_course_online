@@ -15,6 +15,8 @@ vi.mock('@/data/public-demo', async () => {
     usePublicCourse: () => ({ data: course, isPending: false, isError: false, refetch: vi.fn() }),
     usePublicCourseCatalog: vi.fn(),
     usePublicCourseCatalogPage: vi.fn(),
+    usePublicPreviewManifest: () => ({ data: null, isPending: false, isError: false }),
+    usePreviewExperience: vi.fn(),
     usePublicSiteSettings: vi.fn(),
   }
 })

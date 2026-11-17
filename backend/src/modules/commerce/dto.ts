@@ -8,6 +8,32 @@ export type PaymentInstructionsDto = {
   transferInstructions: string;
 };
 
+export type VietQrConfig = {
+  bankBin: string;
+  accountNumber: string;
+  accountName?: string;
+  template: string;
+};
+
+export function buildVietQrUrl(
+  config: VietQrConfig,
+  amount: string,
+  orderCode: string,
+): string {
+  if (!/^[1-9]\d*$/.test(amount))
+    throw new Error("VietQR amount must be a positive VND integer.");
+  if (!/^[A-Z0-9_-]{1,25}$/.test(orderCode))
+    throw new Error("VietQR transfer content is invalid.");
+  const url = new URL(
+    `https://img.vietqr.io/image/${config.bankBin}-${config.accountNumber}-${config.template}.png`,
+  );
+  url.searchParams.set("amount", amount);
+  url.searchParams.set("addInfo", orderCode);
+  if (config.accountName)
+    url.searchParams.set("accountName", config.accountName);
+  return url.toString();
+}
+
 export function amountAsVnd(value: unknown): string {
   const raw =
     value instanceof mongoose.Types.Decimal128
@@ -99,6 +125,12 @@ export function orderDto(value: object, admin = false) {
     cancellationReason:
       admin && typeof order.cancellationReason === "string"
         ? order.cancellationReason
+        : null,
+    rejectionReason:
+      !admin &&
+      order.status === "REJECTED" &&
+      typeof order.reviewNote === "string"
+        ? order.reviewNote
         : null,
     reconciliationOutcome:
       admin && typeof order.reconciliationOutcome === "string"

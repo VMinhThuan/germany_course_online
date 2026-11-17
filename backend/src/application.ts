@@ -111,13 +111,22 @@ export function createApp(
     learningService,
     mediaStorage,
   );
-  const commerceService = new CommerceService();
-  const adminService = new AdminService(mediaStorage);
   const emailOutboxWorker = new EmailOutboxWorker(emailService, {
     ...(config.allowedOrigins[0]
       ? { frontendBaseUrl: config.allowedOrigins[0] }
       : {}),
+    ...(config.adminNotificationEmail
+      ? { adminNotificationEmail: config.adminNotificationEmail }
+      : {}),
   });
+  const commerceService = new CommerceService(
+    () => new Date(),
+    config.vietQr,
+    async (messageId) => {
+      await emailOutboxWorker.processMessage(messageId);
+    },
+  );
+  const adminService = new AdminService(mediaStorage);
   const databaseMiddleware = createDatabaseMiddleware(
     dependencies.ensureDatabase,
   );
@@ -220,6 +229,44 @@ export function createApp(
           "email outbox batch processed",
         );
         success(res, { processed, batchLimit: VERCEL_OUTBOX_BATCH_LIMIT });
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  app.get(
+    "/api/internal/orders/expire",
+    (req, _res, next) => {
+      if (!config.cronSecret)
+        return next(
+          new AppError(
+            503,
+            "CRON_NOT_CONFIGURED",
+            "Scheduled order expiration is not configured.",
+          ),
+        );
+      if (
+        !hasValidCronAuthorization(
+          req.header("authorization"),
+          config.cronSecret,
+        )
+      )
+        return next(
+          new AppError(401, "UNAUTHORIZED", "Authentication is required."),
+        );
+      next();
+    },
+    databaseMiddleware,
+    async (_req, res, next) => {
+      res.setHeader("Cache-Control", "no-store");
+      try {
+        const expired = await commerceService.expirePendingOrders();
+        logger.info(
+          { requestId: res.locals.requestId, expired },
+          "pending orders expired",
+        );
+        success(res, { expired });
       } catch (error) {
         next(error);
       }

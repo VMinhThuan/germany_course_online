@@ -5,6 +5,8 @@ export { EnrollmentAdjustment } from "./enrollment-adjustment.js";
 export type { EnrollmentAdjustmentFields } from "./enrollment-adjustment.js";
 export { Order } from "./order.js";
 export type { OrderFields } from "./order.js";
+export { PaymentConfirmation } from "./payment-confirmation.js";
+export type { PaymentConfirmationFields } from "./payment-confirmation.js";
 export { RenewalPlan } from "./renewal-plan.js";
 export type { RenewalPlanFields } from "./renewal-plan.js";
 export { Coupon } from "./coupon.js";

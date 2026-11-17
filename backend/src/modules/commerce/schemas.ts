@@ -62,7 +62,7 @@ export const pageQuerySchema = z
     page: z.coerce.number().int().min(1).max(100_000).default(1),
     pageSize: z.coerce.number().int().min(1).max(100).default(20),
     status: z
-      .enum(["PENDING", "PAID", "FAILED", "CANCELLED", "EXPIRED"])
+      .enum(["PENDING", "PAID", "FAILED", "CANCELLED", "REJECTED", "EXPIRED"])
       .optional(),
   })
   .strict();
@@ -76,7 +76,10 @@ const queryBoolean = z.preprocess(
 );
 
 export const adminOrderQuerySchema = pageQuerySchema
-  .extend({ paymentSubmitted: queryBoolean })
+  .extend({
+    paymentSubmitted: queryBoolean,
+    q: z.string().trim().max(120).optional(),
+  })
   .strict();
 
 export const orderIdParamsSchema = z.object({ orderId: objectId }).strict();
@@ -91,6 +94,10 @@ export const adminOrderCancelSchema = z.strictObject({
     "NO_FUNDS_RECEIVED",
     "REFUND_CONFIRMED_EXTERNALLY",
   ]),
+});
+
+export const adminOrderRejectSchema = z.strictObject({
+  reason: z.string().trim().min(1).max(1000),
 });
 
 export const bankTransferPatchSchema = z

@@ -269,6 +269,12 @@ export const adminRepository = {
       body: input,
     })
   },
+  rejectOrder(orderId: string, reason: string) {
+    return apiRequest<ApiAdminOrderDetail>(`/admin/orders/${pathId(orderId)}/reject`, {
+      method: 'POST',
+      body: { reason },
+    })
+  },
   getSiteSettings() {
     return apiRequest<ApiAdminSiteSettings>('/admin/site-settings')
   },

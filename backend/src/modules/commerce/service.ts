@@ -11,6 +11,7 @@ import {
   EnrollmentAdjustment,
   MediaAsset,
   Order,
+  PaymentConfirmation,
   RenewalPlan,
   SiteSettings,
   User,
@@ -23,7 +24,10 @@ import {
   enrollmentDto,
   orderDto,
   toIso,
+  buildVietQrUrl,
   toPaymentInstructions,
+  type PaymentInstructionsDto,
+  type VietQrConfig,
 } from "./dto.js";
 import type {
   AdminOrderQuery,
@@ -47,6 +51,8 @@ const PAYMENT_CONFIGURATION_UNAVAILABLE = () =>
     "PAYMENT_CONFIGURATION_UNAVAILABLE",
     "Bank transfer instructions are not configured for checkout.",
   );
+
+const ORDER_PENDING_TTL_MS = 24 * 60 * 60 * 1000;
 
 type Page<T> = {
   items: T[];
@@ -85,8 +91,24 @@ type CheckoutPricing = {
   automaticDiscountAmount: string;
 };
 
+type OutboxMessageProcessor = (messageId: Types.ObjectId) => Promise<void>;
+
 export class CommerceService {
-  constructor(private readonly now: () => Date = () => new Date()) {}
+  constructor(
+    private readonly now: () => Date = () => new Date(),
+    private readonly vietQr?: VietQrConfig,
+    private readonly processOutboxMessage?: OutboxMessageProcessor,
+  ) {}
+
+  private async processCommittedEmail(messageId: Types.ObjectId | null) {
+    if (!messageId || !this.processOutboxMessage) return;
+    try {
+      await this.processOutboxMessage(messageId);
+    } catch {
+      // The durable outbox row remains available for Cron/manual retry. SMTP
+      // failures must never change the already-committed business result.
+    }
+  }
 
   async quote(userId: string, query: CheckoutQuoteQuery) {
     const pricing = await this.calculateCheckout(userId, query);
@@ -211,7 +233,7 @@ export class CommerceService {
           .select("+payment")
           .session(session)
           .lean();
-        if (!toPaymentInstructions(settings?.payment))
+        if (!this.paymentConfigurationAvailable(settings?.payment))
           throw PAYMENT_CONFIGURATION_UNAVAILABLE();
 
         if (pricing.totalAmount === "0")
@@ -228,10 +250,12 @@ export class CommerceService {
           pricing.discountAmount,
         );
         const total = mongoose.Types.Decimal128.fromString(pricing.totalAmount);
+        const createdAt = this.now();
         const [created] = await Order.create(
           [
             {
-              orderCode: createOrderCode(this.now()),
+              orderCode: createOrderCode(createdAt),
+              createdAt,
               userId: userObjectId,
               courseId: new Types.ObjectId(pricing.courseId),
               orderType: input.orderType,
@@ -263,7 +287,7 @@ export class CommerceService {
                 ? { idempotencyKey, requestFingerprint: fingerprint }
                 : {}),
               paidAt: null,
-              expiresAt: null,
+              expiresAt: new Date(createdAt.getTime() + ORDER_PENDING_TTL_MS),
             } satisfies Partial<OrderFields>,
           ],
           { session },
@@ -328,6 +352,7 @@ export class CommerceService {
     userId: string,
     query: PageQuery,
   ): Promise<Page<unknown>> {
+    await this.expirePendingOrders();
     const filter: Record<string, unknown> = {
       userId: new Types.ObjectId(userId),
     };
@@ -348,6 +373,7 @@ export class CommerceService {
   }
 
   async getOwnedOrder(userId: string, orderId: string) {
+    await this.expirePendingOrder(new Types.ObjectId(orderId));
     const order = await Order.findOne({
       _id: new Types.ObjectId(orderId),
       userId: new Types.ObjectId(userId),
@@ -358,8 +384,8 @@ export class CommerceService {
       .select("+payment")
       .lean();
     const paymentInstructions =
-      order.status === "PENDING"
-        ? toPaymentInstructions(settings?.payment)
+      order.status === "PENDING" || order.status === "REJECTED"
+        ? this.paymentInstructions(settings?.payment, order)
         : null;
     const enrollment =
       order.status === "PAID"
@@ -380,9 +406,12 @@ export class CommerceService {
   async confirmTransfer(userId: string, orderId: string) {
     const userObjectId = new Types.ObjectId(userId);
     const orderObjectId = new Types.ObjectId(orderId);
+    const submittedAt = this.now();
+    await this.expirePendingOrder(orderObjectId, submittedAt);
     let submittedOrderId: Types.ObjectId;
+    let emailLogId: Types.ObjectId | null = null;
     try {
-      submittedOrderId = await withTransaction(async (session) => {
+      const result = await withTransaction(async (session) => {
         const order = await Order.findOne({
           _id: orderObjectId,
           userId: userObjectId,
@@ -390,28 +419,77 @@ export class CommerceService {
           .session(session)
           .lean();
         if (!order) throw notFound("Order not found.");
-        if (order.status !== "PENDING")
+        if (order.status === "PAID" || order.status === "CANCELLED")
           throw new AppError(
             409,
             "ORDER_NOT_PENDING",
             "Only pending orders can report a bank transfer.",
           );
-        if (order.paymentSubmittedAt) return order._id;
+        if (order.status === "EXPIRED")
+          throw new AppError(
+            409,
+            "ORDER_EXPIRED",
+            "This order has expired. Please create a new order.",
+          );
+        if (order.status !== "PENDING" && order.status !== "REJECTED")
+          throw new AppError(
+            409,
+            "ORDER_NOT_RESUBMITTABLE",
+            "This order cannot receive another transfer confirmation.",
+          );
+
+        const pendingConfirmation = await PaymentConfirmation.findOne({
+          orderId: order._id,
+          status: "PENDING",
+        })
+          .session(session)
+          .lean();
+        if (pendingConfirmation)
+          return { orderId: order._id, emailLogId: null };
+        if (order.status === "PENDING" && order.paymentSubmittedAt)
+          return { orderId: order._id, emailLogId: null };
+
+        if (
+          order.status === "PENDING" &&
+          order.expiresAt &&
+          order.expiresAt <= submittedAt
+        )
+          throw new AppError(
+            409,
+            "ORDER_EXPIRED",
+            "This order has expired. Please create a new order.",
+          );
 
         const user = await User.findById(userObjectId)
           .select("fullName email")
           .session(session)
           .lean();
         if (!user) throw notFound("Student account not found.");
-        const submittedAt = this.now();
+        const settings = await SiteSettings.findById("site")
+          .select("+payment")
+          .session(session)
+          .lean();
+        const payment = this.paymentInstructions(settings?.payment, order);
+        if (!payment) throw PAYMENT_CONFIGURATION_UNAVAILABLE();
         const update = await Order.updateOne(
           {
             _id: order._id,
             userId: userObjectId,
-            status: "PENDING",
-            paymentSubmittedAt: null,
+            status: order.status,
+            ...(order.status === "PENDING" ? { paymentSubmittedAt: null } : {}),
+            ...(order.status === "PENDING" && order.expiresAt
+              ? { expiresAt: { $gt: submittedAt } }
+              : {}),
           },
-          { $set: { paymentSubmittedAt: submittedAt } },
+          {
+            $set: {
+              status: "PENDING",
+              paymentSubmittedAt: submittedAt,
+              reviewedById: null,
+              reviewedAt: null,
+              reviewNote: null,
+            },
+          },
           { session },
         );
         if (update.modifiedCount !== 1) {
@@ -422,7 +500,17 @@ export class CommerceService {
             .session(session)
             .lean();
           if (current?.status === "PENDING" && current.paymentSubmittedAt)
-            return current._id;
+            return { orderId: current._id, emailLogId: null };
+          if (
+            current?.status === "PENDING" &&
+            current.expiresAt &&
+            current.expiresAt <= submittedAt
+          )
+            throw new AppError(
+              409,
+              "ORDER_EXPIRED",
+              "This order has expired. Please create a new order.",
+            );
           throw new AppError(
             409,
             "ORDER_NOT_PENDING",
@@ -430,7 +518,26 @@ export class CommerceService {
           );
         }
 
-        await EmailLog.create(
+        const attempts = await PaymentConfirmation.countDocuments({
+          orderId: order._id,
+        }).session(session);
+        await PaymentConfirmation.create(
+          [
+            {
+              orderId: order._id,
+              userId: userObjectId,
+              attemptNumber: attempts + 1,
+              submittedAt,
+              status: "PENDING",
+              reviewedById: null,
+              reviewedAt: null,
+              rejectionReason: null,
+            },
+          ],
+          { session },
+        );
+
+        const [emailLog] = await EmailLog.create(
           [
             {
               userId: null,
@@ -439,15 +546,20 @@ export class CommerceService {
               templateType: "TRANSFER_SUBMITTED_ADMIN",
               subject: `Bank transfer reported: ${order.orderCode}`,
               templateData: {
+                orderId: order._id.toString(),
                 orderCode: order.orderCode,
                 studentName: user.fullName,
                 studentEmail: user.email,
                 courseTitle: order.courseTitleSnapshot,
                 amount: amountAsVnd(order.totalAmount),
+                bankName: payment.bankName,
+                accountNumber: payment.accountNumber,
+                transferContent: order.orderCode,
                 submittedAt: submittedAt.toISOString(),
+                attemptNumber: attempts + 1,
               },
               status: "PENDING",
-              dedupeKey: `${order._id.toString()}:TRANSFER_SUBMITTED_ADMIN`,
+              dedupeKey: `${order._id.toString()}:TRANSFER_SUBMITTED_ADMIN:${attempts + 1}`,
               attempts: 0,
               providerMessageId: null,
               sentAt: null,
@@ -460,8 +572,12 @@ export class CommerceService {
           ],
           { session },
         );
-        return order._id;
+        if (!emailLog)
+          throw new Error("Transfer notification was not created.");
+        return { orderId: order._id, emailLogId: emailLog._id };
       });
+      submittedOrderId = result.orderId;
+      emailLogId = result.emailLogId;
     } catch (error) {
       if (isDuplicateKeyError(error)) {
         const existing = await Order.findOne({
@@ -470,12 +586,139 @@ export class CommerceService {
           status: "PENDING",
           paymentSubmittedAt: { $ne: null },
         }).lean();
-        if (existing)
-          return this.getOwnedOrder(userId, existing._id.toString());
-      }
-      throw error;
+        if (existing) {
+          submittedOrderId = existing._id;
+          const existingEmail = await EmailLog.findOne({
+            recipientType: "ADMIN",
+            templateType: "TRANSFER_SUBMITTED_ADMIN",
+            "templateData.orderId": existing._id.toString(),
+            status: { $in: ["PENDING", "PROCESSING"] },
+          })
+            .sort({ createdAt: -1 })
+            .select("_id")
+            .lean();
+          emailLogId = existingEmail?._id ?? null;
+        } else throw error;
+      } else throw error;
     }
+    await this.processCommittedEmail(emailLogId);
     return this.getOwnedOrder(userId, submittedOrderId.toString());
+  }
+
+  async expirePendingOrders(limit = 100): Promise<number> {
+    const candidates = await Order.find({
+      status: "PENDING",
+      paymentSubmittedAt: null,
+      expiresAt: { $ne: null, $lte: this.now() },
+    })
+      .select("_id")
+      .sort({ expiresAt: 1, _id: 1 })
+      .limit(Math.max(1, Math.min(500, Math.floor(limit))))
+      .lean();
+    let expired = 0;
+    for (const candidate of candidates) {
+      const result = await this.expirePendingOrder(candidate._id);
+      if (result?.status === "EXPIRED") expired += 1;
+    }
+    return expired;
+  }
+
+  private async expirePendingOrder(
+    orderId: Types.ObjectId,
+    now = this.now(),
+  ): Promise<{ status: string } | null> {
+    return withTransaction((session) =>
+      this.expirePendingOrderInTransaction(orderId, session, now),
+    );
+  }
+
+  private async expirePendingOrderInTransaction(
+    orderId: Types.ObjectId,
+    session: mongoose.ClientSession,
+    now: Date,
+  ) {
+    const order = await Order.findOne({ _id: orderId }).session(session).lean();
+    if (!order) return null;
+    if (
+      order.status !== "PENDING" ||
+      order.paymentSubmittedAt ||
+      !order.expiresAt ||
+      order.expiresAt > now
+    )
+      return { status: order.status };
+
+    const updated = await Order.updateOne(
+      {
+        _id: order._id,
+        status: "PENDING",
+        paymentSubmittedAt: null,
+        expiresAt: { $lte: now },
+      },
+      { $set: { status: "EXPIRED" } },
+      { session },
+    );
+    if (updated.modifiedCount !== 1) return { status: "PENDING" };
+    await this.releaseCouponReservation(
+      order as OrderFields & { _id: Types.ObjectId },
+      session,
+      now,
+    );
+    await AuditLog.create(
+      [
+        {
+          actorUserId: null,
+          action: "ORDER_EXPIRED",
+          entityType: "ORDER",
+          entityId: order._id,
+          oldValue: { status: "PENDING", paymentSubmittedAt: null },
+          newValue: { status: "EXPIRED", expiredAt: now.toISOString() },
+          ipAddress: null,
+        },
+      ],
+      { session },
+    );
+    return { status: "EXPIRED" };
+  }
+
+  private paymentConfigurationAvailable(payment: unknown): boolean {
+    return Boolean(
+      toPaymentInstructions(payment) ||
+      (this.vietQr?.bankBin &&
+        this.vietQr.accountNumber &&
+        this.vietQr.accountName),
+    );
+  }
+
+  private paymentInstructions(
+    payment: unknown,
+    order?: Pick<OrderFields, "totalAmount" | "orderCode">,
+  ): PaymentInstructionsDto | null {
+    const configured = toPaymentInstructions(payment);
+    // Admin-managed payment settings are the explicit override. Environment
+    // VietQR is the fallback for installations that have not configured them.
+    const accountNumber =
+      configured?.accountNumber ?? this.vietQr?.accountNumber;
+    const accountHolderName =
+      configured?.accountHolderName ?? this.vietQr?.accountName;
+    if (!accountNumber || !accountHolderName) return configured;
+    const base = configured ?? {
+      bankName: "BIDV",
+      accountNumber,
+      accountHolderName,
+      qrUrl: "",
+      transferInstructions:
+        "Chuyển khoản đúng số tiền và ghi mã đơn hàng ở nội dung chuyển khoản.",
+    };
+    const qrUrl =
+      !configured && this.vietQr && order
+        ? buildVietQrUrl(
+            this.vietQr,
+            amountAsVnd(order.totalAmount),
+            order.orderCode,
+          )
+        : base.qrUrl;
+    if (!qrUrl) return null;
+    return { ...base, accountNumber, accountHolderName, qrUrl };
   }
 
   async cancelStudentOrder(userId: string, orderId: string) {
@@ -645,11 +888,138 @@ export class CommerceService {
     return this.getAdminOrder(orderObjectId.toString());
   }
 
+  async rejectOrder(
+    adminId: string,
+    orderId: string,
+    reason: string,
+    ipAddress: string | null,
+  ) {
+    const adminObjectId = new Types.ObjectId(adminId);
+    const orderObjectId = new Types.ObjectId(orderId);
+    const emailLogId = await withTransaction(async (session) => {
+      const order = await Order.findById(orderObjectId).session(session).lean();
+      if (!order) throw notFound("Order not found.");
+      if (order.status === "REJECTED") return null;
+      if (order.status !== "PENDING")
+        throw new AppError(
+          409,
+          "ORDER_ALREADY_REVIEWED",
+          "Only pending orders can be rejected.",
+        );
+      const pendingConfirmation = await PaymentConfirmation.findOne({
+        orderId: order._id,
+        status: "PENDING",
+      })
+        .session(session)
+        .lean();
+      const now = this.now();
+      const update = await Order.updateOne(
+        { _id: order._id, status: "PENDING" },
+        {
+          $set: {
+            status: "REJECTED",
+            reviewedById: adminObjectId,
+            reviewedAt: now,
+            reviewNote: reason,
+            cancellationReason: reason,
+          },
+        },
+        { session },
+      );
+      if (update.modifiedCount !== 1)
+        throw new AppError(
+          409,
+          "ORDER_ALREADY_REVIEWED",
+          "Order changed before rejection.",
+        );
+      if (pendingConfirmation) {
+        const confirmationCas = await PaymentConfirmation.updateOne(
+          { _id: pendingConfirmation._id, status: "PENDING" },
+          {
+            $set: {
+              status: "REJECTED",
+              reviewedById: adminObjectId,
+              reviewedAt: now,
+              rejectionReason: reason,
+            },
+          },
+          { session },
+        );
+        if (confirmationCas.modifiedCount !== 1)
+          throw new AppError(
+            409,
+            "PAYMENT_CONFIRMATION_ALREADY_REVIEWED",
+            "The transfer confirmation changed before rejection.",
+          );
+      }
+      await this.releaseCouponReservation(
+        order as OrderFields & { _id: Types.ObjectId },
+        session,
+        now,
+      );
+      await AuditLog.create(
+        [
+          {
+            actorUserId: adminObjectId,
+            action: "ORDER_REJECTED_BY_ADMIN",
+            entityType: "ORDER",
+            entityId: order._id,
+            oldValue: {
+              status: "PENDING",
+              paymentSubmittedAt: toIso(order.paymentSubmittedAt),
+            },
+            newValue: { status: "REJECTED", reason },
+            ipAddress,
+          },
+        ],
+        { session },
+      );
+      const user = await User.findById(order.userId)
+        .select("email")
+        .session(session)
+        .lean();
+      if (user)
+        return queueStudentEmail(
+          session,
+          order.userId,
+          user.email,
+          "ORDER_REJECTED_STUDENT",
+          `Payment rejected: ${order.orderCode}`,
+          {
+            orderId: order._id.toString(),
+            orderCode: order.orderCode,
+            reason,
+          },
+          `${order._id.toString()}:ORDER_REJECTED_STUDENT`,
+          now,
+        );
+      return null;
+    });
+    await this.processCommittedEmail(emailLogId);
+    return this.getAdminOrder(orderObjectId.toString());
+  }
+
   async listAdminOrders(query: AdminOrderQuery): Promise<Page<unknown>> {
+    await this.expirePendingOrders();
     const filter: Record<string, unknown> = {};
     if (query.status) filter.status = query.status;
     if (query.paymentSubmitted !== undefined)
       filter.paymentSubmittedAt = query.paymentSubmitted ? { $ne: null } : null;
+    if (query.q) {
+      const escaped = query.q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const matchingUsers = await User.find({
+        $or: [
+          { fullName: new RegExp(escaped, "i") },
+          { email: new RegExp(escaped, "i") },
+        ],
+      })
+        .select("_id")
+        .lean();
+      filter.$or = [
+        { orderCode: new RegExp(escaped, "i") },
+        { userId: { $in: matchingUsers.map((user) => user._id) } },
+      ];
+    }
     const [orders, total] = await Promise.all([
       Order.find(filter)
         .sort({ status: 1, paymentSubmittedAt: 1, createdAt: 1, _id: 1 })
@@ -663,6 +1033,7 @@ export class CommerceService {
   }
 
   async getAdminOrder(orderId: string) {
+    await this.expirePendingOrder(new Types.ObjectId(orderId));
     const order = await Order.findById(new Types.ObjectId(orderId)).lean();
     if (!order) throw notFound("Order not found.");
     return (await this.adminOrderContext([order]))[0];
@@ -674,18 +1045,25 @@ export class CommerceService {
     if (!orders.length) return [];
     const userIds = orders.map((order) => order.userId as Types.ObjectId);
     const courseIds = orders.map((order) => order.courseId as Types.ObjectId);
-    const [users, courses, enrollments] = await Promise.all([
-      User.find({ _id: { $in: userIds } })
-        .select("fullName email")
-        .lean(),
-      Course.find({ _id: { $in: courseIds } })
-        .select("code title status deletedAt")
-        .lean(),
-      Enrollment.find({
-        userId: { $in: userIds },
-        courseId: { $in: courseIds },
-      }).lean(),
-    ]);
+    const [users, courses, enrollments, settings, confirmations] =
+      await Promise.all([
+        User.find({ _id: { $in: userIds } })
+          .select("fullName email")
+          .lean(),
+        Course.find({ _id: { $in: courseIds } })
+          .select("code title status deletedAt")
+          .lean(),
+        Enrollment.find({
+          userId: { $in: userIds },
+          courseId: { $in: courseIds },
+        }).lean(),
+        SiteSettings.findById("site").select("+payment").lean(),
+        PaymentConfirmation.find({
+          orderId: { $in: orders.map((order) => order._id) },
+        })
+          .sort({ attemptNumber: 1 })
+          .lean(),
+      ]);
     const redemptions = await CouponRedemption.find({
       orderId: { $in: orders.map((order) => order._id) },
     }).lean();
@@ -710,6 +1088,13 @@ export class CommerceService {
     const redemptionByOrder = new Map(
       redemptions.map((row) => [row.orderId.toString(), row]),
     );
+    const confirmationsByOrder = new Map<string, typeof confirmations>();
+    for (const confirmation of confirmations) {
+      const key = confirmation.orderId.toString();
+      const history = confirmationsByOrder.get(key) ?? [];
+      history.push(confirmation);
+      confirmationsByOrder.set(key, history);
+    }
     return orders.map((order) => {
       const user = usersById.get(order.userId.toString());
       const course = coursesById.get(order.courseId.toString());
@@ -717,6 +1102,17 @@ export class CommerceService {
         `${order.userId}:${order.courseId}`,
       );
       const redemption = redemptionByOrder.get(order._id.toString());
+      const paymentConfirmationHistory = (
+        confirmationsByOrder.get(order._id.toString()) ?? []
+      ).map((confirmation) => ({
+        id: confirmation._id.toString(),
+        attemptNumber: confirmation.attemptNumber,
+        submittedAt: toIso(confirmation.submittedAt),
+        status: confirmation.status,
+        reviewedById: confirmation.reviewedById?.toString() ?? null,
+        reviewedAt: toIso(confirmation.reviewedAt),
+        rejectionReason: confirmation.rejectionReason,
+      }));
       return {
         order: orderDto(order, true),
         student: user
@@ -759,6 +1155,8 @@ export class CommerceService {
               releasedAt: toIso(redemption.releasedAt),
             }
           : null,
+        paymentInstructions: this.paymentInstructions(settings?.payment, order),
+        paymentConfirmations: paymentConfirmationHistory,
       };
     });
   }
@@ -772,7 +1170,11 @@ export class CommerceService {
     const adminObjectId = new Types.ObjectId(adminId);
     const orderObjectId = new Types.ObjectId(orderId);
     const now = this.now();
-    let result: { orderId: Types.ObjectId; enrollmentId: Types.ObjectId };
+    let result: {
+      orderId: Types.ObjectId;
+      enrollmentId: Types.ObjectId;
+      emailLogId: Types.ObjectId;
+    };
     try {
       result = await withTransaction(async (session) => {
         const order = await Order.findById(orderObjectId)
@@ -790,6 +1192,19 @@ export class CommerceService {
             409,
             "TRANSFER_NOT_SUBMITTED",
             "Student must report the bank transfer before approval.",
+          );
+
+        const pendingConfirmation = await PaymentConfirmation.findOne({
+          orderId: order._id,
+          status: "PENDING",
+        })
+          .session(session)
+          .lean();
+        if (!pendingConfirmation)
+          throw new AppError(
+            409,
+            "PAYMENT_CONFIRMATION_NOT_PENDING",
+            "There is no pending transfer confirmation to approve. Ask the student to report the transfer first.",
           );
 
         const existingEnrollment = await Enrollment.findOne({
@@ -863,6 +1278,27 @@ export class CommerceService {
             "ORDER_ALREADY_REVIEWED",
             "Order state changed before approval.",
           );
+
+        if (pendingConfirmation) {
+          const confirmationCas = await PaymentConfirmation.updateOne(
+            { _id: pendingConfirmation._id, status: "PENDING" },
+            {
+              $set: {
+                status: "APPROVED",
+                reviewedById: adminObjectId,
+                reviewedAt: now,
+                rejectionReason: null,
+              },
+            },
+            { session },
+          );
+          if (confirmationCas.modifiedCount !== 1)
+            throw new AppError(
+              409,
+              "PAYMENT_CONFIRMATION_ALREADY_REVIEWED",
+              "The transfer confirmation changed before approval.",
+            );
+        }
 
         let enrollmentId: Types.ObjectId;
         if (order.orderType === "PURCHASE") {
@@ -958,7 +1394,7 @@ export class CommerceService {
           order.orderType === "PURCHASE"
             ? "ORDER_APPROVED_STUDENT"
             : "RENEWAL_APPROVED_STUDENT";
-        await queueStudentEmail(
+        const emailLogId = await queueStudentEmail(
           session,
           order.userId,
           user.email,
@@ -968,13 +1404,14 @@ export class CommerceService {
             courseTitle: order.courseTitleSnapshot,
             orderCode: order.orderCode,
             durationMonths: order.durationMonthsSnapshot,
+            activatedAt: now.toISOString(),
             expiresAt: expiresAt.toISOString(),
             learningUrl: `/student/courses/${order.courseId.toString()}`,
           },
           `${order._id.toString()}:${templateType}`,
           now,
         );
-        return { orderId: order._id, enrollmentId };
+        return { orderId: order._id, enrollmentId, emailLogId };
       });
     } catch (error) {
       if (isDuplicateKeyError(error)) {
@@ -1001,6 +1438,7 @@ export class CommerceService {
       throw error;
     }
 
+    await this.processCommittedEmail(result.emailLogId);
     const approvedOrder = await Order.findById(result.orderId).lean();
     const enrollment = await Enrollment.findById(result.enrollmentId).lean();
     if (!approvedOrder || !enrollment)
@@ -1257,9 +1695,21 @@ export class CommerceService {
         orderType: "PURCHASE",
         status: "PENDING",
       });
-      const pending = await (
+      let pending = await (
         session ? pendingQuery.session(session) : pendingQuery
       ).lean();
+      if (pending && pending.expiresAt && pending.expiresAt <= this.now()) {
+        if (session)
+          await this.expirePendingOrderInTransaction(
+            pending._id,
+            session,
+            this.now(),
+          );
+        else await this.expirePendingOrder(pending._id);
+        pending = await (
+          session ? pendingQuery.session(session) : pendingQuery
+        ).lean();
+      }
       if (pending)
         throw new AppError(
           409,
@@ -1329,9 +1779,21 @@ export class CommerceService {
         orderType: "RENEWAL",
         status: "PENDING",
       });
-      const pending = await (
+      let pending = await (
         session ? pendingQuery.session(session) : pendingQuery
       ).lean();
+      if (pending && pending.expiresAt && pending.expiresAt <= this.now()) {
+        if (session)
+          await this.expirePendingOrderInTransaction(
+            pending._id,
+            session,
+            this.now(),
+          );
+        else await this.expirePendingOrder(pending._id);
+        pending = await (
+          session ? pendingQuery.session(session) : pendingQuery
+        ).lean();
+      }
       if (pending)
         throw new AppError(
           409,
@@ -1522,6 +1984,7 @@ async function queueStudentEmail(
     | "ORDER_APPROVED_STUDENT"
     | "RENEWAL_APPROVED_STUDENT"
     | "ORDER_CANCELLED_STUDENT"
+    | "ORDER_REJECTED_STUDENT"
     | "ENROLLMENT_GRANTED_STUDENT"
     | "ENROLLMENT_REVOKED_STUDENT"
     | "ENROLLMENT_RESTORED_STUDENT"
@@ -1530,8 +1993,8 @@ async function queueStudentEmail(
   templateData: Record<string, unknown>,
   dedupeKey: string,
   availableAt: Date,
-) {
-  await EmailLog.create(
+): Promise<Types.ObjectId> {
+  const [emailLog] = await EmailLog.create(
     [
       {
         userId,
@@ -1554,6 +2017,8 @@ async function queueStudentEmail(
     ],
     { session },
   );
+  if (!emailLog) throw new Error("Student notification was not created.");
+  return emailLog._id;
 }
 
 function requestFingerprint(input: OrderCreateInput): string {

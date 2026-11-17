@@ -48,6 +48,7 @@ const courseWriteFields = {
   introVideoAssetId: assetId.optional(),
   price: z.string().regex(/^(0|[1-9]\d{0,11})$/),
   accessDurationMonths: z.number().int().min(1).max(120),
+  previewChapterCount: z.number().int().min(0).max(10_000).optional(),
   sortOrder: z.number().int().min(0).max(1_000_000),
 };
 export const createCourseSchema = z.strictObject({
@@ -76,6 +77,7 @@ export const coursePatchSchema = z
     introVideoAssetId: assetId.optional(),
     price: courseWriteFields.price.optional(),
     accessDurationMonths: courseWriteFields.accessDurationMonths.optional(),
+    previewChapterCount: courseWriteFields.previewChapterCount.optional(),
     sortOrder: courseWriteFields.sortOrder.optional(),
     status: z.enum(["DRAFT", "ARCHIVED"]).optional(),
   })

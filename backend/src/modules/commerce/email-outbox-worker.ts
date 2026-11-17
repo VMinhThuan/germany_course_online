@@ -12,8 +12,8 @@ export const EMAIL_OUTBOX_BATCH_LIMIT = BATCH_LIMIT;
 
 type WorkerOptions = {
   now?: () => Date;
-  intervalMs?: number;
   frontendBaseUrl?: string;
+  adminNotificationEmail?: string;
 };
 
 type OutboxJob = {
@@ -23,6 +23,7 @@ type OutboxJob = {
   recipientEmail?: string | null;
   templateType:
     | "TRANSFER_SUBMITTED_ADMIN"
+    | "ORDER_REJECTED_STUDENT"
     | "ORDER_APPROVED_STUDENT"
     | "RENEWAL_APPROVED_STUDENT"
     | "ORDER_CANCELLED_STUDENT"
@@ -38,36 +39,17 @@ type OutboxJob = {
 
 export class EmailOutboxWorker {
   private readonly now: () => Date;
-  private readonly intervalMs: number;
   private readonly frontendBaseUrl: string;
-  private interval: NodeJS.Timeout | undefined;
+  private readonly adminNotificationEmail: string | undefined;
   private activePoll: Promise<number> | undefined;
-  private stopping = false;
 
   constructor(
     private readonly emailService: EmailService,
     options: WorkerOptions = {},
   ) {
     this.now = options.now ?? (() => new Date());
-    this.intervalMs = options.intervalMs ?? 5_000;
     this.frontendBaseUrl = (options.frontendBaseUrl ?? "").replace(/\/$/, "");
-  }
-
-  start(): void {
-    if (this.interval || this.stopping || !this.emailService.available) return;
-    void this.runOnce().catch(() => undefined);
-    this.interval = setInterval(() => {
-      if (!this.stopping && !this.activePoll)
-        void this.runOnce().catch(() => undefined);
-    }, this.intervalMs);
-    this.interval.unref();
-  }
-
-  async stop(): Promise<void> {
-    this.stopping = true;
-    if (this.interval) clearInterval(this.interval);
-    this.interval = undefined;
-    await this.activePoll?.catch(() => undefined);
+    this.adminNotificationEmail = options.adminNotificationEmail;
   }
 
   async runOnce(limit = BATCH_LIMIT): Promise<number> {
@@ -84,10 +66,20 @@ export class EmailOutboxWorker {
     }
   }
 
+  /** Process one known outbox row after its transaction has committed. */
+  async processMessage(messageId: Types.ObjectId | string): Promise<boolean> {
+    if (!this.emailService.available) return false;
+    const id =
+      typeof messageId === "string" ? new Types.ObjectId(messageId) : messageId;
+    const job = await this.claim({ _id: id });
+    if (!job) return false;
+    await this.deliver(job);
+    return true;
+  }
+
   private async processBatch(limit: number): Promise<number> {
     let processed = 0;
     for (let index = 0; index < limit; index += 1) {
-      if (this.stopping) break;
       const job = await this.claim();
       if (!job) break;
       await this.deliver(job);
@@ -96,10 +88,13 @@ export class EmailOutboxWorker {
     return processed;
   }
 
-  private async claim(): Promise<OutboxJob | null> {
+  private async claim(
+    filter: Record<string, unknown> = {},
+  ): Promise<OutboxJob | null> {
     const now = this.now();
     return EmailLog.findOneAndUpdate(
       {
+        ...filter,
         $or: [
           { status: "PENDING", availableAt: { $lte: now } },
           { status: "PROCESSING", leaseExpiresAt: { $lte: now } },
@@ -169,25 +164,70 @@ export class EmailOutboxWorker {
   private async buildNotification(job: OutboxJob): Promise<NotificationEmail> {
     const data = asRecord(job.templateData);
     if (job.templateType === "TRANSFER_SUBMITTED_ADMIN") {
-      const admins = await User.find({ role: "ADMIN", status: "ACTIVE" })
-        .select("email")
-        .lean();
-      const recipients = [
-        ...new Set(admins.map((admin) => admin.email).filter(Boolean)),
-      ];
+      const admins = this.adminNotificationEmail
+        ? []
+        : await User.find({ role: "ADMIN", status: "ACTIVE" })
+            .select("email")
+            .lean();
+      const recipients = this.adminNotificationEmail
+        ? [this.adminNotificationEmail]
+        : [...new Set(admins.map((admin) => admin.email).filter(Boolean))];
       if (!recipients.length) throw new MissingRecipientError();
+      const reviewUrl = `${this.frontendBaseUrl}/admin/orders/${encodeURIComponent(requiredText(data.orderId))}`;
       return {
         to: recipients,
-        subject: "A student reported a bank transfer",
+        subject: `[LMS] Giao dịch đang chờ xác nhận - ${requiredText(data.orderCode)}`,
         text: [
-          "A bank transfer has been reported and requires manual review.",
-          `Order: ${requiredText(data.orderCode)}`,
-          `Student: ${requiredText(data.studentName)} (${requiredText(data.studentEmail)})`,
-          `Course: ${requiredText(data.courseTitle)}`,
-          `Amount: ${requiredText(data.amount)} VND`,
-          `Submitted at: ${requiredText(data.submittedAt)}`,
-          "Review the incoming bank transaction in the Admin order queue before approving.",
+          "Có giao dịch chuyển khoản cần đối soát thủ công.",
+          `Học viên: ${requiredText(data.studentName)} (${requiredText(data.studentEmail)})`,
+          `Khóa học: ${requiredText(data.courseTitle)}`,
+          `Mã đơn: ${requiredText(data.orderCode)}`,
+          `Số tiền: ${requiredText(data.amount)} VND`,
+          `Ngân hàng nhận: ${requiredText(data.bankName)}`,
+          `Số tài khoản nhận: ${requiredText(data.accountNumber)}`,
+          `Nội dung chuyển khoản: ${requiredText(data.transferContent)}`,
+          `Khách xác nhận lúc: ${requiredText(data.submittedAt)}`,
+          "Trạng thái: Chờ admin kiểm tra",
+          `XEM VÀ DUYỆT GIAO DỊCH: ${reviewUrl}`,
+          "Link chỉ mở giao dịch; không tự động phê duyệt.",
         ].join("\n"),
+        html: `
+          <h2>Có giao dịch chuyển khoản cần đối soát</h2>
+          <p><strong>Trạng thái:</strong> Chờ admin kiểm tra</p>
+          <dl>
+            <dt>Học viên</dt><dd>${escapeHtml(requiredText(data.studentName))} (${escapeHtml(requiredText(data.studentEmail))})</dd>
+            <dt>Khóa học</dt><dd>${escapeHtml(requiredText(data.courseTitle))}</dd>
+            <dt>Mã đơn</dt><dd>${escapeHtml(requiredText(data.orderCode))}</dd>
+            <dt>Số tiền</dt><dd>${escapeHtml(requiredText(data.amount))} VND</dd>
+            <dt>Ngân hàng nhận</dt><dd>${escapeHtml(requiredText(data.bankName))}</dd>
+            <dt>Số tài khoản nhận</dt><dd>${escapeHtml(requiredText(data.accountNumber))}</dd>
+            <dt>Nội dung chuyển khoản</dt><dd>${escapeHtml(requiredText(data.transferContent))}</dd>
+            <dt>Khách xác nhận lúc</dt><dd>${escapeHtml(requiredText(data.submittedAt))}</dd>
+          </dl>
+          <p><a href="${escapeHtml(reviewUrl)}">Xem và duyệt giao dịch</a></p>
+          <p>Link chỉ mở giao dịch; không tự động phê duyệt.</p>
+        `.trim(),
+      };
+    }
+
+    if (job.templateType === "ORDER_REJECTED_STUDENT") {
+      if (!job.recipientEmail) throw new MissingRecipientError();
+      const orderUrl = data.orderId
+        ? `${this.frontendBaseUrl}/student/orders/${encodeURIComponent(requiredText(data.orderId))}`
+        : undefined;
+      return {
+        to: [job.recipientEmail],
+        subject: "Giao dịch khóa học chưa được xác nhận",
+        text: [
+          `Đơn ${requiredText(data.orderCode)} chưa được xác nhận thanh toán.`,
+          `Lý do: ${requiredText(data.reason)}`,
+          "Vui lòng liên hệ hỗ trợ hoặc kiểm tra lại thông tin chuyển khoản trước khi gửi lại yêu cầu.",
+        ].join("\n"),
+        ...(orderUrl
+          ? {
+              html: `<h2>Giao dịch chưa được xác nhận</h2><p>Đơn <strong>${escapeHtml(requiredText(data.orderCode))}</strong> chưa được xác nhận thanh toán.</p><p><strong>Lý do:</strong> ${escapeHtml(requiredText(data.reason))}</p><p><a href="${escapeHtml(orderUrl)}">Mở đơn hàng và gửi lại yêu cầu</a></p>`,
+            }
+          : {}),
       };
     }
 
@@ -213,9 +253,13 @@ export class EmailOutboxWorker {
             : `Your course access for ${requiredText(data.courseTitle)} has been approved.`,
           ...(data.orderCode ? [`Order: ${requiredText(data.orderCode)}`] : []),
           `Access duration: ${requiredText(data.durationMonths)} months`,
+          ...(data.activatedAt
+            ? [`Access starts: ${requiredText(data.activatedAt)}`]
+            : []),
           `Access expires: ${requiredText(data.expiresAt)}`,
           ...(this.frontendBaseUrl ? [`Open your course: ${learningUrl}`] : []),
         ].join("\n"),
+        html: `<h2>${job.templateType === "RENEWAL_APPROVED_STUDENT" ? "Gia hạn khóa học đã được duyệt" : "Quyền học đã được kích hoạt"}</h2><p>${escapeHtml(requiredText(data.courseTitle))}</p>${data.activatedAt ? `<p>Bắt đầu: ${escapeHtml(requiredText(data.activatedAt))}</p>` : ""}<p>Thời hạn: ${escapeHtml(requiredText(data.durationMonths))} tháng</p><p>Hết hạn: ${escapeHtml(requiredText(data.expiresAt))}</p>${this.frontendBaseUrl ? `<p><a href="${escapeHtml(learningUrl)}">Mở khóa học</a></p>` : ""}`,
       };
     }
 
@@ -288,4 +332,18 @@ function requiredText(value: unknown): string {
   return String(value)
     .replace(/[\r\n]/g, " ")
     .slice(0, 1000);
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(
+    /[&<>"']/g,
+    (character) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[character] ?? character,
+  );
 }

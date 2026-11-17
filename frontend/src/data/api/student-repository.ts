@@ -194,8 +194,10 @@ function mapOrderSummary(order: ApiOrder): OrderSummaryViewModel {
     itemTitle: orderTitle,
     amountVnd: order.totalAmount,
     createdAt: order.createdAt,
+    expiresAt: order.expiresAt,
     paymentStatus:
       order.status === 'PAID' ? 'SUCCESS' : order.status === 'PENDING' ? 'PENDING' : 'FAILED',
+    ...(order.rejectionReason ? { rejectionReason: order.rejectionReason } : {}),
   }
 }
 

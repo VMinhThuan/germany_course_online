@@ -334,6 +334,62 @@ paths:
         idempotency: Safe read
         validation: Draft/soft-deleted is not found
       security: []
+  /courses/{slug}/preview/lessons/{lessonId}:
+    get:
+      operationId: getPublicPreviewLesson
+      summary: Read a configured free preview lesson
+      tags:
+        - Public
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string, pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+        - name: lessonId
+          in: path
+          required: true
+          schema: { type: string, pattern: "^[a-fA-F0-9]{24}$" }
+        - name: sectionId
+          in: query
+          required: true
+          schema: { type: string, pattern: "^[a-fA-F0-9]{24}$" }
+      responses:
+        "200":
+          description: Sanitized preview content.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success: { type: boolean, const: true }
+                  data:
+                    type: object
+                    required: [courseSlug, sectionId, lessonId, title, paragraphs, video, media]
+                    properties:
+                      courseSlug: { type: string }
+                      sectionId: { type: string }
+                      lessonId: { type: string }
+                      title: { type: string }
+                      paragraphs: { type: array, items: { type: string } }
+                      video: { nullable: true, type: object }
+                      media: { type: array, items: { $ref: "#/components/schemas/PublicMedia" } }
+        "404":
+          description: Preview is not configured for the requested section/lesson.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+      x-contract:
+        access: PUBLIC
+        backendModule: catalog
+        relatedCollections: [courses, course_sections, lessons]
+        frontendOperation: PublicCourseRepository.getPreviewLesson(slug, sectionId, lessonId)
+        query: sectionId
+        requestBody: none
+        responseData: PreviewLesson
+        idempotency: Safe read
+        validation: Only the first previewChapterCount published CHAPTER sections by sortOrder are readable
+      security: []
   /media/{assetId}/metadata:
     get:
       operationId: getPublicMediaMetadata
@@ -8459,6 +8515,53 @@ paths:
         validation: Must attest NO_FUNDS_RECEIVED or REFUND_CONFIRMED_EXTERNALLY
       security:
         - AccessToken: []
+  /admin/orders/{orderId}/reject:
+    post:
+      operationId: rejectOrder
+      summary: Reject a pending manual transfer
+      tags: [Admin Management]
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema: { type: string, pattern: "^[a-fA-F0-9]{24}$" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 1, maxLength: 1000 }
+      responses:
+        "200":
+          description: Rejection and audit committed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success: { type: boolean, const: true }
+                  data: { $ref: "#/components/schemas/AdminOrderDetail" }
+        "409":
+          description: The order has already changed state.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+      x-contract:
+        access: ADMIN
+        backendModule: commerce
+        relatedCollections: [orders, coupon_redemptions, coupons, audit_logs, email_logs]
+        frontendOperation: adminRejectOrder
+        query: none
+        requestBody: AdminOrderRejectRequest
+        responseData: AdminOrderDetail
+        idempotency: Repeated rejection is a safe no-op
+        validation: Must not grant enrollment
+      security:
+        - AccessToken: []
   /admin/orders/{orderId}/approve:
     post:
       operationId: approveOrder
@@ -10356,6 +10459,9 @@ components:
           description: VND decimal integer string; MongoDB Decimal128.
         accessDurationMonths:
           type: integer
+        previewChapterCount:
+          type: integer
+          minimum: 0
         thumbnail:
           $ref: "#/components/schemas/PublicMedia"
         banner:
@@ -10375,6 +10481,7 @@ components:
         - description
         - price
         - accessDurationMonths
+        - previewChapterCount
         - sections
     PublicCourseSection:
       type: object
@@ -10384,8 +10491,15 @@ components:
           pattern: ^[a-fA-F0-9]{24}$
         title:
           type: string
+        sectionType:
+          type: string
+          enum:
+            - CHAPTER
+            - EXAM_PREP
         description:
           type: string
+        isPreview:
+          type: boolean
         sortOrder:
           type: integer
           minimum: 0
@@ -10400,7 +10514,9 @@ components:
       required:
         - id
         - title
+        - sectionType
         - sortOrder
+        - isPreview
         - lessonCount
         - lessons
     PublicLessonSummary:
@@ -12237,6 +12353,14 @@ components:
           oneOf:
             - $ref: "#/components/schemas/CouponReservation"
             - type: "null"
+        paymentInstructions:
+          oneOf:
+            - $ref: "#/components/schemas/PaymentInstructions"
+            - type: "null"
+        paymentConfirmations:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaymentConfirmation"
       additionalProperties: false
       required:
         - order
@@ -12244,6 +12368,39 @@ components:
         - course
         - existingEnrollment
         - couponReservation
+        - paymentInstructions
+        - paymentConfirmations
+    PaymentConfirmation:
+      type: object
+      properties:
+        id:
+          type: string
+          pattern: ^[a-fA-F0-9]{24}$
+        attemptNumber:
+          type: integer
+          minimum: 1
+        submittedAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [PENDING, APPROVED, REJECTED]
+        reviewedById:
+          oneOf:
+            - type: string
+              pattern: ^[a-fA-F0-9]{24}$
+            - type: "null"
+        reviewedAt:
+          oneOf:
+            - type: string
+              format: date-time
+            - type: "null"
+        rejectionReason:
+          type:
+            - string
+            - "null"
+      additionalProperties: false
+      required: [id, attemptNumber, submittedAt, status, reviewedById, reviewedAt, rejectionReason]
     AdminOrderStudentSummary:
       type: object
       properties:
@@ -12325,12 +12482,22 @@ components:
           oneOf:
             - $ref: "#/components/schemas/AdminOrderEnrollmentSummary"
             - type: "null"
+        paymentInstructions:
+          oneOf:
+            - $ref: "#/components/schemas/PaymentInstructions"
+            - type: "null"
+        paymentConfirmations:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaymentConfirmation"
       additionalProperties: false
       required:
         - order
         - student
         - course
         - existingEnrollment
+        - paymentInstructions
+        - paymentConfirmations
     SiteSettingsAdmin:
       type: object
       properties:
@@ -12723,6 +12890,9 @@ components:
         accessDurationMonths:
           type: integer
           minimum: 1
+        previewChapterCount:
+          type: integer
+          minimum: 0
         sortOrder:
           type: integer
         status:
@@ -13455,6 +13625,7 @@ components:
         - introVideoAssetId
         - price
         - accessDurationMonths
+        - previewChapterCount
         - sortOrder
         - status
         - createdAt
@@ -13551,6 +13722,10 @@ components:
           type: integer
           minimum: 1
           maximum: 120
+        previewChapterCount:
+          type: integer
+          minimum: 0
+          maximum: 10000
         sortOrder:
           type: integer
           minimum: 0
@@ -13629,6 +13804,10 @@ components:
           type: integer
           minimum: 1
           maximum: 120
+        previewChapterCount:
+          type: integer
+          minimum: 0
+          maximum: 10000
         sortOrder:
           type: integer
           minimum: 0

@@ -89,6 +89,8 @@ export function ApiLoginPage() {
   const navigate = useNavigate()
   const [search] = useSearchParams()
   const returnTo = useMemo(() => getReturnToFromSearch(search.toString()), [search])
+  const adminReturnTo = returnTo.startsWith('/admin') ? returnTo : '/admin'
+  const studentReturnTo = returnTo.startsWith('/admin') ? '/student' : returnTo
   const { status, session, acceptSession } = useAuthSession()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -96,7 +98,8 @@ export function ApiLoginPage() {
   const [requestError, setRequestError] = useState('')
   const [pending, setPending] = useState(false)
   if (status === 'checking') return <AuthChecking />
-  if (session) return <Navigate replace to={session.role === 'ADMIN' ? '/admin' : returnTo} />
+  if (session)
+    return <Navigate replace to={session.role === 'ADMIN' ? adminReturnTo : studentReturnTo} />
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -110,7 +113,7 @@ export function ApiLoginPage() {
     try {
       const restored = await apiAuth.login(email, password)
       acceptSession(restored)
-      navigate(restored.role === 'ADMIN' ? '/admin' : returnTo, { replace: true })
+      navigate(restored.role === 'ADMIN' ? adminReturnTo : studentReturnTo, { replace: true })
     } catch (error) {
       setRequestError(authError(error))
       if (error instanceof ApiError) setErrors(error.fieldErrors)
@@ -181,7 +184,10 @@ export function ApiLoginPage() {
           </Button>
         </form>
         <p className="text-center text-sm text-ink-secondary">
-          Chưa có tài khoản? <InlineProductLink to="/register">Tạo tài khoản</InlineProductLink>
+          Chưa có tài khoản?{' '}
+          <InlineProductLink to={`/register?returnTo=${encodeURIComponent(returnTo)}`}>
+            Tạo tài khoản
+          </InlineProductLink>
         </p>
       </AuthFormCard>
     </AuthPageFrame>
@@ -191,6 +197,8 @@ export function ApiLoginPage() {
 export function ApiRegisterPage() {
   usePageTitle('Tạo tài khoản')
   const navigate = useNavigate()
+  const [search] = useSearchParams()
+  const returnTo = useMemo(() => getReturnToFromSearch(search.toString()), [search])
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -230,7 +238,11 @@ export function ApiRegisterPage() {
             </InlineAlert>
             <Button
               className="w-full"
-              onClick={() => navigate('/login?registered=1', { replace: true })}
+              onClick={() =>
+                navigate(`/login?registered=1&returnTo=${encodeURIComponent(returnTo)}`, {
+                  replace: true,
+                })
+              }
             >
               Đến đăng nhập
             </Button>
@@ -310,7 +322,10 @@ export function ApiRegisterPage() {
           </>
         )}
         <p className="text-center text-sm text-ink-secondary">
-          Đã có tài khoản? <InlineProductLink to="/login">Đăng nhập</InlineProductLink>
+          Đã có tài khoản?{' '}
+          <InlineProductLink to={`/login?returnTo=${encodeURIComponent(returnTo)}`}>
+            Đăng nhập
+          </InlineProductLink>
         </p>
       </AuthFormCard>
     </AuthPageFrame>

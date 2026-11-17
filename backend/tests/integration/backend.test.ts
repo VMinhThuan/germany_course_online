@@ -90,6 +90,7 @@ async function createPublishedCourse(
   options: {
     price?: string;
     slug?: string;
+    previewChapterCount?: number;
     thumbnailAssetId?: mongoose.Types.ObjectId;
     bannerAssetId?: mongoose.Types.ObjectId;
   } = {},
@@ -108,6 +109,7 @@ async function createPublishedCourse(
     introVideoAssetId: null,
     price: mongoose.Types.Decimal128.fromString(options.price ?? "1950000"),
     accessDurationMonths: 12,
+    previewChapterCount: options.previewChapterCount ?? 0,
     status: "PUBLISHED",
     sortOrder: 1,
     deletedAt: null,
@@ -278,6 +280,29 @@ describe("Express foundation, auth, and public APIs", () => {
       expect(processed.body.data).toEqual({ processed: 0, batchLimit: 1 });
       expect(databaseCalls).toBe(1);
       expect(processed.headers["cache-control"]).toBe("no-store");
+
+      const expireRejected = await request(cronApp)
+        .get("/api/internal/orders/expire")
+        .set("Authorization", "Bearer incorrect-secret");
+      expect(expireRejected.status).toBe(401);
+      expect(databaseCalls).toBe(1);
+
+      const expirations = await Promise.all([
+        request(cronApp)
+          .get("/api/internal/orders/expire")
+          .set("Authorization", `Bearer ${cronSecret}`),
+        request(cronApp)
+          .get("/api/internal/orders/expire")
+          .set("Authorization", `Bearer ${cronSecret}`),
+      ]);
+      expect(expirations.map((response) => response.status)).toEqual([
+        200, 200,
+      ]);
+      expect(expirations.map((response) => response.body.data.expired)).toEqual(
+        [0, 0],
+      );
+      expect(databaseCalls).toBe(3);
+      expect(expirations[0]?.headers["cache-control"]).toBe("no-store");
     });
 
     it("gracefully closes the HTTP listener and disconnects the database", async () => {
@@ -1051,6 +1076,101 @@ describe("Express foundation, auth, and public APIs", () => {
       const empty = await request(app).get("/api/v1/courses?q=no-match");
       expect(empty.body.data.items).toEqual([]);
       expect(empty.body.data.total).toBe(0);
+    });
+
+    it("derives guest preview access from previewChapterCount and course order", async () => {
+      const course = await createPublishedCourse({
+        slug: "configurable-preview",
+        previewChapterCount: 1,
+      });
+      const first = await CourseSection.create({
+        courseId: course._id,
+        title: "Chapter 1",
+        sectionType: "CHAPTER",
+        sortOrder: 10,
+        status: "PUBLISHED",
+        deletedAt: null,
+      });
+      const exam = await CourseSection.create({
+        courseId: course._id,
+        title: "Exam preparation",
+        sectionType: "EXAM_PREP",
+        sortOrder: 15,
+        status: "PUBLISHED",
+        deletedAt: null,
+      });
+      const second = await CourseSection.create({
+        courseId: course._id,
+        title: "Chapter 2",
+        sectionType: "CHAPTER",
+        sortOrder: 20,
+        status: "PUBLISHED",
+        deletedAt: null,
+      });
+      const lessons = await Promise.all(
+        [first, exam, second].map((section, index) =>
+          Lesson.create({
+            sectionId: section._id,
+            title: `Lesson ${index + 1}`,
+            content: { version: 1, paragraphs: [`Public lesson ${index + 1}`] },
+            lessonType: "LECTURE",
+            estimatedMinutes: 10,
+            countsTowardProgress: true,
+            sortOrder: 1,
+            status: "PUBLISHED",
+            deletedAt: null,
+          }),
+        ),
+      );
+
+      const detail = await request(app).get(
+        "/api/v1/courses/configurable-preview",
+      );
+      expect(detail.status).toBe(200);
+      expect(detail.body.data.previewChapterCount).toBe(1);
+      expect(
+        detail.body.data.sections.map(
+          (section: { isPreview: boolean }) => section.isPreview,
+        ),
+      ).toEqual([true, false, false]);
+
+      const guestPreview = await request(app).get(
+        `/api/v1/courses/configurable-preview/preview/lessons/${lessons[0]!._id.toString()}?sectionId=${first._id.toString()}`,
+      );
+      expect(guestPreview.status).toBe(200);
+      expect(guestPreview.body.data.paragraphs).toEqual(["Public lesson 1"]);
+
+      const paidPreview = await request(app).get(
+        `/api/v1/courses/configurable-preview/preview/lessons/${lessons[2]!._id.toString()}?sectionId=${second._id.toString()}`,
+      );
+      expect(paidPreview.status).toBe(404);
+      const examPreview = await request(app).get(
+        `/api/v1/courses/configurable-preview/preview/lessons/${lessons[1]!._id.toString()}?sectionId=${exam._id.toString()}`,
+      );
+      expect(examPreview.status).toBe(404);
+
+      await Course.updateOne(
+        { _id: course._id },
+        { $set: { previewChapterCount: 2 } },
+      );
+      expect(
+        (
+          await request(app).get(
+            `/api/v1/courses/configurable-preview/preview/lessons/${lessons[2]!._id.toString()}?sectionId=${second._id.toString()}`,
+          )
+        ).status,
+      ).toBe(200);
+      await Course.updateOne(
+        { _id: course._id },
+        { $set: { previewChapterCount: 0 } },
+      );
+      expect(
+        (
+          await request(app).get(
+            `/api/v1/courses/configurable-preview/preview/lessons/${lessons[0]!._id.toString()}?sectionId=${first._id.toString()}`,
+          )
+        ).status,
+      ).toBe(404);
     });
   });
 

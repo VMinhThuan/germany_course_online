@@ -385,6 +385,93 @@ describe("BE-03B Admin CMS, media, account security, enrollment and audit APIs",
     ).toBe(404);
   });
 
+  it("preserves preview configuration across Admin section changes and clamps only invalid counts", async () => {
+    const created = await as(admin, "post", "/api/v1/admin/courses").send(
+      courseInput({ previewChapterCount: 0 }),
+    );
+    expect(created.status).toBe(201);
+    const courseId = created.body.data.id as string;
+
+    const createChapter = (title: string, sortOrder: number) =>
+      as(admin, "post", `/api/v1/admin/courses/${courseId}/sections`).send({
+        title,
+        sectionType: "CHAPTER",
+        sortOrder,
+        status: "PUBLISHED",
+      });
+
+    const first = await createChapter("Chapter 1", 1);
+    const second = await createChapter("Chapter 2", 2);
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(201);
+
+    const configured = await as(
+      admin,
+      "patch",
+      `/api/v1/admin/courses/${courseId}`,
+    ).send({ previewChapterCount: 1 });
+    expect(configured.status).toBe(200);
+    expect(configured.body.data.previewChapterCount).toBe(1);
+
+    const third = await createChapter("Chapter 3", 3);
+    expect(third.status).toBe(201);
+    expect(
+      (await as(admin, "get", `/api/v1/admin/courses/${courseId}`)).body.data
+        .previewChapterCount,
+    ).toBe(1);
+
+    const reordered = await as(
+      admin,
+      "patch",
+      `/api/v1/admin/sections/${third.body.data.id}`,
+    ).send({ sortOrder: 0 });
+    expect(reordered.status).toBe(200);
+    expect(
+      (await as(admin, "get", `/api/v1/admin/courses/${courseId}`)).body.data
+        .previewChapterCount,
+    ).toBe(1);
+
+    const hidden = await as(
+      admin,
+      "patch",
+      `/api/v1/admin/sections/${first.body.data.id}`,
+    ).send({ status: "HIDDEN" });
+    expect(hidden.status).toBe(200);
+    expect(
+      (await as(admin, "get", `/api/v1/admin/courses/${courseId}`)).body.data
+        .previewChapterCount,
+    ).toBe(1);
+
+    const deletedSecond = await as(
+      admin,
+      "delete",
+      `/api/v1/admin/sections/${second.body.data.id}`,
+    );
+    expect(deletedSecond.status).toBe(200);
+    expect(
+      (await as(admin, "get", `/api/v1/admin/courses/${courseId}`)).body.data
+        .previewChapterCount,
+    ).toBe(1);
+
+    const deletedThird = await as(
+      admin,
+      "delete",
+      `/api/v1/admin/sections/${third.body.data.id}`,
+    );
+    expect(deletedThird.status).toBe(200);
+    expect(
+      (await as(admin, "get", `/api/v1/admin/courses/${courseId}`)).body.data
+        .previewChapterCount,
+    ).toBe(0);
+
+    const fourth = await createChapter("Chapter 4", 4);
+    expect(fourth.status).toBe(201);
+    expect(
+      (await as(admin, "get", `/api/v1/admin/courses/${courseId}`)).body.data
+        .previewChapterCount,
+    ).toBe(0);
+  });
+
   it("rejects invalid hierarchy substitutions and unsafe lesson content", async () => {
     const mismatch = await as(
       admin,

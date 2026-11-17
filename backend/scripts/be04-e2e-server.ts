@@ -33,6 +33,8 @@ const fixtureIds = {
   course: "660000000000000000000003",
   section: "660000000000000000000004",
   lesson: "660000000000000000000005",
+  secondSection: "66000000000000000000000f",
+  secondLesson: "660000000000000000000010",
   fileExercise: "660000000000000000000006",
   quizExercise: "660000000000000000000007",
   answerPdf: "660000000000000000000008",
@@ -130,6 +132,7 @@ async function seedFixtures() {
     introVideoAssetId: null,
     price: mongoose.Types.Decimal128.fromString("1950000"),
     accessDurationMonths: 12,
+    previewChapterCount: 1,
     status: "PUBLISHED",
     sortOrder: 1,
     deletedAt: null,
@@ -178,33 +181,63 @@ async function seedFixtures() {
     },
   ]);
 
-  await CourseSection.create({
-    _id: section,
-    courseId: course,
-    title: "Chào hỏi · dữ liệu kiểm thử",
-    description: "Chương tổng hợp để kiểm chứng quyền truy cập.",
-    sectionType: "CHAPTER",
-    sortOrder: 1,
-    status: "PUBLISHED",
-    deletedAt: null,
-  });
-
-  await Lesson.create({
-    _id: lesson,
-    sectionId: section,
-    title: "Guten Tag · bài học E2E",
-    description: "Bài học giả lập trong môi trường kiểm thử cô lập.",
-    content: {
-      version: 1,
-      paragraphs: ["Guten Tag!", "Wie heißt du? Ich heiße Alex."],
+  await CourseSection.create([
+    {
+      _id: section,
+      courseId: course,
+      title: "Chào hỏi · dữ liệu kiểm thử",
+      description: "Chương tổng hợp để kiểm chứng quyền truy cập.",
+      sectionType: "CHAPTER",
+      sortOrder: 1,
+      status: "PUBLISHED",
+      deletedAt: null,
     },
-    lessonType: "LECTURE",
-    estimatedMinutes: 5,
-    countsTowardProgress: true,
-    sortOrder: 1,
-    status: "PUBLISHED",
-    deletedAt: null,
-  });
+    {
+      _id: new mongoose.Types.ObjectId(fixtureIds.secondSection),
+      courseId: course,
+      title: "Giới thiệu bản thân · chương trả phí",
+      description: "Chương thứ hai dùng để kiểm chứng giới hạn preview.",
+      sectionType: "CHAPTER",
+      sortOrder: 2,
+      status: "PUBLISHED",
+      deletedAt: null,
+    },
+  ]);
+
+  await Lesson.create([
+    {
+      _id: lesson,
+      sectionId: section,
+      title: "Guten Tag · bài học E2E",
+      description: "Bài học giả lập trong môi trường kiểm thử cô lập.",
+      content: {
+        version: 1,
+        paragraphs: ["Guten Tag!", "Wie heißt du? Ich heiße Alex."],
+      },
+      lessonType: "LECTURE",
+      estimatedMinutes: 5,
+      countsTowardProgress: true,
+      sortOrder: 1,
+      status: "PUBLISHED",
+      deletedAt: null,
+    },
+    {
+      _id: new mongoose.Types.ObjectId(fixtureIds.secondLesson),
+      sectionId: new mongoose.Types.ObjectId(fixtureIds.secondSection),
+      title: "Ich heiße … · bài học trả phí",
+      description: "Bài học thứ hai dùng để kiểm chứng khóa truy cập.",
+      content: {
+        version: 1,
+        paragraphs: ["Ich heiße Alex."],
+      },
+      lessonType: "LECTURE",
+      estimatedMinutes: 6,
+      countsTowardProgress: true,
+      sortOrder: 1,
+      status: "PUBLISHED",
+      deletedAt: null,
+    },
+  ]);
 
   await Exercise.create([
     {

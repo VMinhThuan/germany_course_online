@@ -6,6 +6,7 @@ const protectedTargets = new Set([
   '/student/profile',
   '/student/security/password',
   '/student/security/sessions',
+  '/admin',
 ])
 
 const protectedTargetPatterns = [
@@ -18,9 +19,10 @@ const protectedTargetPatterns = [
   /^\/orders\/[A-Za-z0-9_-]+\/(?:pending|result)$/,
   /^\/student\/orders\/[A-Za-z0-9_-]+$/,
   /^\/student\/courses\/[A-Za-z0-9_-]+\/renew$/,
+  /^\/admin\/orders\/[A-Za-z0-9_-]+$/,
 ]
 
-/** Restrict returnTo to known internal student pages; it can never redirect to another origin. */
+/** Restrict returnTo to known internal protected pages; it can never redirect to another origin. */
 export function sanitizeReturnTo(value: string | null | undefined, fallback = '/student') {
   if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) {
     return fallback

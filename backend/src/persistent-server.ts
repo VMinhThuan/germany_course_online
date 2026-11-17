@@ -6,7 +6,6 @@ import { ensureIndexes } from "./db/ensure-indexes.js";
 import { createApp } from "./application.js";
 import { createLogger } from "./http/logger.js";
 import { closeHttpServer, listenHttp } from "./http/server-lifecycle.js";
-import { EmailOutboxWorker } from "./modules/commerce/email-outbox-worker.js";
 
 async function main(): Promise<void> {
   const config = parseEnvironment(process.env);
@@ -39,14 +38,10 @@ async function main(): Promise<void> {
   }
 
   let shuttingDown = false;
-  const emailOutboxWorker = app.locals.emailOutboxWorker as EmailOutboxWorker;
-  emailOutboxWorker.start();
   const shutdown = (signal: string) => {
     if (shuttingDown) return;
     shuttingDown = true;
-    void closeHttpServer(server, disconnectMongo, logger, signal, () =>
-      emailOutboxWorker.stop(),
-    )
+    void closeHttpServer(server, disconnectMongo, logger, signal)
       .then(() => {
         process.exitCode = 0;
       })

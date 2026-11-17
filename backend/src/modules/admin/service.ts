@@ -25,6 +25,7 @@ import {
 import { withTransaction } from "../../db/connection.js";
 import type { MediaProvider } from "../../config/env.js";
 import { AppError, conflict, notFound } from "../../shared/errors.js";
+import { normalizePreviewChapterCount } from "../../shared/course-preview.js";
 import { addUtcCalendarMonths } from "../commerce/dto.js";
 import { normalizeCouponCode } from "../commerce/pricing.js";
 import {
@@ -189,6 +190,7 @@ export class AdminService {
                 : null,
               price: mongoose.Types.Decimal128.fromString(input.price),
               accessDurationMonths: input.accessDurationMonths,
+              previewChapterCount: input.previewChapterCount ?? 0,
               sortOrder: input.sortOrder,
               status: "DRAFT",
               deletedAt: null,
@@ -197,6 +199,11 @@ export class AdminService {
           { session },
         );
         const result = created[0]!;
+        await this.assertPreviewChapterCount(
+          result._id,
+          input.previewChapterCount ?? 0,
+          session,
+        );
         await audit(
           actor,
           "COURSE_CREATED",
@@ -233,6 +240,12 @@ export class AdminService {
           update.slug = update.slug.toLowerCase();
         if (typeof update.price === "string")
           update.price = mongoose.Types.Decimal128.fromString(update.price);
+        if (Object.hasOwn(update, "previewChapterCount"))
+          await this.assertPreviewChapterCount(
+            course._id,
+            update.previewChapterCount,
+            session,
+          );
         course.set(update);
         await course.save({ session, validateModifiedOnly: true });
         await audit(
@@ -383,6 +396,7 @@ export class AdminService {
       if (patch.status === "PUBLISHED")
         await this.assertSectionTreePublishable(section._id, session);
       await section.save({ session, validateModifiedOnly: true });
+      await this.clampPreviewChapterCount(section.get("courseId"), session);
       await audit(
         actor,
         "SECTION_UPDATED",
@@ -403,6 +417,7 @@ export class AdminService {
       if (!section.get("deletedAt")) {
         section.set("deletedAt", this.now());
         await section.save({ session });
+        await this.clampPreviewChapterCount(section.get("courseId"), session);
         await audit(
           actor,
           "SECTION_SOFT_DELETED",
@@ -2414,6 +2429,54 @@ export class AdminService {
       );
       if (locked.modifiedCount !== 1)
         throw conflict("Referenced media asset is no longer available.");
+    }
+  }
+
+  private async assertPreviewChapterCount(
+    courseId: Types.ObjectId,
+    value: unknown,
+    session: mongoose.ClientSession,
+  ) {
+    const previewChapterCount = normalizePreviewChapterCount(value);
+    if (value !== previewChapterCount)
+      throw new AppError(
+        422,
+        "INVALID_PREVIEW_CHAPTER_COUNT",
+        "Preview chapter count must be a non-negative integer.",
+      );
+    const availableChapterCount = await CourseSection.countDocuments({
+      courseId,
+      sectionType: "CHAPTER",
+      status: { $ne: "HIDDEN" },
+      deletedAt: null,
+    }).session(session);
+    if (previewChapterCount > availableChapterCount)
+      throw conflict(
+        `Preview chapter count cannot exceed the ${availableChapterCount} active CHAPTER sections.`,
+      );
+  }
+
+  private async clampPreviewChapterCount(
+    courseId: Types.ObjectId,
+    session: mongoose.ClientSession,
+  ) {
+    const course = await Course.findOne({
+      _id: courseId,
+      deletedAt: null,
+    }).session(session);
+    if (!course) return;
+    const availableChapterCount = await CourseSection.countDocuments({
+      courseId,
+      sectionType: "CHAPTER",
+      status: { $ne: "HIDDEN" },
+      deletedAt: null,
+    }).session(session);
+    const configuredCount = normalizePreviewChapterCount(
+      course.get("previewChapterCount"),
+    );
+    if (configuredCount > availableChapterCount) {
+      course.set("previewChapterCount", availableChapterCount);
+      await course.save({ session, validateModifiedOnly: true });
     }
   }
 

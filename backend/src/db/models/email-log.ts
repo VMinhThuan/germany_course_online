@@ -21,6 +21,7 @@ const emailLogSchema = new Schema(
       type: String,
       enum: [
         "TRANSFER_SUBMITTED_ADMIN",
+        "ORDER_REJECTED_STUDENT",
         "ORDER_APPROVED_STUDENT",
         "RENEWAL_APPROVED_STUDENT",
         "ORDER_CANCELLED_STUDENT",

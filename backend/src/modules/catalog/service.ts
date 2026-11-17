@@ -8,11 +8,13 @@ import {
 } from "../../db/models/index.js";
 import type { MediaProvider } from "../../config/env.js";
 import { notFound } from "../../shared/errors.js";
+import { getPreviewSectionIds } from "../../shared/course-preview.js";
 import type {
   MediaResourceType,
   MediaStorageAdapter,
 } from "../learning/media-storage.js";
 import { DEFAULT_SITE_SETTINGS } from "../site-settings/defaults.js";
+import { safeLessonContent } from "../learning/dto.js";
 import {
   getAssociatedPublicMedia,
   toPublicMedia,
@@ -40,7 +42,9 @@ type PublicSection = {
   id: string;
   title: string;
   description?: string;
+  sectionType: "CHAPTER" | "EXAM_PREP";
   sortOrder: number;
+  isPreview: boolean;
   lessonCount: number;
   lessons: PublicLesson[];
 };
@@ -70,7 +74,7 @@ export class PublicCatalogService {
     const sort = sortFor(query.sort);
     const courses = await Course.find(filter)
       .select(
-        "code title slug level shortDescription thumbnailAssetId bannerAssetId price accessDurationMonths status sortOrder",
+        "code title slug level shortDescription thumbnailAssetId bannerAssetId price accessDurationMonths status sortOrder previewChapterCount",
       )
       .sort(sort)
       .skip((query.page - 1) * query.pageSize)
@@ -84,7 +88,7 @@ export class PublicCatalogService {
           status: "PUBLISHED",
           deletedAt: null,
         })
-          .select("_id courseId")
+          .select("_id courseId sectionType")
           .lean()
       : [];
     const sectionIds = sections.map((section) => section._id);
@@ -109,7 +113,7 @@ export class PublicCatalogService {
     for (const section of sections) {
       const key = String(section.courseId);
       const counts = countsByCourse.get(key) ?? { sections: 0, lessons: 0 };
-      counts.sections += 1;
+      if (section.sectionType === "CHAPTER") counts.sections += 1;
       counts.lessons += lessonsBySection.get(String(section._id)) ?? 0;
       countsByCourse.set(key, counts);
     }
@@ -179,7 +183,7 @@ export class PublicCatalogService {
       deletedAt: null,
     })
       .select(
-        "code title slug description shortDescription objectives requirements level thumbnailAssetId bannerAssetId introVideoAssetId price accessDurationMonths",
+        "code title slug description shortDescription objectives requirements level thumbnailAssetId bannerAssetId introVideoAssetId price accessDurationMonths previewChapterCount",
       )
       .lean();
     if (!course) throw notFound("Published course not found.");
@@ -189,9 +193,12 @@ export class PublicCatalogService {
       status: "PUBLISHED",
       deletedAt: null,
     })
-      .select("_id title description sortOrder")
+      .select("_id title description sectionType sortOrder")
       .sort({ sortOrder: 1, _id: 1 })
       .lean();
+    const previewSectionIds = new Set(
+      getPreviewSectionIds(sections, Number(course.previewChapterCount ?? 0)),
+    );
     const sectionIds = sections.map((section) => section._id);
     const lessons = sectionIds.length
       ? await Lesson.find({
@@ -226,7 +233,9 @@ export class PublicCatalogService {
         id: String(section._id),
         title: section.title,
         ...(section.description ? { description: section.description } : {}),
+        sectionType: section.sectionType as PublicSection["sectionType"],
         sortOrder: section.sortOrder,
+        isPreview: previewSectionIds.has(String(section._id)),
         lessonCount: sectionLessons.length,
         lessons: sectionLessons,
       };
@@ -249,10 +258,83 @@ export class PublicCatalogService {
       level: course.level,
       price: decimalIntegerString(course.price),
       accessDurationMonths: course.accessDurationMonths,
+      previewChapterCount: Number(course.previewChapterCount ?? 0),
       thumbnail,
       banner,
       introMedia,
       sections: publicSections,
+    };
+  }
+
+  async getPreviewLesson(slug: string, sectionId: string, lessonId: string) {
+    if (
+      !mongoose.isValidObjectId(sectionId) ||
+      !mongoose.isValidObjectId(lessonId)
+    )
+      throw notFound("Preview lesson not found.");
+    const course = await Course.findOne({
+      slug,
+      status: "PUBLISHED",
+      deletedAt: null,
+    })
+      .select("_id slug title previewChapterCount")
+      .lean();
+    if (!course) throw notFound("Published course not found.");
+    const previewSections = await CourseSection.find({
+      courseId: course._id,
+      status: "PUBLISHED",
+      deletedAt: null,
+    })
+      .select("_id sectionType sortOrder")
+      .sort({ sortOrder: 1, _id: 1 })
+      .lean();
+    const previewSectionIds = new Set(
+      getPreviewSectionIds(
+        previewSections,
+        Number(course.previewChapterCount ?? 0),
+      ),
+    );
+    const section = await CourseSection.findOne({
+      _id: new mongoose.Types.ObjectId(sectionId),
+      courseId: course._id,
+      sectionType: "CHAPTER",
+      status: "PUBLISHED",
+      deletedAt: null,
+    }).lean();
+    if (!section || !previewSectionIds.has(String(section._id)))
+      throw notFound("Preview section not found.");
+    const lesson = await Lesson.findOne({
+      _id: new mongoose.Types.ObjectId(lessonId),
+      sectionId: section._id,
+      status: "PUBLISHED",
+      deletedAt: null,
+    })
+      .select("_id sectionId title content video lessonType estimatedMinutes")
+      .select("+content")
+      .lean();
+    if (!lesson) throw notFound("Preview lesson not found.");
+    const content = safeLessonContent(lesson.content);
+    const paragraphs =
+      typeof content === "object" && content !== null && "paragraphs" in content
+        ? Array.isArray((content as { paragraphs?: unknown }).paragraphs)
+          ? (content as { paragraphs: unknown[] }).paragraphs.filter(
+              (value): value is string => typeof value === "string",
+            )
+          : []
+        : typeof content === "string"
+          ? content
+              .split(/\n{2,}/)
+              .map((value) => value.trim())
+              .filter(Boolean)
+          : [];
+    return {
+      courseSlug: course.slug,
+      sectionId: section._id.toString(),
+      lessonId: lesson._id.toString(),
+      title: lesson.title,
+      paragraphs,
+      video: lesson.video ?? null,
+      media: [],
     };
   }
 

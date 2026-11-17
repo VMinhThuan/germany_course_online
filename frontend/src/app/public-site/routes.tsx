@@ -1,13 +1,19 @@
 import { useLayoutEffect, useEffect, useRef } from 'react'
 import { useLocation, useNavigationType, useRoutes, type RouteObject } from 'react-router'
 import { PublicHelpPage, PublicNotFoundPage } from './pages'
-import { ApiCourseCatalogPage, ApiCourseDetailPage, ApiPublicLandingPage } from './api-pages'
+import {
+  ApiCourseCatalogPage,
+  ApiCourseDetailPage,
+  ApiCoursePreviewPage,
+  ApiPublicLandingPage,
+} from './api-pages'
 import { authRoutes, studentRoutes } from '@/app/auth/routes'
 
 export const publicSiteRoutes: RouteObject[] = [
   { path: '/', element: <ApiPublicLandingPage /> },
   { path: '/courses', element: <ApiCourseCatalogPage /> },
   { path: '/courses/:slug', element: <ApiCourseDetailPage /> },
+  { path: '/courses/:slug/preview', element: <ApiCoursePreviewPage /> },
   { path: '/help', element: <PublicHelpPage /> },
 ]
 

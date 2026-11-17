@@ -37,6 +37,15 @@ describe('public demo preview use cases', () => {
     ).toBeNull()
   })
 
+  it('supports a configured preview with fewer than three chapters', () => {
+    const course = structuredClone(PUBLIC_DEMO_COURSE)
+    const sections = getPreviewSections(course, {
+      ...PUBLIC_PREVIEW_MANIFEST,
+      sectionIds: ['a11-chapter-01'],
+    })
+    expect(sections?.map((section) => section.id)).toEqual(['a11-chapter-01'])
+  })
+
   it('returns not-found for an unknown course slug', async () => {
     const repository = createPublicDemoRepository()
     await expect(loadPreviewExperience(repository, 'not-a-course')).resolves.toEqual({
