@@ -520,7 +520,7 @@ test('Admin renewal plan, enrollment lifecycle and partial settings changes use 
   const admin = await browser.newPage()
   const adminToken = await login(admin, 'admin.be04@example.test')
   await admin.goto('/admin/renewal-plans')
-  await selectAdminOption(admin, 'Khóa học', /BE05-CMS-A1/)
+  await selectAdminOption(admin, 'Khóa học', /BE05-E2E-A12/)
   await admin.getByLabel('Tên gói').fill('Gói gia hạn BE-05 tạo từ UI')
   await admin.getByLabel('Số tháng').fill('6')
   await admin.getByLabel('Giá (VND nguyên)').fill('650000')
