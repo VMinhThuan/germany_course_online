@@ -53,16 +53,16 @@ function DiscountSummary({
   discountAmount,
   couponDiscountAmount,
   automaticDiscountAmount,
-  discountSource,
   totalAmount,
 }: {
   baseAmount: string
   discountAmount: string
   couponDiscountAmount?: string
   automaticDiscountAmount?: string
-  discountSource?: 'NONE' | 'COUPON' | 'AUTOMATIC_5_PERCENT'
   totalAmount: string
 }) {
+  const hasDiscount = BigInt(discountAmount) > 0n
+
   return (
     <dl className="grid gap-2 text-sm">
       <div className="flex justify-between gap-3">
@@ -71,7 +71,7 @@ function DiscountSummary({
       </div>
       {couponDiscountAmount && BigInt(couponDiscountAmount) > 0n && (
         <div className="flex justify-between gap-3 text-success-foreground">
-          <dt>Giảm từ coupon</dt>
+          <dt>Giảm từ mã ưu đãi</dt>
           <dd>−{formatVnd(couponDiscountAmount)}</dd>
         </div>
       )}
@@ -81,13 +81,17 @@ function DiscountSummary({
           <dd>−{formatVnd(automaticDiscountAmount)}</dd>
         </div>
       )}
-      <div className="flex justify-between gap-3">
-        <dt>Tổng giảm · {discountSource ?? 'NONE'}</dt>
-        <dd>−{formatVnd(discountAmount)}</dd>
-      </div>
-      <div className="mt-1 flex justify-between gap-3 border-t border-border-subtle pt-3 text-base">
-        <dt className="font-bold">Cần thanh toán</dt>
-        <dd className="font-extrabold text-action-primary">{formatVnd(totalAmount)}</dd>
+      {hasDiscount && (
+        <div className="flex justify-between gap-3 text-success-foreground">
+          <dt>Ưu đãi</dt>
+          <dd>−{formatVnd(discountAmount)}</dd>
+        </div>
+      )}
+      <div className="mt-2 flex items-end justify-between gap-3 rounded-2xl bg-surface-blue p-4">
+        <dt className="font-bold text-ink-primary">Tổng thanh toán</dt>
+        <dd className="text-right font-display text-2xl font-extrabold tabular-nums text-action-primary">
+          {formatVnd(totalAmount)}
+        </dd>
       </div>
     </dl>
   )
@@ -149,16 +153,16 @@ export function CheckoutPage() {
 
   return (
     <ProductPage
-      title="Tạo đơn hàng"
-      eyebrow="Báo giá từ máy chủ"
+      title="Đăng ký khóa học"
+      eyebrow="Hoàn tất đăng ký"
       backTo={orderType === 'RENEWAL' ? `/student/courses/${orderContext}/renew` : '/courses'}
     >
       {quote.isPending ? (
-        <ProductLoading title="Đang lấy báo giá" />
+        <ProductLoading title="Đang chuẩn bị thông tin đăng ký" />
       ) : quote.isError ? (
         <ProductError onRetry={() => void quote.refetch()} />
       ) : !quote.data ? (
-        <ProductNotFound message="Không tìm thấy báo giá cho khóa học này." />
+        <ProductNotFound message="Không tìm thấy thông tin đăng ký cho khóa học này." />
       ) : (
         <div className="mx-auto grid w-full max-w-5xl gap-5 lg:grid-cols-[minmax(0,1fr)_21rem]">
           <div className="grid content-start gap-5">
@@ -178,20 +182,20 @@ export function CheckoutPage() {
                 </p>
               )}
               <p className="text-sm leading-6 text-ink-secondary">
-                Báo giá và thời hạn này do backend tính. Tạo đơn sẽ ở trạng thái PENDING; quyền học
-                chỉ được cập nhật sau khi Admin duyệt.
+                Kiểm tra thông tin khóa học trước khi tạo đăng ký. Sau khi chuyển khoản và được xác
+                nhận, quyền học sẽ được mở trong tài khoản của bạn.
               </p>
             </Card>
             <Card className="grid gap-4 p-5 sm:p-6">
               <SectionHeader
                 title="Mã ưu đãi"
-                description="Backend kiểm tra điều kiện và quyết định coupon hay ưu đãi tự động có giá trị lớn hơn."
+                description="Nhập mã ưu đãi nếu bạn có để nhận mức giảm phù hợp."
               />
               <form
                 className="flex flex-col gap-3 sm:flex-row"
                 onSubmit={(event) => void applyCoupon(event)}
               >
-                <FormField id="checkout-coupon-code" label="Mã coupon" className="min-w-0 flex-1">
+                <FormField id="checkout-coupon-code" label="Mã ưu đãi" className="min-w-0 flex-1">
                   {(describedBy, invalid) => (
                     <TextInput
                       id="checkout-coupon-code"
@@ -228,7 +232,7 @@ export function CheckoutPage() {
           </div>
           <aside className="grid content-start gap-4">
             <Card className="grid gap-4 p-5">
-              <h2 className="font-display text-xl font-bold">Tóm tắt</h2>
+              <h2 className="font-display text-xl font-bold">Chi phí đăng ký</h2>
               <DiscountSummary
                 baseAmount={quote.data.originalAmountVnd}
                 discountAmount={quote.data.discountAmountVnd}
@@ -237,9 +241,6 @@ export function CheckoutPage() {
                   : {})}
                 {...(quote.data.automaticDiscountAmountVnd !== undefined
                   ? { automaticDiscountAmount: quote.data.automaticDiscountAmountVnd }
-                  : {})}
-                {...(quote.data.discountSource !== undefined
-                  ? { discountSource: quote.data.discountSource }
                   : {})}
                 totalAmount={quote.data.totalAmountVnd}
               />
@@ -252,7 +253,7 @@ export function CheckoutPage() {
                 onClick={() => void submitOrder()}
                 startIcon={<CreditCard aria-hidden="true" className="size-4" />}
               >
-                Tạo đơn PENDING
+                Tạo đăng ký khóa học
               </Button>
               {createOrder.isError && (
                 <ErrorState
@@ -260,14 +261,14 @@ export function CheckoutPage() {
                   description={
                     createOrder.error instanceof Error
                       ? createOrder.error.message
-                      : 'Backend chưa xác nhận việc tạo đơn.'
+                      : 'Chưa thể tạo đăng ký lúc này.'
                   }
                   onRetry={() => void submitOrder()}
                 />
               )}
               <p className="text-xs leading-5 text-ink-muted">
-                Không thực hiện giao dịch trong ứng dụng. Chuyển khoản thủ công theo hướng dẫn của
-                Admin.
+                Sau khi tạo đăng ký, bạn sẽ nhận hướng dẫn chuyển khoản. Quyền học được mở sau khi
+                thanh toán được xác nhận.
               </p>
             </Card>
           </aside>
@@ -815,8 +816,8 @@ export function CourseRenewalPage() {
               {formatDateTimeInTimezone(renewals.data.course.enrollmentExpiresAt)}
             </p>
             <p className="text-sm leading-6 text-ink-secondary">
-              Thời hạn mới được backend tính khi Admin duyệt đơn gia hạn. Progress, ghi chú và lịch
-              sử quiz hiện có được giữ nguyên.
+              Thời hạn mới sẽ được cập nhật sau khi đơn gia hạn được xác nhận. Tiến độ, ghi chú và
+              lịch sử quiz hiện có được giữ nguyên.
             </p>
           </Card>
           {course.data.access.kind === 'restricted' && (

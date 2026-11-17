@@ -226,7 +226,10 @@ export function ApiCourseDetailPage() {
         ? 'grid gap-4 sm:grid-cols-2'
         : 'grid gap-4 sm:grid-cols-2 lg:grid-cols-3'
   const checkout = `/checkout/${encodeURIComponent(course.id)}`
-  const previewAvailable = Boolean(previewManifest.data?.sectionIds?.length)
+  const previewAvailable =
+    (course.previewChapterCount ?? 0) > 0 ||
+    course.previewAvailable === true ||
+    Boolean(previewManifest.data?.sectionIds?.length)
   const previewHref = `/courses/${encodeURIComponent(slug)}/preview`
   const openCheckout = () =>
     navigate(session ? checkout : `/login?returnTo=${encodeURIComponent(checkout)}`)
@@ -262,31 +265,35 @@ export function ApiCourseDetailPage() {
             </div>
           </header>
           <aside>
-            <Card className="p-5 sm:p-6">
-              <p className="text-sm font-semibold text-ink-secondary">Học phí</p>
-              <p className="mt-1 font-display text-3xl font-extrabold tabular-nums text-ink-primary">
-                {course.priceVnd ? formatVnd(course.priceVnd) : 'Đang cập nhật'}
-              </p>
-              {course.accessDurationMonths !== undefined && (
-                <p className="mt-2 text-sm text-ink-secondary">
-                  Truy cập trong {course.accessDurationMonths} tháng
+            <Card className="overflow-hidden border-action-primary/20 shadow-soft">
+              <div className="bg-surface-lime p-5 sm:p-6">
+                <p className="text-sm font-semibold text-pastel-lime-ink">Học phí trọn khóa</p>
+                <p className="mt-1 font-display text-4xl font-extrabold tabular-nums tracking-tight text-ink-primary">
+                  {course.priceVnd ? formatVnd(course.priceVnd) : 'Đang cập nhật'}
                 </p>
-              )}
-              <Button className="mt-5 w-full" onClick={openCheckout}>
-                Đăng ký khóa học <ArrowRight aria-hidden="true" />
-              </Button>
-              {previewAvailable && (
-                <LinkButton to={previewHref} variant="outline" className="mt-3 w-full">
-                  Học thử chương 1 miễn phí <ArrowRight aria-hidden="true" />
-                </LinkButton>
-              )}
-              <p className="mt-3 text-xs leading-5 text-ink-muted">
-                {previewAvailable
-                  ? 'Trải nghiệm chương đầu trước khi quyết định đăng ký khóa học.'
-                  : session
-                    ? 'Bài học sẽ mở sau khi đăng ký được xác nhận.'
-                    : 'Đăng nhập hoặc tạo tài khoản để đăng ký khóa học.'}
-              </p>
+                {course.accessDurationMonths !== undefined && (
+                  <p className="mt-2 text-sm font-medium text-ink-secondary">
+                    Truy cập trong {course.accessDurationMonths} tháng
+                  </p>
+                )}
+              </div>
+              <div className="grid gap-3 p-5 sm:p-6">
+                <Button className="w-full" onClick={openCheckout}>
+                  Đăng ký khóa học <ArrowRight aria-hidden="true" />
+                </Button>
+                {previewAvailable && (
+                  <LinkButton to={previewHref} variant="outline" className="w-full">
+                    Học thử chương 1 miễn phí <ArrowRight aria-hidden="true" />
+                  </LinkButton>
+                )}
+                <p className="text-xs leading-5 text-ink-muted">
+                  {previewAvailable
+                    ? 'Trải nghiệm chương đầu miễn phí trước khi quyết định đăng ký.'
+                    : session
+                      ? 'Bài học sẽ mở sau khi đăng ký được xác nhận.'
+                      : 'Đăng nhập hoặc tạo tài khoản để đăng ký khóa học.'}
+                </p>
+              </div>
             </Card>
           </aside>
         </div>

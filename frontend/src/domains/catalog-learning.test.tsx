@@ -36,6 +36,20 @@ describe('catalog components', () => {
     expect(screen.getByText(A11_COURSE.level, { exact: true })).toHaveClass('bg-brand-pink')
   })
 
+  it('shows the free first-chapter trial action when preview content is available', () => {
+    render(
+      <CourseCard
+        course={{ ...A11_COURSE, previewChapterCount: 1 }}
+        href={`/courses/${A11_COURSE.slug}`}
+      />,
+    )
+
+    expect(screen.getByRole('link', { name: /Học thử chương 1/ })).toHaveAttribute(
+      'href',
+      `/courses/${A11_COURSE.slug}/preview`,
+    )
+  })
+
   it('shows catalog loading, empty, and error states', () => {
     const { rerender } = render(<CourseGrid courses={[]} loading />)
     expect(screen.getByRole('status')).toHaveTextContent('Đang tải khóa học')

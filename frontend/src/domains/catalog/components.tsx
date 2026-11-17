@@ -158,6 +158,8 @@ export function CourseCard({
 }) {
   const [imageFailed, setImageFailed] = useState(false)
   const hasCourseImage = Boolean(course.thumbnailUrl && !imageFailed)
+  const previewAvailable = (course.previewChapterCount ?? 0) > 0 || course.previewAvailable === true
+  const previewHref = href ? `${href}/preview` : undefined
   return (
     <Card className="flex min-w-0 flex-col overflow-hidden shadow-soft">
       <div
@@ -216,19 +218,33 @@ export function CourseCard({
           </span>
         )}
         {course.priceVnd ? (
-          <span className="ml-auto font-bold text-ink-primary">{formatVnd(course.priceVnd)}</span>
+          <span className="ml-auto rounded-xl bg-surface-lime px-3 py-1.5 font-display text-base font-extrabold tabular-nums text-ink-primary">
+            {formatVnd(course.priceVnd)}
+          </span>
         ) : (
           <span className="ml-auto text-sm text-ink-muted">Học phí đang cập nhật</span>
         )}
       </CardContent>
-      <CardFooter className="border-t border-border-subtle pt-4">
+      <CardFooter className="flex-wrap border-t border-border-subtle pt-4">
         {href ? (
-          <Link
-            to={href}
-            className="inline-flex min-h-11 items-center gap-2 font-semibold text-action-primary underline-offset-4 hover:underline"
-          >
-            Xem khóa học <ArrowRight aria-hidden="true" className="size-4" />
-          </Link>
+          <>
+            <Link
+              to={href}
+              className="inline-flex min-h-11 flex-1 items-center gap-2 font-semibold text-action-primary underline-offset-4 hover:underline"
+            >
+              Xem khóa học <ArrowRight aria-hidden="true" className="size-4" />
+            </Link>
+            {previewAvailable && previewHref && (
+              <LinkButton
+                to={previewHref}
+                variant="secondary"
+                size="sm"
+                startIcon={<BookOpenText aria-hidden="true" />}
+              >
+                Học thử chương 1
+              </LinkButton>
+            )}
+          </>
         ) : (
           <Button variant="outline" onClick={onOpen}>
             Xem khóa học <ArrowRight aria-hidden="true" />
