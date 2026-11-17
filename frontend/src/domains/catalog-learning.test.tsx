@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import {
   CourseCard,
@@ -38,10 +39,12 @@ describe('catalog components', () => {
 
   it('shows the free first-chapter trial action when preview content is available', () => {
     render(
-      <CourseCard
-        course={{ ...A11_COURSE, previewChapterCount: 1 }}
-        href={`/courses/${A11_COURSE.slug}`}
-      />,
+      <MemoryRouter>
+        <CourseCard
+          course={{ ...A11_COURSE, previewChapterCount: 1 }}
+          href={`/courses/${A11_COURSE.slug}`}
+        />
+      </MemoryRouter>,
     )
 
     expect(screen.getByRole('link', { name: /Học thử chương 1/ })).toHaveAttribute(
