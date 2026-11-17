@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "npm ci --cache /tmp/paniversedeutsch-backend-npm-cache --no-audit --no-fund",
   "functions": {
     "src/index.ts": {
       "maxDuration": 60,
