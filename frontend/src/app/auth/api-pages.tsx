@@ -38,10 +38,12 @@ function AuthPageFrame({ title, children }: { title: string; children: ReactNode
   return (
     <AuthShell showBrand={false} showPreviewNotice={false} showFooter={false}>
       <div role="region" aria-label={title} className="mx-auto grid w-full max-w-3xl gap-4">
-        <BrandLogo
-          className="mx-auto"
-          imageClassName="h-12 w-[17.75rem] max-w-[calc(100vw-3rem)]"
-        />
+        <div className="flex w-full justify-center px-3 sm:px-0">
+          <BrandLogo
+            className="flex w-fit max-w-full justify-center"
+            imageClassName="h-12 w-auto max-w-full"
+          />
+        </div>
         {children}
       </div>
     </AuthShell>
@@ -60,19 +62,23 @@ function AuthFormCard({
   return (
     <Card className="border-border-subtle/90 shadow-soft">
       <CardHeader className="pb-3">
-        <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
-          <span aria-hidden="true" />
-          <div className="grid justify-items-center gap-2 text-center">
+        <div className="grid justify-items-center gap-3 text-center">
+          <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-surface-lime text-pastel-lime-ink">
+            <ShieldCheck aria-hidden="true" className="size-5" />
+          </span>
+          <div className="grid w-full min-w-0 justify-items-center gap-2">
             {title && (
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-action-primary">
                 {title}
               </p>
             )}
-            <DecorativeHeading text={description} level={1} size="sm" className="text-center" />
+            <DecorativeHeading
+              text={description}
+              level={1}
+              size="sm"
+              className="w-full text-center"
+            />
           </div>
-          <span className="grid size-10 shrink-0 place-items-center justify-self-end rounded-2xl bg-surface-lime text-pastel-lime-ink">
-            <ShieldCheck aria-hidden="true" className="size-5" />
-          </span>
         </div>
       </CardHeader>
       <CardContent className="grid gap-5">{children}</CardContent>

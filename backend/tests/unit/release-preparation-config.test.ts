@@ -6,6 +6,7 @@ import { createSmtpTransportOptions } from "../../src/modules/auth/email-service
 import {
   isStagingDatabaseName,
   mongoHosts,
+  validateProductionTargetAuthorization,
   validateStagingTargetAuthorization,
 } from "../../src/config/release-authorization.js";
 
@@ -93,6 +94,46 @@ describe("BE-06A environment examples and release authorization", () => {
         backupCheckpoint: "secret value",
       }),
     ).toThrow(/non-secret identifier/);
+  });
+
+  it("requires explicit production confirmation and exact target acknowledgements", () => {
+    const config = parseEnvironment({
+      NODE_ENV: "production",
+      MONGODB_URI:
+        "mongodb+srv://sample-user:sample-password@prod.example.invalid/?retryWrites=true",
+      MONGODB_DB_NAME: "paniverse_lms",
+      JWT_ACCESS_SECRET: "sample-placeholder-secret-longer-than-thirty-two",
+      JWT_ISSUER: "https://api.example.invalid",
+      JWT_AUDIENCE: "paniverse-web",
+      APP_ORIGINS: "https://www.example.invalid",
+      COOKIE_SECURE: "true",
+    });
+    const authorization = {
+      allowProduction: true,
+      targetDatabase: "paniverse_lms",
+      confirmedHosts: "prod.example.invalid",
+      confirmedReplicaSet: "prod-rs",
+      backupCheckpoint: "prod-backup-2026-01",
+    };
+
+    expect(
+      validateProductionTargetAuthorization(config, authorization),
+    ).toEqual({
+      expectedHosts: ["prod.example.invalid"],
+      expectedDatabase: "paniverse_lms",
+    });
+    expect(() =>
+      validateProductionTargetAuthorization(config, {
+        ...authorization,
+        allowProduction: false,
+      }),
+    ).toThrow(/allow-production/);
+    expect(() =>
+      validateProductionTargetAuthorization(config, {
+        ...authorization,
+        targetDatabase: "other_database",
+      }),
+    ).toThrow(/MONGODB_DB_NAME/);
   });
 
   it("requires SMTP TLS and bounds transport timeouts", () => {

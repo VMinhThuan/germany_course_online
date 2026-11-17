@@ -25,6 +25,7 @@ const bootstrapInputSchema = z.strictObject({
 });
 
 export type InitialAdminInput = z.input<typeof bootstrapInputSchema>;
+export type AdminAccountInput = InitialAdminInput;
 
 export class AdminBootstrapError extends Error {
   constructor(message: string) {
@@ -130,6 +131,76 @@ export async function createInitialAdmin(
     if (isDuplicateKeyError(error))
       throw new AdminBootstrapError(
         "Initial Admin bootstrap already exists or collided with a duplicate account; no credentials were changed.",
+      );
+    throw error;
+  }
+}
+
+/** Create an additional Admin through an explicitly controlled operator flow. */
+export async function createAdminAccount(
+  input: AdminAccountInput,
+): Promise<{ userId: string; email: string }> {
+  const parsed = bootstrapInputSchema.safeParse(input);
+  if (!parsed.success)
+    throw new AdminBootstrapError(
+      "Admin bootstrap input is invalid; expected a valid name/email, a 12-128 character password, operator, and approval ticket.",
+    );
+
+  const fullName = parsed.data.fullName;
+  const email = parsed.data.email.toLowerCase();
+  const passwordHash = await argon2.hash(parsed.data.password, ARGON_OPTIONS);
+  const userId = new Types.ObjectId();
+
+  try {
+    return await withTransaction(async (session) => {
+      const existingEmail = await User.exists({ email }).session(session);
+      if (existingEmail)
+        throw new AdminBootstrapError(
+          "An account with this email already exists; no account was changed.",
+        );
+
+      await User.create(
+        [
+          {
+            _id: userId,
+            fullName,
+            email,
+            passwordHash,
+            role: "ADMIN",
+            status: "ACTIVE",
+            emailVerifiedAt: null,
+          },
+        ],
+        { session },
+      );
+      await AuditLog.create(
+        [
+          {
+            actorUserId: null,
+            action: "ADMIN_CREATED",
+            entityType: "User",
+            entityId: userId.toString(),
+            oldValue: null,
+            newValue: {
+              email,
+              role: "ADMIN",
+              status: "ACTIVE",
+              bootstrapOperator: parsed.data.operator,
+              approvalTicket: parsed.data.approvalTicket,
+            },
+            ipAddress: null,
+          },
+        ],
+        { session },
+      );
+
+      return { userId: userId.toString(), email };
+    });
+  } catch (error) {
+    if (error instanceof AdminBootstrapError) throw error;
+    if (isDuplicateKeyError(error))
+      throw new AdminBootstrapError(
+        "An account with this email already exists or collided with a duplicate; no credentials were changed.",
       );
     throw error;
   }

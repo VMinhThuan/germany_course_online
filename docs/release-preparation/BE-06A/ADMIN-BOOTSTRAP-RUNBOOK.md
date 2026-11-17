@@ -25,3 +25,15 @@
 5. Sign in over HTTPS, rotate the bootstrap password through the approved account procedure, verify refresh/logout, and remove the temporary secret values from the secret channel.
 
 If the first Admin already exists or bootstrap partially fails, stop. Do not delete the marker or manually elevate a user. Use a separately approved recovery change with database/audit review. The current tool supports only the initial Admin; provisioning later Admins needs a separately designed, audited owner-controlled procedure.
+
+## Controlled production Admin bootstrap
+
+For the explicit owner-approved production test-account operation, use the separate interactive command below. It is never imported by the application or Vercel build, requires `--allow-production` and `--apply`, verifies the exact database host list and replica set, displays only redacted target metadata, and requires typing `CREATE PRODUCTION ADMIN` in a TTY before connecting and writing.
+
+```text
+npm run db:bootstrap-production-admin -- --allow-production --apply --target-db=<exact-production-database> --confirm-host=<sorted-host-list-from-uri> --confirm-replica-set=<exact-set-name> --backup-checkpoint=<non-secret-backup-id> --operator-ticket=<approved-ticket-id>
+```
+
+The command interactively asks for the Admin name, email, operator and hidden password confirmation. It refuses an existing email, never elevates an existing account, hashes the password with Argon2id, writes `role=ADMIN` and `status=ACTIVE`, and records an `ADMIN_CREATED` audit event in the same transaction. It does not create payment data or expose a public Admin-registration API.
+
+After the one-time operation, remove the production bootstrap script and its package command in the approved follow-up change, or restrict repository/production database access so only the release owner can run it. Keep `seed-test-admin` restricted to local development/test; never use it against Production.

@@ -1,4 +1,6 @@
 export { cn } from './cn'
+export { DropdownSelect } from './dropdown-select'
+export type { DropdownOption } from './dropdown-select'
 export {
   Accordion,
   AccordionContent,

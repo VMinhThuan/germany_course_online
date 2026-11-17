@@ -7,6 +7,10 @@ export type StagingTargetAuthorization = {
   backupCheckpoint: string | undefined;
 };
 
+export type ProductionTargetAuthorization = StagingTargetAuthorization & {
+  allowProduction: boolean;
+};
+
 export class ReleaseAuthorizationError extends Error {
   constructor(message: string) {
     super(message);
@@ -64,6 +68,44 @@ export function validateStagingTargetAuthorization(
       "--confirm-host must exactly match the MongoDB URI host list.",
     );
   }
+  if (!authorization.confirmedReplicaSet?.trim())
+    throw new ReleaseAuthorizationError("--confirm-replica-set is required.");
+  if (!authorization.backupCheckpoint?.trim())
+    throw new ReleaseAuthorizationError(
+      "--backup-checkpoint is required before applying changes.",
+    );
+  if (
+    !/^[A-Za-z0-9][A-Za-z0-9._:/-]{2,127}$/.test(authorization.backupCheckpoint)
+  )
+    throw new ReleaseAuthorizationError(
+      "--backup-checkpoint must be a non-secret identifier containing only letters, digits, dot, underscore, colon, slash, or hyphen.",
+    );
+
+  return { expectedHosts, expectedDatabase: config.databaseName };
+}
+
+export function validateProductionTargetAuthorization(
+  config: AppConfig,
+  authorization: ProductionTargetAuthorization,
+): { expectedHosts: string[]; expectedDatabase: string } {
+  if (config.nodeEnv !== "production")
+    throw new ReleaseAuthorizationError(
+      "Production Admin bootstrap requires NODE_ENV=production.",
+    );
+  if (!authorization.allowProduction)
+    throw new ReleaseAuthorizationError(
+      "Production Admin bootstrap requires --allow-production.",
+    );
+  if (authorization.targetDatabase !== config.databaseName)
+    throw new ReleaseAuthorizationError(
+      "--target-db must exactly match MONGODB_DB_NAME.",
+    );
+
+  const expectedHosts = mongoHosts(config.mongoUri);
+  if (authorization.confirmedHosts?.toLowerCase() !== expectedHosts.join(","))
+    throw new ReleaseAuthorizationError(
+      "--confirm-host must exactly match the MongoDB URI host list.",
+    );
   if (!authorization.confirmedReplicaSet?.trim())
     throw new ReleaseAuthorizationError("--confirm-replica-set is required.");
   if (!authorization.backupCheckpoint?.trim())

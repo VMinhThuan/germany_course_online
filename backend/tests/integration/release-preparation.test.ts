@@ -3,6 +3,7 @@ import argon2 from "argon2";
 import { AuditLog, BootstrapMarker, User } from "../../src/db/models/index.js";
 import {
   AdminBootstrapError,
+  createAdminAccount,
   createInitialAdmin,
 } from "../../src/modules/admin/admin-bootstrap.js";
 import { createIndexPlan } from "../../src/db/index-migration.js";
@@ -135,5 +136,34 @@ describe("release preparation controls", () => {
       }),
     ).rejects.toBeInstanceOf(AdminBootstrapError);
     expect(await User.countDocuments({ role: "ADMIN" })).toBe(0);
+  });
+
+  it("creates an additional audited Admin without changing an existing account", async () => {
+    const input = {
+      fullName: "Production Bootstrap Synthetic Admin",
+      email: "admin.production-bootstrap@example.test",
+      password: "Synthetic-Production-Password-123!",
+      operator: "Local release test operator",
+      approvalTicket: "PROD-ADMIN-LOCAL-TEST-01",
+    };
+    const result = await createAdminAccount(input);
+    const admin = await User.findById(result.userId).select("+passwordHash");
+    const passwordHash = admin?.get("passwordHash") as string;
+
+    expect(admin?.get("role")).toBe("ADMIN");
+    expect(admin?.get("status")).toBe("ACTIVE");
+    expect(passwordHash).toMatch(/^\$argon2id\$/);
+    expect(await argon2.verify(passwordHash, input.password)).toBe(true);
+    expect(await AuditLog.countDocuments({ action: "ADMIN_CREATED" })).toBe(1);
+    expect(
+      JSON.stringify(
+        await AuditLog.findOne({ action: "ADMIN_CREATED" }).lean(),
+      ),
+    ).not.toContain(input.password);
+
+    await expect(createAdminAccount(input)).rejects.toBeInstanceOf(
+      AdminBootstrapError,
+    );
+    expect(await User.countDocuments({ email: input.email })).toBe(1);
   });
 });

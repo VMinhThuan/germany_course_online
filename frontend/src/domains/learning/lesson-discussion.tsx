@@ -9,7 +9,7 @@ import type {
   ApiLessonCommentReactionType,
   ApiStudentLessonComment,
 } from '@/lib/api/types'
-import { BaseDialog, Button, DropdownMenu, ErrorState } from '@/shared/ui'
+import { BaseDialog, Button, DropdownMenu, DropdownSelect, ErrorState } from '@/shared/ui'
 import { ConfirmDialog } from '@/shared/ui/dialogs'
 
 function displayTime(value: string) {
@@ -605,14 +605,16 @@ function LessonDiscussionContent({ lessonId }: { lessonId: string }) {
         </div>
         <label className="flex min-h-9 items-center gap-2 text-sm text-ink-secondary">
           <span>Sắp xếp</span>
-          <select
+          <DropdownSelect
             value={sort}
-            onChange={(event) => setSort(event.target.value as 'newest' | 'oldest')}
-            className="min-h-9 rounded-lg border border-border-subtle bg-white px-2.5 font-medium text-ink-primary outline-none focus-visible:ring-2 focus-visible:ring-action-primary"
-          >
-            <option value="newest">Mới nhất</option>
-            <option value="oldest">Cũ nhất</option>
-          </select>
+            onValueChange={(value) => setSort(value as 'newest' | 'oldest')}
+            options={[
+              { value: 'newest', label: 'Mới nhất' },
+              { value: 'oldest', label: 'Cũ nhất' },
+            ]}
+            aria-label="Sắp xếp thảo luận"
+            className="min-h-9 w-auto min-w-32 px-2.5 py-1.5 font-medium"
+          />
         </label>
       </header>
       <p className="-mt-2 text-xs text-ink-muted">

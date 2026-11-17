@@ -20,6 +20,8 @@
     "check:openapi": "tsx scripts/validate-openapi.ts",
     "db:indexes": "tsx scripts/create-indexes.ts",
     "db:bootstrap-admin": "tsx scripts/bootstrap-admin.ts",
+    "db:bootstrap-production-admin": "tsx scripts/bootstrap-production-admin.ts",
+    "db:seed-test-admin": "tsx scripts/seed-test-admin.ts",
     "media:migrate": "tsx scripts/media-migration/cli.ts",
     "db:course-import": "tsx scripts/course-import/cli.ts",
     "db:seed-a11-quizzes": "tsx scripts/seed-a11-quizzes.ts",

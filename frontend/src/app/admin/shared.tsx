@@ -14,38 +14,151 @@ import {
   ArrowUp,
   ArrowUpDown,
   BookOpenText,
+  FileText,
+  GraduationCap,
+  LayoutDashboard,
+  Library,
+  ListChecks,
   LogOut,
+  Menu,
+  MessageSquareText,
+  RefreshCw,
+  ScrollText,
   Settings2,
+  ShoppingBag,
+  TicketPercent,
+  UsersRound,
+  type LucideIcon,
 } from 'lucide-react'
 import { Link, NavLink, useLocation } from 'react-router'
 import { useQueryClient, useMutation } from '@tanstack/react-query'
 import { useAuthSession } from '@/app/auth/auth-session'
 import { DecorativeHeading } from '@/domains/shared/decorative-heading'
-import { Button, Card, ErrorState, Skeleton } from '@/shared/ui'
+import { Button, Card, DropdownSelect, ErrorState, Sheet, Skeleton } from '@/shared/ui'
 import { useNotifications } from '@/shared/ui/notifications'
 import { ApiError } from '@/lib/api/client'
 
-const navigation = [
-  { to: '/admin', label: 'Tổng quan' },
+type AdminNavigationLeaf = {
+  to: string
+  label: string
+  icon: LucideIcon
+}
+
+type AdminNavigationGroup = {
+  label: string
+  icon: LucideIcon
+  children: readonly AdminNavigationLeaf[]
+}
+
+type AdminNavigationItem = AdminNavigationLeaf | AdminNavigationGroup
+
+const navigation: readonly AdminNavigationItem[] = [
+  { to: '/admin', label: 'Tổng quan', icon: LayoutDashboard },
   {
     label: 'Quản lý khóa học',
+    icon: BookOpenText,
     children: [
-      { to: '/admin/courses', label: 'Khóa học' },
-      { to: '/admin/sections', label: 'Chương' },
-      { to: '/admin/lessons', label: 'Bài học' },
-      { to: '/admin/exercises', label: 'Bài tập' },
+      { to: '/admin/courses', label: 'Khóa học', icon: GraduationCap },
+      { to: '/admin/sections', label: 'Chương', icon: Library },
+      { to: '/admin/lessons', label: 'Bài học', icon: FileText },
+      { to: '/admin/exercises', label: 'Bài tập', icon: ListChecks },
     ],
   },
-  { to: '/admin/media', label: 'Thư viện tệp' },
-  { to: '/admin/lesson-comments', label: 'Quản lý bình luận' },
-  { to: '/admin/students', label: 'Học viên' },
-  { to: '/admin/enrollments', label: 'Quyền học' },
-  { to: '/admin/orders', label: 'Đơn hàng' },
-  { to: '/admin/renewal-plans', label: 'Gói gia hạn' },
-  { to: '/admin/coupons', label: 'Mã ưu đãi' },
-  { to: '/admin/settings', label: 'Cài đặt website' },
-  { to: '/admin/audit-logs', label: 'Nhật ký quản trị' },
+  { to: '/admin/media', label: 'Thư viện tệp', icon: Library },
+  { to: '/admin/lesson-comments', label: 'Quản lý bình luận', icon: MessageSquareText },
+  { to: '/admin/students', label: 'Học viên', icon: UsersRound },
+  { to: '/admin/enrollments', label: 'Quyền học', icon: GraduationCap },
+  { to: '/admin/orders', label: 'Đơn hàng', icon: ShoppingBag },
+  { to: '/admin/renewal-plans', label: 'Gói gia hạn', icon: RefreshCw },
+  { to: '/admin/coupons', label: 'Mã ưu đãi', icon: TicketPercent },
+  { to: '/admin/settings', label: 'Cài đặt website', icon: Settings2 },
+  { to: '/admin/audit-logs', label: 'Nhật ký quản trị', icon: ScrollText },
 ]
+
+function isAdminChildActive(pathname: string, child: AdminNavigationLeaf) {
+  const nestedSectionEditor = /^\/admin\/courses\/[^/]+\/sections\/[^/]+$/.test(pathname)
+  const nestedLessonEditor = /^\/admin\/courses\/[^/]+\/sections\/[^/]+\/lessons\/[^/]+$/.test(
+    pathname,
+  )
+  const nestedExerciseEditor =
+    /^\/admin\/courses\/[^/]+\/sections\/[^/]+\/lessons\/[^/]+\/exercises\/[^/]+$/.test(pathname)
+
+  return (
+    pathname === child.to ||
+    (pathname.startsWith(`${child.to}/`) &&
+      !(
+        child.to === '/admin/courses' &&
+        (nestedSectionEditor || nestedLessonEditor || nestedExerciseEditor)
+      )) ||
+    (child.to === '/admin/sections' && nestedSectionEditor) ||
+    (child.to === '/admin/lessons' && nestedLessonEditor) ||
+    (child.to === '/admin/exercises' && nestedExerciseEditor)
+  )
+}
+
+function AdminNavigation({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
+  return (
+    <nav aria-label="Điều hướng quản trị" className="grid gap-1.5">
+      <p className="px-3 pb-1 text-[0.68rem] font-bold uppercase tracking-[0.14em] text-ink-muted">
+        Không gian quản trị
+      </p>
+      {navigation.map((item) => {
+        if ('children' in item) {
+          const GroupIcon = item.icon
+          return (
+            <div
+              key={item.label}
+              className="rounded-2xl border border-brand-pink/60 bg-gradient-to-b from-brand-pink/30 to-brand-pink/10 p-2"
+            >
+              <div className="flex items-center gap-2 px-2 pb-2 pt-1">
+                <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-white/80 text-action-primary shadow-sm">
+                  <GroupIcon aria-hidden="true" className="size-4" />
+                </span>
+                <p className="truncate text-[0.68rem] font-bold uppercase tracking-[0.12em] text-ink-secondary">
+                  {item.label}
+                </p>
+              </div>
+              <div className="grid gap-1 border-l border-brand-pink/70 pl-2">
+                {item.children.map((child) => {
+                  const ChildIcon = child.icon
+                  const active = isAdminChildActive(pathname, child)
+                  return (
+                    <NavLink
+                      key={child.to}
+                      to={child.to}
+                      aria-current={active ? 'page' : undefined}
+                      onClick={onNavigate}
+                      className={`flex min-h-10 min-w-0 items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary ${active ? 'bg-white text-action-primary shadow-sm' : 'text-ink-secondary hover:bg-white/80 hover:text-ink-primary'}`}
+                    >
+                      <ChildIcon aria-hidden="true" className="size-4 shrink-0" />
+                      <span className="truncate">{child.label}</span>
+                    </NavLink>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        }
+
+        const ItemIcon = item.icon
+        const active =
+          pathname === item.to || (item.to !== '/admin' && pathname.startsWith(`${item.to}/`))
+        return (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            aria-current={active ? 'page' : undefined}
+            onClick={onNavigate}
+            className={`flex min-h-11 min-w-0 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary ${active ? 'bg-surface-blue text-action-primary shadow-sm' : 'text-ink-secondary hover:bg-surface-muted hover:text-ink-primary'}`}
+          >
+            <ItemIcon aria-hidden="true" className="size-[1.1rem] shrink-0" />
+            <span className="truncate">{item.label}</span>
+          </NavLink>
+        )
+      })}
+    </nav>
+  )
+}
 
 export function AdminLayout({
   title,
@@ -60,16 +173,30 @@ export function AdminLayout({
 }) {
   const { logout, session } = useAuthSession()
   const location = useLocation()
+  const [menuOpen, setMenuOpen] = useState(false)
   return (
     <div className="min-h-screen bg-surface-muted text-ink-primary">
       <header className="sticky top-0 z-30 border-b border-border-subtle bg-white/95 shadow-sm backdrop-blur">
         <div className="mx-auto flex min-h-16 max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-6">
-          <Link
-            to="/admin"
-            className="flex items-center gap-2 font-display text-lg font-extrabold text-action-primary"
-          >
-            <BookOpenText aria-hidden="true" className="size-5" /> PAniverseDeutsch · Admin
-          </Link>
+          <div className="flex min-w-0 items-center gap-2">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="lg:hidden"
+              aria-label="Mở điều hướng quản trị"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen(true)}
+            >
+              <Menu aria-hidden="true" className="size-5" />
+            </Button>
+            <Link
+              to="/admin"
+              className="flex min-w-0 items-center gap-2 font-display text-lg font-extrabold text-action-primary"
+            >
+              <BookOpenText aria-hidden="true" className="size-5 shrink-0" />
+              <span className="truncate">PAniverseDeutsch · Admin</span>
+            </Link>
+          </div>
           <div className="flex items-center gap-3 text-sm">
             <span className="hidden max-w-52 truncate text-ink-secondary sm:inline">
               {session?.profile.displayName || session?.profile.email}
@@ -85,80 +212,28 @@ export function AdminLayout({
           </div>
         </div>
       </header>
-      <div className="mx-auto grid max-w-[1600px] gap-5 px-4 pt-3 pb-5 sm:px-6 sm:pt-4 lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-8 lg:pt-5 lg:pb-8">
-        <aside className="min-w-0 lg:sticky lg:top-24 lg:h-[calc(100vh-7rem)]">
-          <nav
-            aria-label="Điều hướng quản trị"
-            className="flex gap-2 overflow-x-auto rounded-2xl border border-border-subtle bg-white p-2 lg:grid lg:content-start lg:gap-1 lg:overflow-visible"
-          >
-            {navigation.map((item) => {
-              if ('children' in item) {
-                return (
-                  <div
-                    key={item.label}
-                    className="min-w-[13rem] rounded-xl border border-brand-pink/50 bg-brand-pink/25 p-2 lg:min-w-0"
-                  >
-                    <p className="px-2 pb-1 pt-0.5 text-[0.65rem] font-bold uppercase tracking-[0.12em] text-ink-secondary">
-                      {item.label}
-                    </p>
-                    <div className="grid grid-cols-2 gap-1 lg:grid-cols-1">
-                      {item.children.map((child) => {
-                        const nestedSectionEditor =
-                          /^\/admin\/courses\/[^/]+\/sections\/[^/]+$/.test(location.pathname)
-                        const nestedLessonEditor =
-                          /^\/admin\/courses\/[^/]+\/sections\/[^/]+\/lessons\/[^/]+$/.test(
-                            location.pathname,
-                          )
-                        const nestedExerciseEditor =
-                          /^\/admin\/courses\/[^/]+\/sections\/[^/]+\/lessons\/[^/]+\/exercises\/[^/]+$/.test(
-                            location.pathname,
-                          )
-                        const active =
-                          location.pathname === child.to ||
-                          (location.pathname.startsWith(`${child.to}/`) &&
-                            !(
-                              child.to === '/admin/courses' &&
-                              (nestedSectionEditor || nestedLessonEditor || nestedExerciseEditor)
-                            )) ||
-                          (child.to === '/admin/sections' && nestedSectionEditor) ||
-                          (child.to === '/admin/lessons' && nestedLessonEditor) ||
-                          (child.to === '/admin/exercises' && nestedExerciseEditor)
-                        return (
-                          <NavLink
-                            key={child.to}
-                            to={child.to}
-                            aria-current={active ? 'page' : undefined}
-                            className={`min-h-10 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${active ? 'bg-white text-action-primary shadow-sm' : 'text-ink-secondary hover:bg-white/80 hover:text-ink-primary'}`}
-                          >
-                            {child.label}
-                          </NavLink>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )
-              }
-              const active =
-                location.pathname === item.to ||
-                (item.to !== '/admin' && location.pathname.startsWith(`${item.to}/`))
-              return (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  aria-current={active ? 'page' : undefined}
-                  className={`min-h-10 shrink-0 rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${active ? 'bg-surface-blue text-action-primary' : 'text-ink-secondary hover:bg-surface-muted hover:text-ink-primary'}`}
-                >
-                  {item.label}
-                </NavLink>
-              )
-            })}
-          </nav>
-          <div className="mt-4 hidden rounded-2xl border border-border-subtle bg-white p-4 text-sm text-ink-secondary lg:block">
-            <Settings2 aria-hidden="true" className="mb-2 size-5 text-action-primary" />
-            <p className="font-semibold text-ink-primary">Quản lý nội dung học</p>
-            <p className="mt-1 leading-6">
-              Chọn khóa học, chương, bài học hoặc bài tập để bắt đầu chỉnh sửa.
-            </p>
+      <div className="mx-auto grid max-w-[1600px] gap-5 px-4 pt-3 pb-5 sm:px-6 sm:pt-4 lg:grid-cols-[17rem_minmax(0,1fr)] lg:gap-6 lg:pt-5 lg:pb-8">
+        <aside className="hidden min-w-0 lg:sticky lg:top-[5.5rem] lg:block lg:h-[calc(100vh-7rem)]">
+          <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-3xl border border-border-subtle bg-white shadow-soft">
+            <div className="border-b border-border-subtle bg-gradient-to-br from-surface-blue to-white px-4 py-4">
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-action-primary">
+                Bảng điều khiển
+              </p>
+              <p className="mt-1 text-sm text-ink-secondary">Quản lý khóa học và học viên</p>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-3">
+              <AdminNavigation pathname={location.pathname} />
+            </div>
+            <div className="border-t border-border-subtle p-3">
+              <div className="rounded-2xl bg-surface-lime/60 px-3 py-2.5">
+                <p className="text-[0.68rem] font-bold uppercase tracking-[0.1em] text-pastel-lime-ink">
+                  Đang đăng nhập
+                </p>
+                <p className="mt-1 truncate text-sm font-semibold text-ink-primary">
+                  {session?.profile.displayName || session?.profile.email}
+                </p>
+              </div>
+            </div>
           </div>
         </aside>
         <main className="min-w-0">
@@ -189,6 +264,15 @@ export function AdminLayout({
           {children}
         </main>
       </div>
+      <Sheet
+        open={menuOpen}
+        onOpenChange={setMenuOpen}
+        side="left"
+        title="Điều hướng quản trị"
+        description="Quản lý nội dung, học viên và đơn hàng"
+      >
+        <AdminNavigation pathname={location.pathname} onNavigate={() => setMenuOpen(false)} />
+      </Sheet>
     </div>
   )
 }
@@ -280,18 +364,13 @@ export function AdminSelect({
   return (
     <label className="grid min-w-0 gap-1.5 text-sm font-semibold text-ink-primary">
       <span>{label}</span>
-      <select
-        className="min-h-11 w-full rounded-xl border border-border-subtle bg-white px-3 font-normal outline-none focus-visible:ring-2 focus-visible:ring-action-primary disabled:bg-surface-muted"
+      <DropdownSelect
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        onValueChange={onChange}
+        options={options}
         disabled={disabled}
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
+        aria-label={label}
+      />
     </label>
   )
 }

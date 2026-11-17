@@ -1,10 +1,9 @@
 import * as CheckboxPrimitive from '@radix-ui/react-checkbox'
 import * as LabelPrimitive from '@radix-ui/react-label'
 import * as RadioGroupPrimitive from '@radix-ui/react-radio-group'
-import * as SelectPrimitive from '@radix-ui/react-select'
 import * as SwitchPrimitive from '@radix-ui/react-switch'
 import { useController, type Control, type FieldPath, type FieldValues } from 'react-hook-form'
-import { Check, ChevronDown, ChevronUp, Eye, EyeOff, Search, X } from 'lucide-react'
+import { Check, Eye, EyeOff, Search, X } from 'lucide-react'
 import {
   forwardRef,
   type ComponentProps,
@@ -16,6 +15,7 @@ import {
   useState,
 } from 'react'
 import { cn } from './cn'
+import { DropdownSelect } from './dropdown-select'
 
 export function FormLabel({ className, ...props }: ComponentProps<typeof LabelPrimitive.Root>) {
   return (
@@ -209,51 +209,16 @@ export function SelectField({
       {...(error ? { error } : {})}
     >
       {(describedBy, invalid) => (
-        <SelectPrimitive.Root value={value} onValueChange={onValueChange} disabled={disabled}>
-          <SelectPrimitive.Trigger
-            id={id}
-            aria-invalid={invalid || undefined}
-            aria-describedby={describedBy}
-            className={cn(
-              inputClassName,
-              'flex items-center justify-between text-left data-[placeholder]:text-ink-secondary',
-            )}
-          >
-            <SelectPrimitive.Value placeholder={placeholder} />
-            <SelectPrimitive.Icon asChild>
-              <ChevronDown aria-hidden="true" className="size-4 text-ink-secondary" />
-            </SelectPrimitive.Icon>
-          </SelectPrimitive.Trigger>
-          <SelectPrimitive.Portal>
-            <SelectPrimitive.Content
-              position="popper"
-              sideOffset={5}
-              className="z-50 max-h-64 min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-xl border border-border-subtle bg-card-surface shadow-raised"
-            >
-              <SelectPrimitive.ScrollUpButton className="grid h-8 place-items-center">
-                <ChevronUp aria-hidden="true" className="size-4" />
-              </SelectPrimitive.ScrollUpButton>
-              <SelectPrimitive.Viewport className="p-1">
-                {options.map((option) => (
-                  <SelectPrimitive.Item
-                    key={option.value}
-                    value={option.value}
-                    disabled={option.disabled}
-                    className="relative flex min-h-10 cursor-default select-none items-center rounded-lg py-2 pl-9 pr-3 text-sm outline-none data-[highlighted]:bg-surface-muted data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
-                  >
-                    <SelectPrimitive.ItemIndicator className="absolute left-3">
-                      <Check aria-hidden="true" className="size-4" />
-                    </SelectPrimitive.ItemIndicator>
-                    <SelectPrimitive.ItemText>{option.label}</SelectPrimitive.ItemText>
-                  </SelectPrimitive.Item>
-                ))}
-              </SelectPrimitive.Viewport>
-              <SelectPrimitive.ScrollDownButton className="grid h-8 place-items-center">
-                <ChevronDown aria-hidden="true" className="size-4" />
-              </SelectPrimitive.ScrollDownButton>
-            </SelectPrimitive.Content>
-          </SelectPrimitive.Portal>
-        </SelectPrimitive.Root>
+        <DropdownSelect
+          value={value}
+          onValueChange={onValueChange}
+          options={options}
+          placeholder={placeholder}
+          disabled={disabled}
+          id={id}
+          aria-describedby={describedBy}
+          aria-invalid={invalid || undefined}
+        />
       )}
     </FormField>
   )
