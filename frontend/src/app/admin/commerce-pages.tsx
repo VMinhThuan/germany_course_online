@@ -50,6 +50,12 @@ export function AdminOrdersPage({ orderId }: { orderId?: string }) {
     enabled: Boolean(orderId),
     retry: false,
   })
+  const failedEmails = useQuery({
+    queryKey: ['admin', 'email-outbox'],
+    queryFn: () => adminRepository.listFailedEmailOutbox(),
+    enabled: !orderId,
+    retry: false,
+  })
   const approve = useAdminMutation(({ id, reviewNote }: { id: string; reviewNote: string }) =>
     adminRepository.approveOrder(id, reviewNote),
   )
@@ -67,6 +73,9 @@ export function AdminOrdersPage({ orderId }: { orderId?: string }) {
   )
   const reject = useAdminMutation(({ id, reason }: { id: string; reason: string }) =>
     adminRepository.rejectOrder(id, reason),
+  )
+  const retryEmail = useAdminMutation((messageId: string) =>
+    adminRepository.retryFailedEmail(messageId),
   )
 
   if (orderId) {
@@ -370,135 +379,187 @@ export function AdminOrdersPage({ orderId }: { orderId?: string }) {
   }
 
   return (
-    <AdminCard
-      title="Đơn hàng"
-      description="Xem riêng trạng thái đơn và việc học viên đã báo chuyển khoản hay chưa."
-    >
-      <div className="grid gap-3 sm:grid-cols-3">
-        <AdminField
-          label="Tìm mã đơn / học viên"
-          value={search}
-          onChange={(value) => {
-            setSearch(value)
-            setPage(1)
-          }}
-          placeholder="Mã đơn, tên hoặc email"
-        />
-        <AdminSelect
-          label="Trạng thái đơn"
-          value={status}
-          onChange={(value) => {
-            setStatus(value)
-            setPage(1)
-          }}
-          options={[
-            { value: '', label: 'Tất cả' },
-            ...['PENDING', 'PAID', 'REJECTED', 'CANCELLED', 'FAILED', 'EXPIRED'].map((value) => ({
-              value,
-              label: value,
-            })),
-          ]}
-        />
-        <AdminSelect
-          label="Báo chuyển khoản"
-          value={transferSubmitted}
-          onChange={(value) => {
-            setTransferSubmitted(value)
-            setPage(1)
-          }}
-          options={[
-            { value: '', label: 'Tất cả' },
-            { value: 'true', label: 'Đã báo' },
-            { value: 'false', label: 'Chưa báo' },
-          ]}
-        />
-      </div>
-      {list.isPending ? (
-        <AdminLoading />
-      ) : list.isError ? (
-        <AdminLoadError error={list.error} retry={() => void list.refetch()} />
-      ) : list.data?.items.length ? (
-        <div className="overflow-x-auto rounded-control border border-border-subtle bg-card-surface">
-          <table className="w-full min-w-[780px] text-left text-sm">
-            <thead className="bg-surface-muted text-xs uppercase text-ink-secondary">
-              <tr>
-                <th className="p-3">Mã đơn</th>
-                <th className="p-3">Học viên</th>
-                <th className="p-3">Khóa học</th>
-                <th className="p-3">Số tiền</th>
-                <th className="p-3">Trạng thái</th>
-                <th className="p-3">Chuyển khoản</th>
-                <th className="p-3">Chi tiết</th>
-              </tr>
-            </thead>
-            <tbody>
-              {list.data.items.map(({ order, student, course }) => (
-                <tr key={order.id} className="border-t border-border-subtle bg-card-surface">
-                  <td className="p-3 font-semibold">{order.orderCode}</td>
-                  <td className="p-3">{student?.email ?? '—'}</td>
-                  <td className="p-3">{course.title}</td>
-                  <td className="p-3">{formatVnd(order.totalAmount)}</td>
-                  <td className="p-3">
-                    <StatusBadge
-                      status={
-                        order.status === 'PAID'
-                          ? 'success'
-                          : order.status === 'PENDING'
-                            ? 'warning'
-                            : order.status === 'REJECTED' || order.status === 'FAILED'
-                              ? 'danger'
-                              : 'neutral'
-                      }
-                      label={
-                        order.status === 'PENDING'
-                          ? 'Đang chờ'
-                          : order.status === 'PAID'
-                            ? 'Đã thanh toán'
-                            : order.status === 'REJECTED'
-                              ? 'Đã từ chối'
-                              : order.status === 'CANCELLED'
-                                ? 'Đã hủy'
-                                : order.status === 'FAILED'
-                                  ? 'Thất bại'
-                                  : 'Đã hết hạn'
-                      }
-                    />
-                  </td>
-                  <td className="p-3">
-                    <StatusBadge
-                      status={order.paymentSubmittedAt ? 'info' : 'neutral'}
-                      label={
-                        order.paymentSubmittedAt
-                          ? `Đã báo · ${formatDateTimeInTimezone(order.paymentSubmittedAt)}`
-                          : 'Chưa báo'
-                      }
-                    />
-                  </td>
-                  <td className="p-3">
-                    <Link
-                      to={`/admin/orders/${order.id}`}
-                      className="font-semibold text-action-primary"
-                    >
-                      Mở <ChevronRight aria-hidden="true" className="inline size-4" />
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+    <div className="grid gap-5">
+      <AdminCard
+        title="Đơn hàng"
+        description="Xem riêng trạng thái đơn và việc học viên đã báo chuyển khoản hay chưa."
+      >
+        <div className="grid gap-3 sm:grid-cols-3">
+          <AdminField
+            label="Tìm mã đơn / học viên"
+            value={search}
+            onChange={(value) => {
+              setSearch(value)
+              setPage(1)
+            }}
+            placeholder="Mã đơn, tên hoặc email"
+          />
+          <AdminSelect
+            label="Trạng thái đơn"
+            value={status}
+            onChange={(value) => {
+              setStatus(value)
+              setPage(1)
+            }}
+            options={[
+              { value: '', label: 'Tất cả' },
+              ...['PENDING', 'PAID', 'REJECTED', 'CANCELLED', 'FAILED', 'EXPIRED'].map((value) => ({
+                value,
+                label: value,
+              })),
+            ]}
+          />
+          <AdminSelect
+            label="Báo chuyển khoản"
+            value={transferSubmitted}
+            onChange={(value) => {
+              setTransferSubmitted(value)
+              setPage(1)
+            }}
+            options={[
+              { value: '', label: 'Tất cả' },
+              { value: 'true', label: 'Đã báo' },
+              { value: 'false', label: 'Chưa báo' },
+            ]}
+          />
         </div>
-      ) : (
-        <EmptyState title="Không có đơn hàng" />
-      )}
-      {list.data && <p className="text-xs text-ink-muted">Tổng số: {list.data.total}</p>}
-      {list.data && list.data.total > list.data.pageSize && (
-        <Pagination
-          page={list.data.page}
-          pages={Math.ceil(list.data.total / list.data.pageSize)}
-          onPageChange={setPage}
+        {list.isPending ? (
+          <AdminLoading />
+        ) : list.isError ? (
+          <AdminLoadError error={list.error} retry={() => void list.refetch()} />
+        ) : list.data?.items.length ? (
+          <div className="overflow-x-auto rounded-control border border-border-subtle bg-card-surface">
+            <table className="w-full min-w-[780px] text-left text-sm">
+              <thead className="bg-surface-muted text-xs uppercase text-ink-secondary">
+                <tr>
+                  <th className="p-3">Mã đơn</th>
+                  <th className="p-3">Học viên</th>
+                  <th className="p-3">Khóa học</th>
+                  <th className="p-3">Số tiền</th>
+                  <th className="p-3">Trạng thái</th>
+                  <th className="p-3">Chuyển khoản</th>
+                  <th className="p-3">Chi tiết</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.data.items.map(({ order, student, course }) => (
+                  <tr key={order.id} className="border-t border-border-subtle bg-card-surface">
+                    <td className="p-3 font-semibold">{order.orderCode}</td>
+                    <td className="p-3">{student?.email ?? '—'}</td>
+                    <td className="p-3">{course.title}</td>
+                    <td className="p-3">{formatVnd(order.totalAmount)}</td>
+                    <td className="p-3">
+                      <StatusBadge
+                        status={
+                          order.status === 'PAID'
+                            ? 'success'
+                            : order.status === 'PENDING'
+                              ? 'warning'
+                              : order.status === 'REJECTED' || order.status === 'FAILED'
+                                ? 'danger'
+                                : 'neutral'
+                        }
+                        label={
+                          order.status === 'PENDING'
+                            ? 'Đang chờ'
+                            : order.status === 'PAID'
+                              ? 'Đã thanh toán'
+                              : order.status === 'REJECTED'
+                                ? 'Đã từ chối'
+                                : order.status === 'CANCELLED'
+                                  ? 'Đã hủy'
+                                  : order.status === 'FAILED'
+                                    ? 'Thất bại'
+                                    : 'Đã hết hạn'
+                        }
+                      />
+                    </td>
+                    <td className="p-3">
+                      <StatusBadge
+                        status={order.paymentSubmittedAt ? 'info' : 'neutral'}
+                        label={
+                          order.paymentSubmittedAt
+                            ? `Đã báo · ${formatDateTimeInTimezone(order.paymentSubmittedAt)}`
+                            : 'Chưa báo'
+                        }
+                      />
+                    </td>
+                    <td className="p-3">
+                      <Link
+                        to={`/admin/orders/${order.id}`}
+                        className="font-semibold text-action-primary"
+                      >
+                        Mở <ChevronRight aria-hidden="true" className="inline size-4" />
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <EmptyState title="Không có đơn hàng" />
+        )}
+        {list.data && <p className="text-xs text-ink-muted">Tổng số: {list.data.total}</p>}
+        {list.data && list.data.total > list.data.pageSize && (
+          <Pagination
+            page={list.data.page}
+            pages={Math.ceil(list.data.total / list.data.pageSize)}
+            onPageChange={setPage}
+          />
+        )}
+      </AdminCard>
+      <AdminCard
+        title="Email chưa gửi được"
+        description="Các email lỗi được lưu trong outbox. Admin có thể xem lỗi và gửi lại thủ công; email đã gửi sẽ không được gửi trùng."
+      >
+        {failedEmails.isPending ? (
+          <AdminLoading label="Đang tải email lỗi" />
+        ) : failedEmails.isError ? (
+          <AdminLoadError error={failedEmails.error} retry={() => void failedEmails.refetch()} />
+        ) : failedEmails.data?.items.length ? (
+          <div className="grid gap-3">
+            {failedEmails.data.items.map((message) => (
+              <div
+                key={message.id}
+                className="grid gap-3 rounded-control border border-border-subtle p-4 sm:grid-cols-[1fr_auto] sm:items-center"
+              >
+                <div className="grid gap-1 text-sm">
+                  <strong>{message.subject}</strong>
+                  <span className="text-ink-secondary">
+                    {message.recipientEmail ?? message.recipientType} · {message.status} · lần thử{' '}
+                    {message.attempts}
+                  </span>
+                  <span className="text-danger-foreground">{message.errorMessage}</span>
+                  {message.nextRetryAt && (
+                    <span className="text-xs text-ink-muted">
+                      Mốc retry đề xuất: {formatDateTimeInTimezone(message.nextRetryAt)}
+                    </span>
+                  )}
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  loading={retryEmail.isPending && retryEmail.variables === message.id}
+                  onClick={() => retryEmail.mutate(message.id)}
+                >
+                  Gửi lại
+                </Button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            title="Không có email lỗi"
+            description="Outbox hiện không có email cần Admin xử lý lại."
+          />
+        )}
+        <AdminFeedback
+          error={retryEmail.error}
+          {...(retryEmail.isSuccess ? { success: 'Đã yêu cầu gửi lại email.' } : {})}
         />
-      )}
-    </AdminCard>
+      </AdminCard>
+    </div>
   )
 }
 

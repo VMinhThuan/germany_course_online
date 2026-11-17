@@ -1,8 +1,7 @@
 # Security and Secrets Review
 
 - Server secrets remain backend-only; `VITE_*` values are public.
-- `CRON_SECRET` is optional, validated to at least 32 characters, compared without logging, and fails closed when absent/invalid.
-- The protected cron route checks its secret before connecting to Mongo or touching the outbox.
+- No `CRON_SECRET` is required because no scheduler endpoint is deployed. Manual outbox retry is protected by the existing Admin JWT/role middleware and uses a compare-and-set claim before SMTP delivery.
 - Vercel app import does not run the Admin bootstrap or index migration and does not start a persistent polling loop.
 - Mongo connection failures produce a redacted 503; no URI or database host is emitted in responses/log fields.
 - No remote MongoDB, SMTP, media store, bank/payment service, or real student record was accessed.

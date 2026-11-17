@@ -1,5 +1,4 @@
 import { readFileSync } from "node:fs";
-import { createHash, timingSafeEqual } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import express, { type Express, type RequestHandler } from "express";
 import helmet from "helmet";
@@ -43,7 +42,6 @@ import { EmailOutboxWorker } from "./modules/commerce/email-outbox-worker.js";
 
 // Vercel's Node builder can type this ESM default export as a CJS namespace.
 const helmetFactory = helmet as unknown as () => RequestHandler;
-const VERCEL_OUTBOX_BATCH_LIMIT = 1;
 
 export type AppDependencies = {
   logger?: Logger;
@@ -53,19 +51,6 @@ export type AppDependencies = {
   ensureDatabase?: () => Promise<void>;
   lessonCommentsNow?: () => Date;
 };
-
-function hasValidCronAuthorization(
-  authorization: string | undefined,
-  secret: string | undefined,
-): boolean {
-  const supplied = authorization?.match(/^Bearer\s+([^\s]+)$/i)?.[1] ?? "";
-  const suppliedHash = createHash("sha256").update(supplied).digest();
-  const expectedHash = createHash("sha256")
-    .update(secret ?? "")
-    .digest();
-  const matches = timingSafeEqual(suppliedHash, expectedHash);
-  return Boolean(secret && supplied && matches);
-}
 
 function createDatabaseMiddleware(
   ensureDatabase: (() => Promise<void>) | undefined,
@@ -125,6 +110,7 @@ export function createApp(
     async (messageId) => {
       await emailOutboxWorker.processMessage(messageId);
     },
+    async (messageId) => emailOutboxWorker.retryMessage(messageId),
   );
   const adminService = new AdminService(mediaStorage);
   const databaseMiddleware = createDatabaseMiddleware(
@@ -186,92 +172,6 @@ export function createApp(
       });
     success(res, { status: "ready" });
   });
-
-  app.get(
-    "/api/internal/email-outbox/process",
-    (req, _res, next) => {
-      if (!config.cronSecret)
-        return next(
-          new AppError(
-            503,
-            "CRON_NOT_CONFIGURED",
-            "Scheduled email processing is not configured.",
-          ),
-        );
-      if (
-        !hasValidCronAuthorization(
-          req.header("authorization"),
-          config.cronSecret,
-        )
-      )
-        return next(
-          new AppError(401, "UNAUTHORIZED", "Authentication is required."),
-        );
-      if (!emailService.available)
-        return next(
-          new AppError(
-            503,
-            "EMAIL_DELIVERY_NOT_CONFIGURED",
-            "Email delivery is not configured.",
-          ),
-        );
-      next();
-    },
-    databaseMiddleware,
-    async (_req, res, next) => {
-      res.setHeader("Cache-Control", "no-store");
-      try {
-        const processed = await emailOutboxWorker.runOnce(
-          VERCEL_OUTBOX_BATCH_LIMIT,
-        );
-        logger.info(
-          { requestId: res.locals.requestId, processed },
-          "email outbox batch processed",
-        );
-        success(res, { processed, batchLimit: VERCEL_OUTBOX_BATCH_LIMIT });
-      } catch (error) {
-        next(error);
-      }
-    },
-  );
-
-  app.get(
-    "/api/internal/orders/expire",
-    (req, _res, next) => {
-      if (!config.cronSecret)
-        return next(
-          new AppError(
-            503,
-            "CRON_NOT_CONFIGURED",
-            "Scheduled order expiration is not configured.",
-          ),
-        );
-      if (
-        !hasValidCronAuthorization(
-          req.header("authorization"),
-          config.cronSecret,
-        )
-      )
-        return next(
-          new AppError(401, "UNAUTHORIZED", "Authentication is required."),
-        );
-      next();
-    },
-    databaseMiddleware,
-    async (_req, res, next) => {
-      res.setHeader("Cache-Control", "no-store");
-      try {
-        const expired = await commerceService.expirePendingOrders();
-        logger.info(
-          { requestId: res.locals.requestId, expired },
-          "pending orders expired",
-        );
-        success(res, { expired });
-      } catch (error) {
-        next(error);
-      }
-    },
-  );
 
   try {
     const openApiPath = fileURLToPath(

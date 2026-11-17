@@ -236,73 +236,14 @@ describe("Express foundation, auth, and public APIs", () => {
       );
     });
 
-    it("protects the bounded Vercel outbox endpoint and never reports disabled email as success", async () => {
-      const base = {
-        NODE_ENV: "test",
-        MONGODB_URI: config.mongoUri,
-        MONGODB_DB_NAME: config.databaseName,
-        JWT_ACCESS_SECRET: config.jwtAccessSecret,
-        JWT_ISSUER: config.jwtIssuer,
-        JWT_AUDIENCE: config.jwtAudience,
-        APP_ORIGINS: origin,
-      };
-      const unavailableApp = createApp(config);
-      const unavailable = await request(unavailableApp).get(
-        "/api/internal/email-outbox/process",
-      );
-      expect(unavailable.status).toBe(503);
-      expect(unavailable.body.error.code).toBe("CRON_NOT_CONFIGURED");
-
-      const cronSecret = "synthetic-cron-secret-for-local-tests-123456";
-      const cronConfig = (
-        await import("../../src/config/env.js")
-      ).parseEnvironment({
-        ...base,
-        CRON_SECRET: cronSecret,
-      });
-      let databaseCalls = 0;
-      const cronApp = createApp(cronConfig, {
-        emailService: fakeEmail,
-        ensureDatabase: async () => {
-          databaseCalls += 1;
-        },
-      });
-      const rejected = await request(cronApp)
-        .get("/api/internal/email-outbox/process")
-        .set("Authorization", "Bearer incorrect-secret");
-      expect(rejected.status).toBe(401);
-      expect(databaseCalls).toBe(0);
-
-      const processed = await request(cronApp)
-        .get("/api/internal/email-outbox/process")
-        .set("Authorization", `Bearer ${cronSecret}`);
-      expect(processed.status).toBe(200);
-      expect(processed.body.data).toEqual({ processed: 0, batchLimit: 1 });
-      expect(databaseCalls).toBe(1);
-      expect(processed.headers["cache-control"]).toBe("no-store");
-
-      const expireRejected = await request(cronApp)
-        .get("/api/internal/orders/expire")
-        .set("Authorization", "Bearer incorrect-secret");
-      expect(expireRejected.status).toBe(401);
-      expect(databaseCalls).toBe(1);
-
-      const expirations = await Promise.all([
-        request(cronApp)
-          .get("/api/internal/orders/expire")
-          .set("Authorization", `Bearer ${cronSecret}`),
-        request(cronApp)
-          .get("/api/internal/orders/expire")
-          .set("Authorization", `Bearer ${cronSecret}`),
+    it("does not expose scheduler endpoints after the cron-free migration", async () => {
+      const app = createApp(config);
+      const [outbox, expiration] = await Promise.all([
+        request(app).get("/api/internal/email-outbox/process"),
+        request(app).get("/api/internal/orders/expire"),
       ]);
-      expect(expirations.map((response) => response.status)).toEqual([
-        200, 200,
-      ]);
-      expect(expirations.map((response) => response.body.data.expired)).toEqual(
-        [0, 0],
-      );
-      expect(databaseCalls).toBe(3);
-      expect(expirations[0]?.headers["cache-control"]).toBe("no-store");
+      expect(outbox.status).toBe(404);
+      expect(expiration.status).toBe(404);
     });
 
     it("gracefully closes the HTTP listener and disconnects the database", async () => {

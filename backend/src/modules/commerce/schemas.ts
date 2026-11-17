@@ -84,6 +84,18 @@ export const adminOrderQuerySchema = pageQuerySchema
 
 export const orderIdParamsSchema = z.object({ orderId: objectId }).strict();
 
+export const emailOutboxQuerySchema = z
+  .object({
+    page: z.coerce.number().int().min(1).max(100_000).default(1),
+    pageSize: z.coerce.number().int().min(1).max(100).default(20),
+    status: z.enum(["PENDING", "FAILED"]).optional(),
+  })
+  .strict();
+
+export const emailOutboxIdParamsSchema = z
+  .object({ messageId: objectId })
+  .strict();
+
 export const orderApprovalSchema = z
   .object({ reviewNote: z.string().trim().max(1000).optional() })
   .strict();

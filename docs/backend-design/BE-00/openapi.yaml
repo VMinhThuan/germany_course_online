@@ -8221,6 +8221,125 @@ paths:
         validation: No hard delete
       security:
         - AccessToken: []
+  /admin/email-outbox:
+    get:
+      operationId: adminListFailedEmailOutbox
+      summary: List email notifications that need manual retry
+      tags:
+        - Admin Management
+      description: "Access: ADMIN. SENT messages are never returned; PENDING messages are included only when a prior delivery error exists."
+      parameters:
+        - name: page
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [PENDING, FAILED]
+      responses:
+        "200":
+          description: Failed email outbox page.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success: { type: boolean, const: true }
+                  data: { $ref: "#/components/schemas/AdminEmailOutboxPage" }
+        "401":
+          description: Standard error envelope.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+        "403":
+          description: Standard error envelope.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+      x-contract:
+        access: ADMIN
+        backendModule: commerce/email-outbox
+        relatedCollections: [email_logs]
+        frontendOperation: adminRepository.listFailedEmailOutbox
+        query: page,pageSize,status?
+        requestBody: none
+        responseData: AdminEmailOutboxPage
+        idempotency: Safe read
+        validation: Excludes SENT messages
+      security:
+        - AccessToken: []
+  /admin/email-outbox/{messageId}/retry:
+    post:
+      operationId: adminRetryFailedEmail
+      summary: Retry one failed email notification manually
+      tags:
+        - Admin Management
+      description: "Access: ADMIN. Compare-and-set prevents retrying a message that has already been sent."
+      parameters:
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^[a-fA-F0-9]{24}$
+      responses:
+        "200":
+          description: Retry attempted and the current outbox state is returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success: { type: boolean, const: true }
+                  data: { $ref: "#/components/schemas/AdminEmailOutboxMessage" }
+        "401":
+          description: Standard error envelope.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+        "403":
+          description: Standard error envelope.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+        "409":
+          description: The email was already sent or is not retryable.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+        "503":
+          description: Email delivery is not configured.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+      x-contract:
+        access: ADMIN
+        backendModule: commerce/email-outbox
+        relatedCollections: [email_logs, audit_logs]
+        frontendOperation: adminRepository.retryFailedEmail
+        query: none
+        requestBody: none
+        responseData: AdminEmailOutboxMessage
+        idempotency: Compare-and-set; SENT cannot be retried
+        validation: Manual SMTP retry only
+      security:
+        - AccessToken: []
   /admin/orders:
     get:
       operationId: adminListOrders
@@ -11368,6 +11487,35 @@ components:
         - pageSize
         - total
         - hasMore
+    AdminEmailOutboxMessage:
+      type: object
+      properties:
+        id: { type: string, pattern: "^[a-fA-F0-9]{24}$" }
+        recipientType: { type: string, enum: [ADMIN, STUDENT] }
+        recipientEmail: { type: [string, "null"], format: email }
+        templateType: { type: string }
+        subject: { type: string }
+        status: { type: string, enum: [PENDING, FAILED] }
+        attempts: { type: integer, minimum: 0 }
+        errorMessage: { type: [string, "null"] }
+        lastErrorCode: { type: [string, "null"] }
+        nextRetryAt: { type: [string, "null"], format: date-time }
+        sentAt: { type: [string, "null"], format: date-time }
+        createdAt: { type: [string, "null"], format: date-time }
+      additionalProperties: false
+      required: [id, recipientType, recipientEmail, templateType, subject, status, attempts, errorMessage, lastErrorCode, nextRetryAt, sentAt, createdAt]
+    AdminEmailOutboxPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/AdminEmailOutboxMessage" }
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, minimum: 0 }
+        hasMore: { type: boolean }
+      additionalProperties: false
+      required: [items, page, pageSize, total, hasMore]
     CouponPage:
       type: object
       properties:

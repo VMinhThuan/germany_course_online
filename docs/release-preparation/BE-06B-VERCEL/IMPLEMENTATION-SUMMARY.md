@@ -7,7 +7,7 @@
 - Added a Vercel Express entrypoint at `backend/src/index.ts`, which directly imports Express and mounts the Vercel handler so the platform detects the application. It shares business routes from `src/application.ts` with the persistent VPS entrypoint `src/persistent-server.ts`. It does not start a listener, Admin bootstrap, index migration or continuous worker.
 - Added serverless-safe lazy MongoDB connection reuse: concurrent cold requests share one connection attempt, failures can retry, the connection stays warm, selection timeout is five seconds and pool size is five.
 - When required backend configuration is absent or invalid, Vercel can still serve liveness at `/health`; `/ready` and API requests fail closed with redacted `503 CONFIGURATION_UNAVAILABLE` responses. With valid configuration, normal shared API behavior is used.
-- Added protected `GET /api/internal/email-outbox/process`. It checks a minimum 32-character `CRON_SECRET` using a constant-time digest comparison, then processes at most one message per invocation. VPS polling remains shared and is capped at ten per batch.
+- Removed the Cron endpoint and persistent polling dependency. Committed order/payment-confirmation transactions trigger an immediate SMTP attempt; durable outbox rows keep retry state, and Admins can manually retry failed messages through the protected admin API.
 - Added `backend/vercel.json`, frontend SPA fallback, read-only GitHub Actions quality gates, and the 18 required BE-06B documents.
 
 ## Local validation

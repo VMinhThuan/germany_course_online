@@ -92,12 +92,14 @@ type CheckoutPricing = {
 };
 
 type OutboxMessageProcessor = (messageId: Types.ObjectId) => Promise<void>;
+type OutboxMessageRetrier = (messageId: Types.ObjectId) => Promise<boolean>;
 
 export class CommerceService {
   constructor(
     private readonly now: () => Date = () => new Date(),
     private readonly vietQr?: VietQrConfig,
     private readonly processOutboxMessage?: OutboxMessageProcessor,
+    private readonly retryOutboxMessage?: OutboxMessageRetrier,
   ) {}
 
   private async processCommittedEmail(messageId: Types.ObjectId | null) {
@@ -105,7 +107,7 @@ export class CommerceService {
     try {
       await this.processOutboxMessage(messageId);
     } catch {
-      // The durable outbox row remains available for Cron/manual retry. SMTP
+      // The durable outbox row remains available for manual Admin retry. SMTP
       // failures must never change the already-committed business result.
     }
   }
@@ -724,6 +726,7 @@ export class CommerceService {
   async cancelStudentOrder(userId: string, orderId: string) {
     const userObjectId = new Types.ObjectId(userId);
     const orderObjectId = new Types.ObjectId(orderId);
+    await this.expirePendingOrder(orderObjectId);
     await withTransaction(async (session) => {
       const order = await Order.findOne({
         _id: orderObjectId,
@@ -806,6 +809,7 @@ export class CommerceService {
   ) {
     const adminObjectId = new Types.ObjectId(adminId);
     const orderObjectId = new Types.ObjectId(orderId);
+    await this.expirePendingOrder(orderObjectId);
     await withTransaction(async (session) => {
       const order = await Order.findById(orderObjectId).session(session).lean();
       if (!order) throw notFound("Order not found.");
@@ -896,6 +900,7 @@ export class CommerceService {
   ) {
     const adminObjectId = new Types.ObjectId(adminId);
     const orderObjectId = new Types.ObjectId(orderId);
+    await this.expirePendingOrder(orderObjectId);
     const emailLogId = await withTransaction(async (session) => {
       const order = await Order.findById(orderObjectId).session(session).lean();
       if (!order) throw notFound("Order not found.");
@@ -1039,6 +1044,92 @@ export class CommerceService {
     return (await this.adminOrderContext([order]))[0];
   }
 
+  async listFailedEmailOutbox(query: {
+    page: number;
+    pageSize: number;
+    status?: "PENDING" | "FAILED";
+  }): Promise<Page<unknown>> {
+    const filter = {
+      errorMessage: { $ne: null },
+      ...(query.status
+        ? { status: query.status }
+        : { status: { $in: ["PENDING", "FAILED"] } }),
+    } as unknown as Parameters<typeof EmailLog.find>[0];
+    const [messages, total] = await Promise.all([
+      EmailLog.find(filter)
+        .sort({ createdAt: -1, _id: -1 })
+        .skip((query.page - 1) * query.pageSize)
+        .limit(query.pageSize)
+        .lean(),
+      EmailLog.countDocuments(filter),
+    ]);
+    return pageResult(
+      messages.map((message) => emailOutboxDto(message)),
+      query,
+      total,
+    );
+  }
+
+  async retryFailedEmail(
+    adminId: string,
+    messageId: string,
+    ipAddress: string | null,
+  ) {
+    const messageObjectId = new Types.ObjectId(messageId);
+    const message = await EmailLog.findOne({
+      _id: messageObjectId,
+      status: { $in: ["PENDING", "FAILED"] },
+      errorMessage: { $ne: null },
+    }).lean();
+    if (!message) {
+      const current = await EmailLog.findById(messageObjectId)
+        .select("status")
+        .lean();
+      if (current?.status === "SENT")
+        throw new AppError(
+          409,
+          "EMAIL_ALREADY_SENT",
+          "This email has already been sent and cannot be retried.",
+        );
+      throw new AppError(
+        409,
+        "EMAIL_NOT_RETRYABLE",
+        "This email is not currently marked as failed.",
+      );
+    }
+    if (!this.retryOutboxMessage)
+      throw new AppError(
+        503,
+        "EMAIL_RETRY_UNAVAILABLE",
+        "Email retry is not configured.",
+      );
+    if (!(await this.retryOutboxMessage(messageObjectId)))
+      throw new AppError(
+        503,
+        "EMAIL_RETRY_UNAVAILABLE",
+        "Email delivery is not configured or the message is being handled by another request.",
+      );
+    await AuditLog.create({
+      actorUserId: new Types.ObjectId(adminId),
+      action: "EMAIL_OUTBOX_RETRIED",
+      entityType: "EMAIL_LOG",
+      entityId: messageObjectId,
+      oldValue: {
+        status: message.status,
+        attempts: message.attempts,
+        errorMessage: message.errorMessage,
+      },
+      newValue: {
+        status: "PENDING",
+        retryRequestedAt: this.now().toISOString(),
+      },
+      ipAddress,
+    });
+    const latest = await EmailLog.findById(messageObjectId).lean();
+    if (!latest) throw new Error("Retried email outbox message disappeared.");
+    return emailOutboxDto(latest);
+  }
+
   private async adminOrderContext(
     orders: Array<OrderFields & { _id: Types.ObjectId }>,
   ) {
@@ -1169,6 +1260,7 @@ export class CommerceService {
   ) {
     const adminObjectId = new Types.ObjectId(adminId);
     const orderObjectId = new Types.ObjectId(orderId);
+    await this.expirePendingOrder(orderObjectId);
     const now = this.now();
     let result: {
       orderId: Types.ObjectId;
@@ -1973,6 +2065,32 @@ function pageResult<T>(
     pageSize: query.pageSize,
     total,
     hasMore: query.page * query.pageSize < total,
+  };
+}
+
+function emailOutboxDto(value: object) {
+  const message = value as Record<string, unknown>;
+  return {
+    id:
+      message._id instanceof Types.ObjectId
+        ? message._id.toString()
+        : String(message._id),
+    recipientType: String(message.recipientType),
+    recipientEmail:
+      typeof message.recipientEmail === "string"
+        ? message.recipientEmail
+        : null,
+    templateType: String(message.templateType),
+    subject: String(message.subject),
+    status: String(message.status),
+    attempts: Number(message.attempts ?? 0),
+    errorMessage:
+      typeof message.errorMessage === "string" ? message.errorMessage : null,
+    lastErrorCode:
+      typeof message.lastErrorCode === "string" ? message.lastErrorCode : null,
+    nextRetryAt: toIso(message.availableAt as Date | null),
+    sentAt: toIso(message.sentAt as Date | null),
+    createdAt: toIso(message.createdAt as Date | null),
   };
 }
 

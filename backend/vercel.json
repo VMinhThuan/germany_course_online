@@ -5,15 +5,5 @@
       "maxDuration": 60,
       "includeFiles": "openapi.yaml"
     }
-  },
-  "crons": [
-    {
-      "path": "/api/internal/orders/expire",
-      "schedule": "0 * * * *"
-    },
-    {
-      "path": "/api/internal/email-outbox/process",
-      "schedule": "* * * * *"
-    }
-  ]
+  }
 }

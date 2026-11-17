@@ -42,10 +42,6 @@ const environmentSchema = z.object({
   SESSION_TTL_DAYS: z.coerce.number().int().min(1).max(365).default(30),
   APP_ORIGINS: z.string().trim().min(1),
   LESSON_COMMENTS_ENABLED: enabledByDefault,
-  CRON_SECRET: z.preprocess(
-    (value) => (value === "" ? undefined : value),
-    z.string().min(32).optional(),
-  ),
   COOKIE_SECURE: truthy.default(false),
   COOKIE_SAME_SITE: z.enum(["lax", "strict", "none"]).default("lax"),
   PASSWORD_RESET_URL: optionalText.pipe(z.string().url().optional()),
@@ -151,7 +147,6 @@ export type AppConfig = {
   sessionTtlDays: number;
   allowedOrigins: string[];
   lessonCommentsEnabled: boolean;
-  cronSecret?: string;
   cookieSecure: boolean;
   cookieSameSite: "lax" | "strict" | "none";
   passwordResetUrl: string | undefined;
@@ -432,7 +427,6 @@ export function parseEnvironment(
     sessionTtlDays: env.SESSION_TTL_DAYS,
     allowedOrigins: normalizedOrigins,
     lessonCommentsEnabled: env.LESSON_COMMENTS_ENABLED,
-    ...(env.CRON_SECRET ? { cronSecret: env.CRON_SECRET } : {}),
     cookieSecure: env.COOKIE_SECURE,
     cookieSameSite: env.COOKIE_SAME_SITE,
     passwordResetUrl: env.PASSWORD_RESET_URL,

@@ -107,19 +107,6 @@ describe("parseEnvironment", () => {
     ).toThrow(/database name/);
   });
 
-  it("accepts only a sufficiently long optional cron secret", () => {
-    expect(parseEnvironment(baseEnv).cronSecret).toBeUndefined();
-    expect(() =>
-      parseEnvironment({ ...baseEnv, CRON_SECRET: "too-short" }),
-    ).toThrow(/CRON_SECRET/);
-    expect(
-      parseEnvironment({
-        ...baseEnv,
-        CRON_SECRET: "synthetic-cron-secret-for-local-tests-123456",
-      }).cronSecret,
-    ).toBe("synthetic-cron-secret-for-local-tests-123456");
-  });
-
   it("rejects invalid boolean environment values instead of silently treating them as false", () => {
     expect(() =>
       parseEnvironment({ ...baseEnv, COOKIE_SECURE: "sometimes" }),

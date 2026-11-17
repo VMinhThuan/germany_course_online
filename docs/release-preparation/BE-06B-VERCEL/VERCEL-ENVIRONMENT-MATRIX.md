@@ -7,7 +7,7 @@
 | `MONGODB_URI` / `MONGODB_DB_NAME` | No | Yes | Required private runtime values for a dedicated approved target; not configured. |
 | `JWT_ACCESS_SECRET`, `JWT_ISSUER`, `JWT_AUDIENCE` | No | Yes | Required backend settings; secret unique to environment. Not configured. |
 | `APP_ORIGINS`, cookie settings | No | Yes | Exact approved frontend origins; not configured. |
-| `CRON_SECRET` | No | Yes | Private, at least 32 characters; add only when a schedule is enabled. Not configured. |
+| `CRON_SECRET` | No | No | Not used. The LMS payment/email flow has no Cron dependency. |
 | SMTP settings / reset URL | No | Yes | Optional complete tuple; no provider or test mailbox configured. |
 | MEDIA_S3_* | No | Yes | Optional complete private storage tuple; not configured. |
 

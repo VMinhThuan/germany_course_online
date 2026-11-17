@@ -301,12 +301,6 @@ describe("BE-03A purchase, manual approval, enrollment, and email outbox", () =>
       "passwordHash",
     );
 
-    const transferWorker = new EmailOutboxWorker(emailService, {
-      ...(config.allowedOrigins[0]
-        ? { frontendBaseUrl: config.allowedOrigins[0] }
-        : {}),
-    });
-    expect(await transferWorker.runOnce()).toBe(0);
     expect(emailService.notificationDeliveries[0]?.to).toContain(admin.email);
     expect(emailService.notificationDeliveries[0]?.text).toContain(
       created.body.data.order.orderCode,
@@ -401,7 +395,7 @@ describe("BE-03A purchase, manual approval, enrollment, and email outbox", () =>
         ? { frontendBaseUrl: config.allowedOrigins[0] }
         : {}),
     });
-    expect(await retryWorker.runOnce()).toBe(1);
+    expect(await retryWorker.processMessage(studentOutbox!._id)).toBe(true);
     studentOutbox = await EmailLog.findOne({
       templateType: "ORDER_APPROVED_STUDENT",
     }).lean();
@@ -740,7 +734,12 @@ describe("BE-03A purchase, manual approval, enrollment, and email outbox", () =>
         throw new Error("unavailable");
       },
     });
-    expect(await unavailableWorker.runOnce()).toBe(0);
+    const unavailableJob = await EmailLog.findOne({
+      templateType: "TRANSFER_SUBMITTED_ADMIN",
+    }).lean();
+    expect(await unavailableWorker.processMessage(unavailableJob!._id)).toBe(
+      false,
+    );
     expect(
       (
         await EmailLog.findOne({
@@ -758,7 +757,7 @@ describe("BE-03A purchase, manual approval, enrollment, and email outbox", () =>
     expect(job?.attempts).toBe(1);
     now = new Date((job?.availableAt.getTime() ?? now.getTime()) + 1);
     for (let attempt = 1; attempt < 5; attempt += 1) {
-      expect(await worker.runOnce(1)).toBe(1);
+      expect(await worker.processMessage(job!._id)).toBe(true);
       job = await EmailLog.findOne({
         templateType: "TRANSFER_SUBMITTED_ADMIN",
       }).lean();
@@ -774,6 +773,103 @@ describe("BE-03A purchase, manual approval, enrollment, and email outbox", () =>
     }
     expect(emailService.notificationDeliveries).toHaveLength(0);
     expect((await Order.findById(orderId).lean())?.status).toBe("PENDING");
+
+    const failedMessages = await as(admin, "get", "/api/v1/admin/email-outbox");
+    expect(failedMessages.status).toBe(200);
+    expect(failedMessages.body.data.items).toHaveLength(1);
+    expect(failedMessages.body.data.items[0].status).toBe("FAILED");
+    expect(failedMessages.body.data.items[0].errorMessage).toContain(
+      "retry limit",
+    );
+    expect(
+      (await as(student, "get", "/api/v1/admin/email-outbox")).status,
+    ).toBe(403);
+
+    emailService.notificationFailuresRemaining = 0;
+    const retried = await as(
+      admin,
+      "post",
+      `/api/v1/admin/email-outbox/${failedMessages.body.data.items[0].id}/retry`,
+    ).send({});
+    expect(retried.status).toBe(200);
+    expect(retried.body.data.status).toBe("SENT");
+    expect(
+      (await EmailLog.findOne({ templateType: "TRANSFER_SUBMITTED_ADMIN" }))
+        ?.status,
+    ).toBe("SENT");
+    const duplicateRetry = await as(
+      admin,
+      "post",
+      `/api/v1/admin/email-outbox/${failedMessages.body.data.items[0].id}/retry`,
+    ).send({});
+    expect(duplicateRetry.status).toBe(409);
+    expect(duplicateRetry.body.error.code).toBe("EMAIL_ALREADY_SENT");
+  });
+
+  it("lazily expires unreported orders without expiring reported or paid orders", async () => {
+    await setupPaymentSettings();
+    const course = await createCourse();
+    const created = await as(student, "post", "/api/v1/orders").send({
+      courseId: course._id.toString(),
+      orderType: "PURCHASE",
+    });
+    const expiredOrderId = created.body.data.order.id as string;
+    await Order.updateOne(
+      { _id: expiredOrderId },
+      { $set: { expiresAt: new Date(Date.now() - 1) } },
+    );
+
+    const expiredRead = await as(
+      student,
+      "get",
+      `/api/v1/orders/${expiredOrderId}`,
+    );
+    expect(expiredRead.status).toBe(200);
+    expect(expiredRead.body.data.order.status).toBe("EXPIRED");
+    const expiredConfirmation = await as(
+      student,
+      "post",
+      `/api/v1/orders/${expiredOrderId}/confirm-transfer`,
+    ).send({});
+    expect(expiredConfirmation.status).toBe(409);
+    expect(expiredConfirmation.body.error.code).toBe("ORDER_EXPIRED");
+
+    const reportedCourse = await createCourse();
+    const reported = await as(student, "post", "/api/v1/orders").send({
+      courseId: reportedCourse._id.toString(),
+      orderType: "PURCHASE",
+    });
+    const reportedOrderId = reported.body.data.order.id as string;
+    const confirmation = await as(
+      student,
+      "post",
+      `/api/v1/orders/${reportedOrderId}/confirm-transfer`,
+    ).send({});
+    expect(confirmation.status).toBe(200);
+    await Order.updateOne(
+      { _id: reportedOrderId },
+      { $set: { expiresAt: new Date(Date.now() - 1) } },
+    );
+    expect(
+      (await as(student, "get", `/api/v1/orders/${reportedOrderId}`)).body.data
+        .order.status,
+    ).toBe("PENDING");
+
+    const approved = await as(
+      admin,
+      "post",
+      `/api/v1/admin/orders/${reportedOrderId}/approve`,
+    ).send({});
+    expect(approved.status).toBe(200);
+    expect(approved.body.data.order.status).toBe("PAID");
+    await Order.updateOne(
+      { _id: reportedOrderId },
+      { $set: { expiresAt: new Date(Date.now() - 1) } },
+    );
+    expect(
+      (await as(student, "get", `/api/v1/orders/${reportedOrderId}`)).body.data
+        .order.status,
+    ).toBe("PAID");
   });
 
   it("reclaims an expired outbox lease after worker restart and does not redeliver a sent job", async () => {
@@ -802,7 +898,7 @@ describe("BE-03A purchase, manual approval, enrollment, and email outbox", () =>
     const restartedWorker = new EmailOutboxWorker(emailService, {
       now: () => now,
     });
-    expect(await restartedWorker.runOnce()).toBe(1);
+    expect(await restartedWorker.processMessage(job._id)).toBe(true);
     const delivered = await EmailLog.findById(job._id).lean();
     expect(delivered?.status).toBe("SENT");
     expect(delivered?.attempts).toBe(2);
@@ -812,7 +908,7 @@ describe("BE-03A purchase, manual approval, enrollment, and email outbox", () =>
     );
 
     const nextWorker = new EmailOutboxWorker(emailService, { now: () => now });
-    expect(await nextWorker.runOnce()).toBe(0);
+    expect(await nextWorker.processMessage(job._id)).toBe(false);
     expect(emailService.notificationDeliveries).toHaveLength(1);
   });
 

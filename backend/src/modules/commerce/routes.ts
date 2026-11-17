@@ -12,6 +12,8 @@ import {
   checkoutQuoteQuerySchema,
   courseIdParamsSchema,
   couponValidateSchema,
+  emailOutboxIdParamsSchema,
+  emailOutboxQuerySchema,
   orderApprovalSchema,
   orderCreateSchema,
   orderIdParamsSchema,
@@ -199,6 +201,41 @@ export function createCommerceRouter(
         success(
           res,
           await commerce.listAdminOrders(res.locals.validated.query),
+        );
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  router.get(
+    "/admin/email-outbox",
+    validateRequest({ query: emailOutboxQuerySchema }),
+    async (_req, res, next) => {
+      try {
+        success(
+          res,
+          await commerce.listFailedEmailOutbox(res.locals.validated.query),
+        );
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  router.post(
+    "/admin/email-outbox/:messageId/retry",
+    validateRequest({ params: emailOutboxIdParamsSchema }),
+    async (req, res, next) => {
+      try {
+        if (!req.auth) throw unauthorized();
+        success(
+          res,
+          await commerce.retryFailedEmail(
+            req.auth.sub,
+            res.locals.validated.params.messageId,
+            req.ip ?? null,
+          ),
         );
       } catch (error) {
         next(error);

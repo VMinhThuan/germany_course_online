@@ -7,8 +7,6 @@ const MAX_ATTEMPTS = 5;
 const LEASE_MS = 60_000;
 const BASE_BACKOFF_MS = 30_000;
 const MAX_BACKOFF_MS = 30 * 60_000;
-const BATCH_LIMIT = 10;
-export const EMAIL_OUTBOX_BATCH_LIMIT = BATCH_LIMIT;
 
 type WorkerOptions = {
   now?: () => Date;
@@ -41,7 +39,6 @@ export class EmailOutboxWorker {
   private readonly now: () => Date;
   private readonly frontendBaseUrl: string;
   private readonly adminNotificationEmail: string | undefined;
-  private activePoll: Promise<number> | undefined;
 
   constructor(
     private readonly emailService: EmailService,
@@ -50,20 +47,6 @@ export class EmailOutboxWorker {
     this.now = options.now ?? (() => new Date());
     this.frontendBaseUrl = (options.frontendBaseUrl ?? "").replace(/\/$/, "");
     this.adminNotificationEmail = options.adminNotificationEmail;
-  }
-
-  async runOnce(limit = BATCH_LIMIT): Promise<number> {
-    if (!this.emailService.available) return 0;
-    if (this.activePoll) return this.activePoll;
-    const boundedLimit = Number.isFinite(limit)
-      ? Math.min(BATCH_LIMIT, Math.max(1, Math.floor(limit)))
-      : BATCH_LIMIT;
-    this.activePoll = this.processBatch(boundedLimit);
-    try {
-      return await this.activePoll;
-    } finally {
-      this.activePoll = undefined;
-    }
   }
 
   /** Process one known outbox row after its transaction has committed. */
@@ -77,15 +60,35 @@ export class EmailOutboxWorker {
     return true;
   }
 
-  private async processBatch(limit: number): Promise<number> {
-    let processed = 0;
-    for (let index = 0; index < limit; index += 1) {
-      const job = await this.claim();
-      if (!job) break;
-      await this.deliver(job);
-      processed += 1;
-    }
-    return processed;
+  /**
+   * Re-queue one failed notification for an explicit Admin retry.
+   * The compare-and-set keeps two Admin clicks from creating two deliveries.
+   */
+  async retryMessage(messageId: Types.ObjectId | string): Promise<boolean> {
+    if (!this.emailService.available) return false;
+    const id =
+      typeof messageId === "string" ? new Types.ObjectId(messageId) : messageId;
+    const now = this.now();
+    const reset = await EmailLog.updateOne(
+      {
+        _id: id,
+        status: { $in: ["PENDING", "FAILED"] },
+        errorMessage: { $ne: null },
+      },
+      {
+        $set: {
+          status: "PENDING",
+          availableAt: now,
+          errorMessage: null,
+          lastErrorCode: null,
+          leaseExpiresAt: null,
+          leaseToken: null,
+        },
+      },
+    );
+    if (reset.modifiedCount !== 1) return false;
+    await this.processMessage(id);
+    return true;
   }
 
   private async claim(
@@ -148,7 +151,7 @@ export class EmailOutboxWorker {
             availableAt: new Date(this.now().getTime() + backoff),
             errorMessage: terminal
               ? "Notification delivery failed after the retry limit."
-              : "Notification delivery failed; retry scheduled.",
+              : "Notification delivery failed; Admin retry required.",
             lastErrorCode:
               error instanceof MissingRecipientError
                 ? error.code

@@ -1,6 +1,7 @@
 import { apiRequest, uploadWithProgress } from '@/lib/api/client'
 import type {
   ApiAdminCourse,
+  ApiAdminEmailOutbox,
   ApiAdminEnrollment,
   ApiAdminEnrollmentDetail,
   ApiAdminExercise,
@@ -273,6 +274,16 @@ export const adminRepository = {
     return apiRequest<ApiAdminOrderDetail>(`/admin/orders/${pathId(orderId)}/reject`, {
       method: 'POST',
       body: { reason },
+    })
+  },
+  listFailedEmailOutbox(filters: Query = {}) {
+    return apiRequest<ApiPage<ApiAdminEmailOutbox>>(
+      `/admin/email-outbox${queryString({ page: 1, pageSize: 20, ...filters })}`,
+    )
+  },
+  retryFailedEmail(messageId: string) {
+    return apiRequest<ApiAdminEmailOutbox>(`/admin/email-outbox/${pathId(messageId)}/retry`, {
+      method: 'POST',
     })
   },
   getSiteSettings() {

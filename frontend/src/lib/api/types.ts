@@ -578,6 +578,21 @@ export interface ApiAdminOrderDetail extends ApiAdminOrderSummary {
   } | null
 }
 
+export interface ApiAdminEmailOutbox {
+  id: string
+  recipientType: 'ADMIN' | 'STUDENT'
+  recipientEmail: string | null
+  templateType: string
+  subject: string
+  status: 'PENDING' | 'FAILED'
+  attempts: number
+  errorMessage: string | null
+  lastErrorCode: string | null
+  nextRetryAt: string | null
+  sentAt: string | null
+  createdAt: string | null
+}
+
 export interface ApiAdminCoupon {
   id: string
   code: string
