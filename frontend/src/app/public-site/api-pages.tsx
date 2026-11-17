@@ -226,6 +226,8 @@ export function ApiCourseDetailPage() {
         ? 'grid gap-4 sm:grid-cols-2'
         : 'grid gap-4 sm:grid-cols-2 lg:grid-cols-3'
   const checkout = `/checkout/${encodeURIComponent(course.id)}`
+  const previewAvailable = Boolean(previewManifest.data?.sectionIds?.length)
+  const previewHref = `/courses/${encodeURIComponent(slug)}/preview`
   const openCheckout = () =>
     navigate(session ? checkout : `/login?returnTo=${encodeURIComponent(checkout)}`)
   return (
@@ -273,10 +275,17 @@ export function ApiCourseDetailPage() {
               <Button className="mt-5 w-full" onClick={openCheckout}>
                 Đăng ký khóa học <ArrowRight aria-hidden="true" />
               </Button>
+              {previewAvailable && (
+                <LinkButton to={previewHref} variant="outline" className="mt-3 w-full">
+                  Học thử chương 1 miễn phí <ArrowRight aria-hidden="true" />
+                </LinkButton>
+              )}
               <p className="mt-3 text-xs leading-5 text-ink-muted">
-                {session
-                  ? 'Bài học sẽ mở sau khi đăng ký được xác nhận.'
-                  : 'Đăng nhập hoặc tạo tài khoản để đăng ký khóa học.'}
+                {previewAvailable
+                  ? 'Trải nghiệm chương đầu trước khi quyết định đăng ký khóa học.'
+                  : session
+                    ? 'Bài học sẽ mở sau khi đăng ký được xác nhận.'
+                    : 'Đăng nhập hoặc tạo tài khoản để đăng ký khóa học.'}
               </p>
             </Card>
           </aside>
@@ -333,7 +342,9 @@ export function ApiCourseDetailPage() {
               Nội dung khóa học
             </h2>
             <p className="text-sm leading-6 text-ink-secondary">
-              Các chương và bài học được sắp xếp theo từng bước để bạn dễ theo dõi.
+              {previewAvailable
+                ? 'Xem trước chương 1 miễn phí, sau đó đăng ký để mở toàn bộ lộ trình.'
+                : 'Các chương và bài học được sắp xếp theo từng bước để bạn dễ theo dõi.'}
             </p>
           </div>
           <CourseOutline
@@ -342,7 +353,7 @@ export function ApiCourseDetailPage() {
             {...(previewManifest.data?.sectionIds
               ? { previewSectionIds: previewManifest.data.sectionIds }
               : {})}
-            previewHref={`/courses/${encodeURIComponent(slug)}/preview`}
+            previewHref={previewHref}
             onPreviewLessonSelect={(sectionId, lessonId) =>
               navigate(
                 `/courses/${encodeURIComponent(slug)}/preview?sectionId=${encodeURIComponent(sectionId)}&lessonId=${encodeURIComponent(lessonId)}`,
