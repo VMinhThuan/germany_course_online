@@ -72,6 +72,16 @@ function renderMediaPage() {
   )
 }
 
+async function selectAdminOption(
+  user: ReturnType<typeof userEvent.setup>,
+  label: string,
+  optionName: string | RegExp,
+  container: HTMLElement = document.body,
+) {
+  await user.click(within(container).getByRole('combobox', { name: label }))
+  await user.click(await screen.findByRole('option', { name: optionName }))
+}
+
 describe('admin media library', () => {
   beforeEach(() => {
     vi.mocked(adminRepository.getMediaCapabilities).mockResolvedValue({
@@ -108,8 +118,8 @@ describe('admin media library', () => {
     renderMediaPage()
 
     await screen.findByLabelText('Tìm kiếm')
-    await user.selectOptions(screen.getByLabelText('Dịch vụ lưu trữ'), 'CLOUDINARY')
-    await user.selectOptions(screen.getByLabelText('Tình trạng'), 'READY')
+    await selectAdminOption(user, 'Dịch vụ lưu trữ', 'Cloudinary')
+    await selectAdminOption(user, 'Tình trạng', 'Đã sẵn sàng')
     await user.type(screen.getByLabelText('Tìm kiếm'), 'lesson')
 
     await waitFor(() =>
@@ -148,7 +158,12 @@ describe('admin media library', () => {
       await screen.findByLabelText('Tìm kiếm')
       await user.click(screen.getByRole('button', { name: 'Tải tệp lên' }))
       const dialog = await screen.findByRole('dialog', { name: 'Tải tệp lên thư viện' })
-      await user.selectOptions(within(dialog).getByLabelText('Thư mục lưu'), assetFolder)
+      await selectAdminOption(
+        user,
+        'Thư mục lưu',
+        assetFolder === 'lesson-pdf/lektion-1' ? 'Tài liệu PDF · lektion-1' : 'Âm thanh bài tập',
+        dialog,
+      )
       await user.upload(screen.getByLabelText('Tệp'), selectedFile)
       const fileInput = screen.getByLabelText('Tệp') as HTMLInputElement
       expect(fileInput.files?.[0]?.name).toBe(selectedFile.name)
