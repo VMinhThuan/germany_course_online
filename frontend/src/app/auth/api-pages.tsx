@@ -37,10 +37,10 @@ function authError(error: unknown) {
 function AuthPageFrame({ title, children }: { title: string; children: ReactNode }) {
   return (
     <AuthShell showBrand={false} showPreviewNotice={false} showFooter={false}>
-      <div role="region" aria-label={title} className="mx-auto grid w-full max-w-3xl gap-4">
-        <div className="flex w-full justify-center px-3 sm:px-0">
+      <div role="region" aria-label={title} className="mx-auto grid w-full max-w-md gap-4">
+        <div className="flex w-full items-center justify-center px-3 sm:px-0">
           <BrandLogo
-            className="flex w-fit max-w-full justify-center"
+            className="mx-auto flex w-full justify-center"
             imageClassName="h-12 w-auto max-w-full"
           />
         </div>
@@ -133,7 +133,7 @@ export function ApiLoginPage() {
       <AuthFormCard description="Đăng nhập">
         {search.get('registered') === '1' && (
           <InlineAlert tone="success" title="Tạo tài khoản thành công">
-            Đăng nhập bằng email và mật khẩu vừa đăng ký. Tài khoản chưa được đăng nhập tự động.
+            Tài khoản đã được tạo thành công.
           </InlineAlert>
         )}
         {search.get('sessionRevoked') === '1' && (
@@ -240,7 +240,7 @@ export function ApiRegisterPage() {
         {complete ? (
           <div className="grid gap-4">
             <InlineAlert tone="success" title="Tài khoản đã được tạo">
-              Tài khoản Student đã được lưu. Đăng nhập để bắt đầu; đăng ký không tự tạo phiên.
+              Tài khoản Student đã được tạo thành công.
             </InlineAlert>
             <Button
               className="w-full"

@@ -341,8 +341,7 @@ export function RegisterPage() {
         {complete ? (
           <div className="grid gap-4">
             <InlineAlert tone="success" title="Tài khoản demo đã được tạo">
-              Đây là tài khoản mô phỏng trong bộ nhớ hiện tại. Không có email xác minh nào được gửi
-              và bạn chưa được đăng nhập tự động.
+              Tài khoản demo đã được tạo thành công.
             </InlineAlert>
             <LinkButton to="/login" className="w-full justify-center">
               Đến trang đăng nhập
