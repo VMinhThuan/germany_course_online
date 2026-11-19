@@ -123,7 +123,26 @@ export const apiPublicRepository: PublicCourseRepository & {
       keyPhrases: [],
       video: lesson.video,
       media: [],
-      exercises: lesson.exercises,
+      exercises: lesson.exercises.map((exercise) => ({
+        id: exercise.id,
+        lessonId: exercise.lessonId,
+        title: exercise.title,
+        ...(exercise.description ? { description: exercise.description } : {}),
+        instructions: exercise.instructions,
+        exerciseType: exercise.exerciseType,
+        completionMode: exercise.completionMode,
+        isRequired: exercise.isRequired,
+        sortOrder: exercise.sortOrder,
+        assets: (exercise.assets ?? []).map((asset) => ({
+          id: asset.id,
+          title: asset.title ?? asset.role,
+          role: asset.role,
+          mediaType: asset.mediaType,
+          ...(asset.url ? { src: asset.url } : {}),
+          canDownload: Boolean(asset.url),
+          availability: asset.url ? ('ready' as const) : ('unavailable' as const),
+        })),
+      })),
     }))
   },
   async getPublicSiteSettings() {

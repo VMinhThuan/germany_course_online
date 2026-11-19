@@ -1,4 +1,5 @@
 import type { CourseDetailModel, CourseSummaryModel } from '@/domains/catalog/models'
+import type { ExerciseAssetViewModel } from '@/domains/exercises/models'
 import type { MediaViewModel } from '@/domains/media/models'
 import type { ApiLessonVideo } from '@/lib/api/types'
 
@@ -29,6 +30,7 @@ export interface PublicPreviewExercise {
   completionMode: 'MANUAL' | 'QUIZ_SUBMISSION'
   isRequired: boolean
   sortOrder: number
+  assets: readonly ExerciseAssetViewModel[]
 }
 
 export interface PublicCourseRepository {

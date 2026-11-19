@@ -87,6 +87,14 @@ export interface ApiPreviewExercise {
   completionMode: 'MANUAL' | 'QUIZ_SUBMISSION'
   isRequired: boolean
   sortOrder: number
+  assets?: Array<{
+    id: string
+    role: 'QUESTION_PDF' | 'QUESTION_AUDIO'
+    title: string | null
+    mediaType: 'PDF' | 'AUDIO'
+    mimeType: string
+    url?: string
+  }>
 }
 
 export interface ApiCourseDetail {

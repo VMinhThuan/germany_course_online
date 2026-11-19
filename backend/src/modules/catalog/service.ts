@@ -3,6 +3,7 @@ import {
   Course,
   CourseSection,
   Exercise,
+  ExerciseAsset,
   Lesson,
   MediaAsset,
   SiteSettings,
@@ -48,6 +49,15 @@ type PublicSection = {
   isPreview: boolean;
   lessonCount: number;
   lessons: PublicLesson[];
+};
+
+type PublicPreviewExerciseAsset = {
+  id: string;
+  role: "QUESTION_PDF" | "QUESTION_AUDIO";
+  title: string | null;
+  mediaType: "PDF" | "AUDIO";
+  mimeType: string;
+  url?: string;
 };
 
 // This single media asset is intentionally published on the public homepage.
@@ -325,6 +335,15 @@ export class PublicCatalogService {
       )
       .sort({ sortOrder: 1, _id: 1 })
       .lean();
+    const exerciseAssets = await this.previewExerciseAssetDtos(
+      exercises.map((exercise) => exercise._id),
+    );
+    const assetsByExercise = new Map<string, PublicPreviewExerciseAsset[]>();
+    for (const asset of exerciseAssets) {
+      const rows = assetsByExercise.get(asset.exerciseId) ?? [];
+      rows.push(asset.asset);
+      assetsByExercise.set(asset.exerciseId, rows);
+    }
     const content = safeLessonContent(lesson.content);
     const paragraphs =
       typeof content === "object" && content !== null && "paragraphs" in content
@@ -357,8 +376,76 @@ export class PublicCatalogService {
         completionMode: exercise.completionMode,
         isRequired: exercise.isRequired,
         sortOrder: exercise.sortOrder,
+        assets: assetsByExercise.get(exercise._id.toString()) ?? [],
       })),
     };
+  }
+
+  private async previewExerciseAssetDtos(
+    exerciseIds: mongoose.Types.ObjectId[],
+  ): Promise<Array<{ exerciseId: string; asset: PublicPreviewExerciseAsset }>> {
+    if (exerciseIds.length === 0) return [];
+    const associations = await ExerciseAsset.find({
+      exerciseId: { $in: exerciseIds },
+      assetRole: { $in: ["QUESTION_PDF", "QUESTION_AUDIO"] },
+    })
+      .sort({ sortOrder: 1, _id: 1 })
+      .lean();
+    const assets = await MediaAsset.find({
+      _id: { $in: associations.map((association) => association.assetId) },
+      deletedAt: null,
+      uploadStatus: { $nin: ["PENDING", "DELETING", "DELETED"] },
+    })
+      .select(
+        "+provider +storageKey +resourceType +deliveryType originalName mediaType mimeType",
+      )
+      .lean();
+    const assetsById = new Map(
+      assets.map((asset) => [asset._id.toString(), asset]),
+    );
+
+    return (
+      await Promise.all(
+        associations.map(async (association) => {
+          const asset = assetsById.get(association.assetId.toString());
+          if (!asset) return null;
+          if (asset.mediaType !== "PDF" && asset.mediaType !== "AUDIO")
+            return null;
+          const adapter = resolveMediaStorage(
+            this.mediaStorage,
+            asset.provider,
+          );
+          const dto: PublicPreviewExerciseAsset = {
+            id: asset._id.toString(),
+            role: association.assetRole as "QUESTION_PDF" | "QUESTION_AUDIO",
+            title: association.title ?? asset.originalName ?? null,
+            mediaType: asset.mediaType,
+            mimeType: asset.mimeType,
+          };
+          if (adapter) {
+            try {
+              const signed = await adapter.signRead({
+                storageKey: asset.storageKey,
+                mimeType: asset.mimeType,
+                mediaType: asset.mediaType,
+                resourceType: asset.resourceType ?? null,
+                deliveryType: asset.deliveryType ?? null,
+                format: asset.format ?? null,
+              });
+              dto.url = signed.url;
+            } catch {
+              // Keep the exercise metadata available when media storage is unavailable.
+            }
+          }
+          return { exerciseId: association.exerciseId.toString(), asset: dto };
+        }),
+      )
+    ).filter(
+      (
+        value,
+      ): value is { exerciseId: string; asset: PublicPreviewExerciseAsset } =>
+        value !== null,
+    );
   }
 
   async getPublicSiteSettings() {

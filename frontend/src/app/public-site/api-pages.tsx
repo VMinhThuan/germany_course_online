@@ -20,6 +20,7 @@ import {
   usePublicSiteSettings,
 } from '@/data/public-demo'
 import { CourseOutline, CourseGrid } from '@/domains/catalog'
+import { AudioPlayer, PDFViewer } from '@/domains/media'
 import { LessonOutlineAccordion, YouTubeLessonPlayer } from '@/domains/learning'
 import { DomainState } from '@/domains/shared/presentation'
 import { DecorativeHeading } from '@/domains/shared/decorative-heading'
@@ -607,6 +608,7 @@ export function ApiCoursePreviewPage() {
                   </section>
                   {preview.content.exercises.length > 0 && (
                     <section
+                      id="preview-lesson-exercises"
                       className="grid gap-3 rounded-2xl border border-brand-pink bg-brand-pink/20 p-3 sm:p-5"
                       aria-label="Bài tập của bài học"
                     >
@@ -631,6 +633,40 @@ export function ApiCoursePreviewPage() {
                             <p className="mt-3 whitespace-pre-line text-sm leading-6 text-ink-secondary">
                               {exercise.instructions}
                             </p>
+                            {exercise.assets.length > 0 && (
+                              <div
+                                aria-label="Tài liệu bài tập"
+                                className="mt-4 grid gap-4 border-t border-border-subtle pt-4"
+                              >
+                                {exercise.assets.map((asset) =>
+                                  asset.mediaType === 'PDF' ? (
+                                    <PDFViewer
+                                      key={asset.id}
+                                      media={{
+                                        id: asset.id,
+                                        title: asset.title,
+                                        mediaType: 'PDF',
+                                        ...(asset.src ? { src: asset.src } : {}),
+                                        canDownload: asset.canDownload,
+                                        availability: asset.availability ?? 'unavailable',
+                                      }}
+                                    />
+                                  ) : (
+                                    <AudioPlayer
+                                      key={asset.id}
+                                      media={{
+                                        id: asset.id,
+                                        title: asset.title,
+                                        mediaType: 'AUDIO',
+                                        ...(asset.src ? { src: asset.src } : {}),
+                                        canDownload: asset.canDownload,
+                                        availability: asset.availability ?? 'unavailable',
+                                      }}
+                                    />
+                                  ),
+                                )}
+                              </div>
+                            )}
                           </article>
                         ))}
                       </div>
@@ -657,7 +693,9 @@ export function ApiCoursePreviewPage() {
                       expandAll
                       onSelectLesson={(lessonId) => navigate(previewLessonPath(lessonId))}
                       lessonHref={previewLessonPath}
-                      exerciseHref={(lessonId) => previewLessonPath(lessonId)}
+                      exerciseHref={(lessonId) =>
+                        `${previewLessonPath(lessonId)}#preview-lesson-exercises`
+                      }
                     />
                   )}
                 </aside>
@@ -680,7 +718,9 @@ export function ApiCoursePreviewPage() {
                     navigate(previewLessonPath(lessonId))
                   }}
                   lessonHref={previewLessonPath}
-                  exerciseHref={(lessonId) => previewLessonPath(lessonId)}
+                  exerciseHref={(lessonId) =>
+                    `${previewLessonPath(lessonId)}#preview-lesson-exercises`
+                  }
                 />
               )}
             </Sheet>
