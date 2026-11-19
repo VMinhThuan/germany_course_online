@@ -475,27 +475,30 @@ export function ApiCoursePreviewPage() {
         currentLessonId: preview.lesson.id,
         sections: preview.sections.map((section) => ({
           ...section,
-          lessons: section.lessons.map((lesson) =>
-            lesson.id === preview.lesson.id
-              ? {
-                  ...lesson,
-                  hasVideo: Boolean(preview.content.video),
-                  exercises: preview.content.exercises.map((exercise) => ({
-                    id: exercise.id,
-                    title: exercise.title,
-                    sortOrder: exercise.sortOrder,
-                  })),
-                }
-              : lesson,
-          ),
+          lessons: section.lessons.map((lesson) => {
+            const content = preview.contentByLessonId[lesson.id]
+            return {
+              ...lesson,
+              hasVideo: Boolean(content?.video),
+              exercises: content?.exercises.map((exercise) => ({
+                id: exercise.id,
+                title: exercise.title,
+                sortOrder: exercise.sortOrder,
+              })) ?? [],
+            }
+          }),
         })),
       }
     : null
+  const greetingName =
+    session?.profile.displayName?.trim() ||
+    session?.profile.email?.split('@')[0] ||
+    'Học viên'
   usePageTitle(preview ? `${preview.course.title} · Học thử` : 'Học thử miễn phí')
   return (
     <StudentShell
       productMode
-      displayName={session?.profile.displayName || session?.profile.email || 'Học viên xem thử'}
+      displayName={greetingName}
       {...(session ? { onLogout: logout } : {})}
     >
       <div className="grid min-w-0 gap-4">

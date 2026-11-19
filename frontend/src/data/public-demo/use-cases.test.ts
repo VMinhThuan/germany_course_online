@@ -103,6 +103,31 @@ describe('public demo preview use cases', () => {
     expect(experience.content.media[0]).not.toHaveProperty('src')
   })
 
+  it('loads outline content for every lesson in the configured preview chapters', async () => {
+    const base = createPublicDemoRepository()
+    const getPreviewLesson = vi.fn(base.getPreviewLesson)
+    const repository: PublicCourseRepository = { ...base, getPreviewLesson }
+
+    const experience = await loadPreviewExperience(
+      repository,
+      'tieng-duc-a1-1',
+      'a11-chapter-01',
+      'a11-lesson-01',
+    )
+
+    expect(experience.kind).toBe('available')
+    if (experience.kind !== 'available') return
+    expect(getPreviewLesson).toHaveBeenCalledTimes(5)
+    expect(experience.contentByLessonId).toEqual(
+      expect.objectContaining({
+        'a11-lesson-01': expect.objectContaining({ lessonId: 'a11-lesson-01' }),
+        'a11-lesson-03': expect.objectContaining({ lessonId: 'a11-lesson-03' }),
+        'a11-lesson-05': expect.objectContaining({ lessonId: 'a11-lesson-05' }),
+      }),
+    )
+    expect(experience.contentByLessonId).not.toHaveProperty('a11-lesson-02')
+  })
+
   it('keeps published preview lessons with missing fixture content in an empty state', async () => {
     const experience = await loadPreviewExperience(
       createPublicDemoRepository(),

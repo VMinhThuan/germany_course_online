@@ -99,4 +99,5 @@ export type PreviewExperience =
       section: PublicPreviewSection
       lesson: PublicPreviewSection['lessons'][number]
       content: PublicPreviewLessonContent
+      contentByLessonId: Readonly<Record<string, PublicPreviewLessonContent>>
     }

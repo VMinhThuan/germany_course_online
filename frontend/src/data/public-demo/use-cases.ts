@@ -1,5 +1,10 @@
 import type { CourseDetailModel } from '@/domains/catalog/models'
-import type { PublicCourseRepository, PublicPreviewManifest, PublicPreviewSection } from './types'
+import type {
+  PublicCourseRepository,
+  PublicPreviewLessonContent,
+  PublicPreviewManifest,
+  PublicPreviewSection,
+} from './types'
 
 export function getPreviewSections(
   course: CourseDetailModel,
@@ -82,10 +87,36 @@ export async function loadPreviewExperience(
     : section.lessons[0]
   if (!lesson) return { kind: 'lesson-not-found', course, sections, manifest, section } as const
 
-  const content = await repository.getPreviewLesson(courseSlug, selectedSectionId, lesson.id)
+  const contentEntries = await Promise.all(
+    sections.flatMap((previewSection) =>
+      previewSection.lessons.map(async (previewLesson) => {
+        const content = await repository.getPreviewLesson(
+          courseSlug,
+          previewSection.id,
+          previewLesson.id,
+        )
+        return [previewLesson.id, content] as const
+      }),
+    ),
+  )
+  const contentByLessonId = Object.fromEntries(
+    contentEntries.filter(
+      (entry): entry is readonly [string, PublicPreviewLessonContent] => entry[1] !== null,
+    ),
+  )
+  const content = contentByLessonId[lesson.id]
   if (!content) {
     return { kind: 'content-missing', course, sections, manifest, section, lesson } as const
   }
 
-  return { kind: 'available', course, sections, manifest, section, lesson, content } as const
+  return {
+    kind: 'available',
+    course,
+    sections,
+    manifest,
+    section,
+    lesson,
+    content,
+    contentByLessonId,
+  } as const
 }
