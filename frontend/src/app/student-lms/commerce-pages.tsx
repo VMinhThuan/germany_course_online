@@ -65,31 +65,31 @@ function DiscountSummary({
 
   return (
     <dl className="grid gap-2 text-sm">
-      <div className="flex justify-between gap-3">
-        <dt>Giá gốc</dt>
-        <dd className="font-semibold">{formatVnd(baseAmount)}</dd>
+      <div className="flex items-center justify-between gap-3">
+        <dt className="text-ink-secondary">Giá gốc</dt>
+        <dd className="font-semibold tabular-nums">{formatVnd(baseAmount)}</dd>
       </div>
       {couponDiscountAmount && BigInt(couponDiscountAmount) > 0n && (
-        <div className="flex justify-between gap-3 text-success-foreground">
+        <div className="flex items-center justify-between gap-3 text-success-foreground">
           <dt>Giảm từ mã ưu đãi</dt>
-          <dd>−{formatVnd(couponDiscountAmount)}</dd>
+          <dd className="tabular-nums">−{formatVnd(couponDiscountAmount)}</dd>
         </div>
       )}
       {automaticDiscountAmount && BigInt(automaticDiscountAmount) > 0n && (
-        <div className="flex justify-between gap-3 text-success-foreground">
+        <div className="flex items-center justify-between gap-3 text-success-foreground">
           <dt>Ưu đãi tự động</dt>
-          <dd>−{formatVnd(automaticDiscountAmount)}</dd>
+          <dd className="tabular-nums">−{formatVnd(automaticDiscountAmount)}</dd>
         </div>
       )}
       {hasDiscount && (
-        <div className="flex justify-between gap-3 text-success-foreground">
+        <div className="flex items-center justify-between gap-3 text-success-foreground">
           <dt>Ưu đãi</dt>
-          <dd>−{formatVnd(discountAmount)}</dd>
+          <dd className="tabular-nums">−{formatVnd(discountAmount)}</dd>
         </div>
       )}
-      <div className="mt-2 flex items-end justify-between gap-3 rounded-2xl bg-surface-blue p-4">
+      <div className="mt-3 flex items-end justify-between gap-3 rounded-2xl border border-action-primary/15 bg-surface-blue p-4">
         <dt className="font-bold text-ink-primary">Tổng thanh toán</dt>
-        <dd className="text-right font-display text-2xl font-extrabold tabular-nums text-action-primary">
+        <dd className="text-right font-display text-2xl font-extrabold tabular-nums text-action-primary sm:text-3xl">
           {formatVnd(totalAmount)}
         </dd>
       </div>
@@ -153,8 +153,18 @@ export function CheckoutPage() {
 
   return (
     <ProductPage
-      title="Đăng ký khóa học"
-      eyebrow="Hoàn tất đăng ký"
+      title={orderType === 'PURCHASE' ? 'Mua khóa học' : 'Gia hạn khóa học'}
+      eyebrow=""
+      heading={
+        <h1 className="font-display text-3xl font-extrabold tracking-tight text-ink-primary sm:text-4xl">
+          {orderType === 'PURCHASE' ? 'Mua khóa học' : 'Gia hạn khóa học'}
+        </h1>
+      }
+      description={
+        orderType === 'PURCHASE'
+          ? 'Xác nhận thông tin khóa học và tạo đơn đăng ký để nhận hướng dẫn thanh toán.'
+          : 'Kiểm tra gói gia hạn và tạo đơn để tiếp tục quyền truy cập khóa học.'
+      }
       backTo={orderType === 'RENEWAL' ? `/student/courses/${orderContext}/renew` : '/courses'}
     >
       {quote.isPending ? (
@@ -164,33 +174,57 @@ export function CheckoutPage() {
       ) : !quote.data ? (
         <ProductNotFound message="Không tìm thấy thông tin đăng ký cho khóa học này." />
       ) : (
-        <div className="mx-auto grid w-full max-w-5xl gap-5 lg:grid-cols-[minmax(0,1fr)_21rem]">
+        <div className="mx-auto grid w-full max-w-6xl gap-5 lg:grid-cols-[minmax(0,1fr)_23rem] lg:items-start">
           <div className="grid content-start gap-5">
-            <Card className="grid gap-3 p-5 sm:p-6">
-              <Badge tone={quote.data.orderType === 'PURCHASE' ? 'brand' : 'info'}>
-                {quote.data.orderType === 'PURCHASE' ? 'Mua khóa học' : 'Gia hạn khóa học'}
-              </Badge>
-              <h2 className="font-display text-2xl font-bold">{quote.data.courseTitle}</h2>
-              {quote.data.plan && (
-                <p className="text-sm text-ink-secondary">
-                  Gói: {quote.data.plan.title} · {quote.data.plan.durationMonths} tháng
+            <Card className="overflow-hidden border-brand-pink/60 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-brand-pink/40 bg-gradient-to-r from-brand-pink/45 via-card-surface to-brand-blue/30 px-5 py-4 sm:px-6">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-action-primary">
+                    Khóa học đã chọn
+                  </p>
+                  <h2 className="mt-1 font-display text-2xl font-extrabold text-ink-primary">
+                    {quote.data.courseTitle}
+                  </h2>
+                </div>
+                <Badge tone={quote.data.orderType === 'PURCHASE' ? 'brand' : 'info'}>
+                  {quote.data.orderType === 'PURCHASE' ? 'Đăng ký mới' : 'Gia hạn'}
+                </Badge>
+              </div>
+              <div className="grid gap-4 p-5 sm:p-6">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl bg-surface-muted px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                      Thời hạn truy cập
+                    </p>
+                    <p className="mt-1 font-semibold text-ink-primary">
+                      {quote.data.durationMonths} tháng
+                    </p>
+                  </div>
+                  {quote.data.plan && (
+                    <div className="rounded-xl bg-surface-muted px-4 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                        Gói đã chọn
+                      </p>
+                      <p className="mt-1 font-semibold text-ink-primary">{quote.data.plan.title}</p>
+                    </div>
+                  )}
+                </div>
+                {quote.data.currentExpiry && (
+                  <p className="text-sm text-ink-secondary">
+                    Hạn hiện tại:{' '}
+                    <span className="font-semibold">
+                      {formatDateTimeInTimezone(quote.data.currentExpiry)}
+                    </span>
+                  </p>
+                )}
+                <p className="text-sm leading-6 text-ink-secondary">
+                  Sau khi tạo đơn, bạn sẽ nhận hướng dẫn chuyển khoản. Quyền học được mở sau khi
+                  thanh toán được xác nhận.
                 </p>
-              )}
-              {quote.data.currentExpiry && (
-                <p className="text-sm text-ink-secondary">
-                  Hạn hiện tại: {formatDateTimeInTimezone(quote.data.currentExpiry)}
-                </p>
-              )}
-              <p className="text-sm leading-6 text-ink-secondary">
-                Kiểm tra thông tin khóa học trước khi tạo đăng ký. Sau khi chuyển khoản và được xác
-                nhận, quyền học sẽ được mở trong tài khoản của bạn.
-              </p>
+              </div>
             </Card>
             <Card className="grid gap-4 p-5 sm:p-6">
-              <SectionHeader
-                title="Mã ưu đãi"
-                description="Nhập mã ưu đãi nếu bạn có để nhận mức giảm phù hợp."
-              />
+              <SectionHeader title="Mã ưu đãi" description="Bạn có thể nhập mã để nhận ưu đãi." />
               <form
                 className="flex flex-col gap-3 sm:flex-row"
                 onSubmit={(event) => void applyCoupon(event)}
@@ -230,46 +264,50 @@ export function CheckoutPage() {
               )}
             </Card>
           </div>
-          <aside className="grid content-start gap-4">
-            <Card className="grid gap-4 p-5">
-              <h2 className="font-display text-xl font-bold">Chi phí đăng ký</h2>
-              <DiscountSummary
-                baseAmount={quote.data.originalAmountVnd}
-                discountAmount={quote.data.discountAmountVnd}
-                {...(quote.data.couponDiscountAmountVnd !== undefined
-                  ? { couponDiscountAmount: quote.data.couponDiscountAmountVnd }
-                  : {})}
-                {...(quote.data.automaticDiscountAmountVnd !== undefined
-                  ? { automaticDiscountAmount: quote.data.automaticDiscountAmountVnd }
-                  : {})}
-                totalAmount={quote.data.totalAmountVnd}
-              />
-              <p className="text-sm text-ink-secondary">
-                Thời hạn truy cập: {quote.data.durationMonths} tháng
-              </p>
-              <Button
-                loading={createOrder.isPending}
-                disabled={createOrder.isPending}
-                onClick={() => void submitOrder()}
-                startIcon={<CreditCard aria-hidden="true" className="size-4" />}
-              >
-                Tạo đăng ký khóa học
-              </Button>
-              {createOrder.isError && (
-                <ErrorState
-                  title="Chưa tạo được đơn"
-                  description={
-                    createOrder.error instanceof Error
-                      ? createOrder.error.message
-                      : 'Chưa thể tạo đăng ký lúc này.'
-                  }
-                  onRetry={() => void submitOrder()}
+          <aside className="grid content-start gap-4 lg:sticky lg:top-6">
+            <Card className="overflow-hidden border-action-primary/25 shadow-md">
+              <div className="border-b border-action-primary/15 bg-surface-blue/60 px-5 py-4 sm:px-6">
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-action-primary">
+                  Tóm tắt thanh toán
+                </p>
+                <h2 className="mt-1 font-display text-xl font-extrabold">Chi phí khóa học</h2>
+              </div>
+              <div className="grid gap-4 p-5 sm:p-6">
+                <DiscountSummary
+                  baseAmount={quote.data.originalAmountVnd}
+                  discountAmount={quote.data.discountAmountVnd}
+                  {...(quote.data.couponDiscountAmountVnd !== undefined
+                    ? { couponDiscountAmount: quote.data.couponDiscountAmountVnd }
+                    : {})}
+                  {...(quote.data.automaticDiscountAmountVnd !== undefined
+                    ? { automaticDiscountAmount: quote.data.automaticDiscountAmountVnd }
+                    : {})}
+                  totalAmount={quote.data.totalAmountVnd}
                 />
-              )}
-              <p className="text-xs leading-5 text-ink-muted">
-                Sau khi tạo đăng ký, bạn sẽ nhận hướng dẫn chuyển khoản. Quyền học được mở sau khi
-                thanh toán được xác nhận.
-              </p>
+                <Button
+                  className="w-full"
+                  loading={createOrder.isPending}
+                  disabled={createOrder.isPending}
+                  onClick={() => void submitOrder()}
+                  startIcon={<CreditCard aria-hidden="true" className="size-4" />}
+                >
+                  {orderType === 'PURCHASE' ? 'Tiếp tục thanh toán' : 'Tiếp tục gia hạn'}
+                </Button>
+                {createOrder.isError && (
+                  <ErrorState
+                    title="Chưa tạo được đơn"
+                    description={
+                      createOrder.error instanceof Error
+                        ? createOrder.error.message
+                        : 'Chưa thể tạo đăng ký lúc này.'
+                    }
+                    onRetry={() => void submitOrder()}
+                  />
+                )}
+                <p className="text-center text-xs leading-5 text-ink-muted">
+                  Bạn chỉ được cấp quyền học sau khi thanh toán được xác nhận.
+                </p>
+              </div>
             </Card>
           </aside>
         </div>

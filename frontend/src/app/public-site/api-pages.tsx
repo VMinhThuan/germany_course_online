@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { ArrowLeft, ArrowRight, Check, LockKeyhole } from 'lucide-react'
+import { ArrowLeft, ArrowRight, BookOpenText, Check, ListTree, LockKeyhole } from 'lucide-react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { useAuthSession } from '@/app/auth/auth-session'
 import { CoursePricingSection } from '@/features/homepage/sections/CoursePricingSection'
@@ -33,6 +33,8 @@ import {
   LinkButton,
   Pagination,
   Progress,
+  SectionHeader,
+  Sheet,
 } from '@/shared/ui'
 import { formatVnd } from '@/shared/lib/format'
 import { setBrandPageTitle } from '@/config/brand'
@@ -480,27 +482,23 @@ export function ApiCoursePreviewPage() {
             return {
               ...lesson,
               hasVideo: Boolean(content?.video),
-              exercises: content?.exercises.map((exercise) => ({
-                id: exercise.id,
-                title: exercise.title,
-                sortOrder: exercise.sortOrder,
-              })) ?? [],
+              exercises:
+                content?.exercises.map((exercise) => ({
+                  id: exercise.id,
+                  title: exercise.title,
+                  sortOrder: exercise.sortOrder,
+                })) ?? [],
             }
           }),
         })),
       }
     : null
+  const [outlineOpen, setOutlineOpen] = useState(false)
   const greetingName =
-    session?.profile.displayName?.trim() ||
-    session?.profile.email?.split('@')[0] ||
-    'Học viên'
+    session?.profile.displayName?.trim() || session?.profile.email?.split('@')[0] || 'Học viên'
   usePageTitle(preview ? `${preview.course.title} · Học thử` : 'Học thử miễn phí')
   return (
-    <StudentShell
-      productMode
-      displayName={greetingName}
-      {...(session ? { onLogout: logout } : {})}
-    >
+    <StudentShell productMode displayName={greetingName} {...(session ? { onLogout: logout } : {})}>
       <div className="grid min-w-0 gap-4">
         <Link
           to={`/courses/${encodeURIComponent(slug)}`}
@@ -540,98 +538,153 @@ export function ApiCoursePreviewPage() {
             </Card>
           )}
         {preview && (
-          <div className="grid gap-5">
-            <div className="rounded-2xl border border-brand-pink/70 bg-brand-pink/30 p-4 sm:p-5">
-              <div className="mb-3 flex items-center justify-between gap-3 text-sm font-semibold text-ink-secondary">
-                <span>{preview.course.title}</span>
-                <Badge tone="preview">Học thử miễn phí</Badge>
+          <>
+            <div className="grid min-w-0 gap-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <Button
+                  variant="outline"
+                  className="lg:hidden"
+                  startIcon={<ListTree aria-hidden="true" />}
+                  onClick={() => setOutlineOpen(true)}
+                >
+                  Nội dung chương 1
+                </Button>
+                <div className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-2xl border border-brand-pink/70 bg-brand-pink/30 p-4 sm:p-5">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-ink-secondary">
+                      {preview.course.title}
+                    </p>
+                    <p className="mt-1 text-xs text-ink-muted">Học thử miễn phí · Chương 1</p>
+                  </div>
+                  <Badge tone="preview">Học thử</Badge>
+                </div>
               </div>
               <Progress
                 value={0}
                 label={`0/${previewLessonCount} bài học đã học`}
                 indicatorClassName="bg-brand-lime"
               />
-            </div>
-            {previewTree && (
-              <LessonOutlineAccordion
-                tree={previewTree}
-                currentLessonId={preview.lesson.id}
-                onSelectLesson={(lessonId) => navigate(previewLessonPath(lessonId))}
-                lessonHref={previewLessonPath}
-                exerciseHref={(lessonId) => previewLessonPath(lessonId)}
-              />
-            )}
-            <Card className="grid gap-5 p-6 sm:p-8">
-              <div>
-                <p className="text-sm font-bold uppercase tracking-[0.14em] text-action-primary">
-                  {preview.section.title}
-                </p>
-                <h1 className="mt-2 font-display text-3xl font-extrabold">
-                  {preview.lesson.title}
-                </h1>
-                <p className="mt-2 text-sm text-ink-secondary">
-                  Nội dung học thử · không cần đăng nhập
-                </p>
+              <div className="grid min-w-0 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_23rem]">
+                <div className="grid min-w-0 gap-6">
+                  <section
+                    id="preview-lesson-video"
+                    aria-label="Bài giảng của bài học thử"
+                    className="grid min-w-0 gap-4 rounded-2xl border border-brand-blue/60 bg-surface-blue/30 p-3 sm:p-5"
+                  >
+                    <SectionHeader title="Bài giảng" />
+                    <div className="grid min-w-0 gap-4">
+                      <div>
+                        <p className="text-sm font-bold uppercase tracking-[0.14em] text-action-primary">
+                          {preview.section.title}
+                        </p>
+                        <h1 className="mt-2 font-display text-3xl font-extrabold text-ink-primary sm:text-4xl">
+                          {preview.lesson.title}
+                        </h1>
+                        <p className="mt-2 text-sm text-ink-secondary">
+                          Nội dung học thử · không cần đăng nhập
+                        </p>
+                      </div>
+                      {preview.content.video && (
+                        <YouTubeLessonPlayer
+                          video={preview.content.video}
+                          title={preview.lesson.title}
+                          eager
+                        />
+                      )}
+                      {preview.content.paragraphs.length > 0 && (
+                        <div className="grid gap-4 leading-7 text-ink-secondary">
+                          {preview.content.paragraphs.map((paragraph) => (
+                            <p key={paragraph}>{paragraph}</p>
+                          ))}
+                        </div>
+                      )}
+                      {!preview.content.video && preview.content.paragraphs.length === 0 && (
+                        <p className="rounded-xl bg-surface-muted p-4 text-sm text-ink-secondary">
+                          Nội dung bài học đang được cập nhật.
+                        </p>
+                      )}
+                    </div>
+                  </section>
+                  {preview.content.exercises.length > 0 && (
+                    <section
+                      className="grid gap-3 rounded-2xl border border-brand-pink bg-brand-pink/20 p-3 sm:p-5"
+                      aria-label="Bài tập của bài học"
+                    >
+                      <SectionHeader title="Bài tập" />
+                      <div className="grid min-w-0 gap-3">
+                        {preview.content.exercises.map((exercise) => (
+                          <article
+                            key={exercise.id}
+                            className="rounded-xl border border-border-subtle bg-card-surface p-4"
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <h3 className="font-semibold text-ink-primary">{exercise.title}</h3>
+                              <Badge tone="info">
+                                {exercise.exerciseType === 'QUIZ' ? 'Quiz' : 'Bài thực hành'}
+                              </Badge>
+                            </div>
+                            {exercise.description && (
+                              <p className="mt-2 text-sm leading-6 text-ink-secondary">
+                                {exercise.description}
+                              </p>
+                            )}
+                            <p className="mt-3 whitespace-pre-line text-sm leading-6 text-ink-secondary">
+                              {exercise.instructions}
+                            </p>
+                          </article>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+                  <div className="flex flex-wrap gap-3 border-t border-border-subtle pt-4">
+                    <LinkButton to={`/courses/${encodeURIComponent(slug)}`}>
+                      Đăng ký để mở toàn bộ khóa học <ArrowRight aria-hidden="true" />
+                    </LinkButton>
+                  </div>
+                </div>
+                <aside
+                  aria-label="Nội dung chương 1"
+                  className="sticky top-20 hidden max-h-[calc(100dvh-6rem)] min-w-0 overflow-y-auto rounded-2xl border border-border-subtle bg-card-surface p-4 lg:block"
+                >
+                  <h2 className="mb-3 flex items-center gap-2 font-display text-base font-bold">
+                    <BookOpenText aria-hidden="true" className="size-4 text-action-primary" />
+                    {preview.course.title}
+                  </h2>
+                  {previewTree && (
+                    <LessonOutlineAccordion
+                      tree={previewTree}
+                      currentLessonId={preview.lesson.id}
+                      compact
+                      onSelectLesson={(lessonId) => navigate(previewLessonPath(lessonId))}
+                      lessonHref={previewLessonPath}
+                      exerciseHref={(lessonId) => previewLessonPath(lessonId)}
+                    />
+                  )}
+                </aside>
               </div>
-              {preview.content.video && (
-                <YouTubeLessonPlayer
-                  video={preview.content.video}
-                  title={preview.lesson.title}
-                  eager
+            </div>
+            <Sheet
+              open={outlineOpen}
+              onOpenChange={setOutlineOpen}
+              side="right"
+              title="Nội dung chương 1"
+              className="w-[min(24rem,calc(100vw-1.5rem))] lg:hidden"
+            >
+              {previewTree && (
+                <LessonOutlineAccordion
+                  tree={previewTree}
+                  currentLessonId={preview.lesson.id}
+                  compact
+                  onSelectLesson={(lessonId) => {
+                    setOutlineOpen(false)
+                    navigate(previewLessonPath(lessonId))
+                  }}
+                  lessonHref={previewLessonPath}
+                  exerciseHref={(lessonId) => previewLessonPath(lessonId)}
                 />
               )}
-              {preview.content.paragraphs.length > 0 && (
-                <div className="grid gap-4 leading-7 text-ink-secondary">
-                  {preview.content.paragraphs.map((paragraph) => (
-                    <p key={paragraph}>{paragraph}</p>
-                  ))}
-                </div>
-              )}
-              {preview.content.exercises.length > 0 && (
-                <section
-                  className="grid gap-3 rounded-2xl border border-brand-pink bg-brand-pink/20 p-4 sm:p-5"
-                  aria-label="Bài tập của bài học"
-                >
-                  <h2 className="font-display text-xl font-bold text-ink-primary">Bài tập</h2>
-                  <div className="grid gap-3">
-                    {preview.content.exercises.map((exercise) => (
-                      <article
-                        key={exercise.id}
-                        className="rounded-xl border border-border-subtle bg-card-surface p-4"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <h3 className="font-semibold text-ink-primary">{exercise.title}</h3>
-                          <Badge tone="info">
-                            {exercise.exerciseType === 'QUIZ' ? 'Quiz' : 'Bài thực hành'}
-                          </Badge>
-                        </div>
-                        {exercise.description && (
-                          <p className="mt-2 text-sm leading-6 text-ink-secondary">
-                            {exercise.description}
-                          </p>
-                        )}
-                        <p className="mt-3 whitespace-pre-line text-sm leading-6 text-ink-secondary">
-                          {exercise.instructions}
-                        </p>
-                      </article>
-                    ))}
-                  </div>
-                </section>
-              )}
-              {!preview.content.video &&
-                preview.content.paragraphs.length === 0 &&
-                preview.content.exercises.length === 0 && (
-                  <p className="rounded-xl bg-surface-muted p-4 text-sm text-ink-secondary">
-                    Nội dung bài học đang được cập nhật.
-                  </p>
-                )}
-              <div className="flex flex-wrap gap-3 border-t border-border-subtle pt-4">
-                <LinkButton to={`/courses/${encodeURIComponent(slug)}`}>
-                  Đăng ký để mở toàn bộ khóa học <ArrowRight aria-hidden="true" />
-                </LinkButton>
-              </div>
-            </Card>
-          </div>
+            </Sheet>
+          </>
         )}
       </div>
     </StudentShell>
