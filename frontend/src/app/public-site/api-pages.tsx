@@ -231,6 +231,8 @@ export function ApiCourseDetailPage() {
     course.previewAvailable === true ||
     Boolean(previewManifest.data?.sectionIds?.length)
   const previewHref = `/courses/${encodeURIComponent(slug)}/preview`
+  const secondaryBannerUrl =
+    course.slug === 'niveau-a1-1' ? '/assets/homepage/course-banner-a11-v2.png' : undefined
   const openCheckout = () =>
     navigate(session ? checkout : `/login?returnTo=${encodeURIComponent(checkout)}`)
   return (
@@ -252,24 +254,31 @@ export function ApiCourseDetailPage() {
                 className="block aspect-[16/7] w-full object-cover object-center"
               />
             )}
-            <div className="flex flex-col justify-center p-6 sm:p-9">
-              {!course.title.toLowerCase().includes(course.level.toLowerCase()) && (
-                <p className="mb-3 text-sm font-bold uppercase tracking-[0.14em] text-action-primary">
-                  Trình độ {course.level}
-                </p>
-              )}
-              <DecorativeHeading text={course.title} level={1} size="lg" />
-              <div className="mt-4 flex flex-wrap gap-2 text-sm text-ink-secondary">
-                {course.chapterCount !== undefined && (
-                  <span className="rounded-full bg-card-surface px-3 py-1">
-                    {course.chapterCount} chương
-                  </span>
+            <div
+              className="relative overflow-hidden bg-cover bg-center"
+              style={
+                secondaryBannerUrl ? { backgroundImage: `url(${secondaryBannerUrl})` } : undefined
+              }
+            >
+              <div className="flex min-h-56 flex-col justify-center bg-surface-blue/80 p-6 sm:min-h-64 sm:p-9">
+                {!course.title.toLowerCase().includes(course.level.toLowerCase()) && (
+                  <p className="mb-3 text-sm font-bold uppercase tracking-[0.14em] text-action-primary">
+                    Trình độ {course.level}
+                  </p>
                 )}
-                {course.lessonCount !== undefined && (
-                  <span className="rounded-full bg-card-surface px-3 py-1">
-                    {course.lessonCount} bài học
-                  </span>
-                )}
+                <DecorativeHeading text={course.title} level={1} size="lg" />
+                <div className="mt-4 flex flex-wrap gap-2 text-sm text-ink-secondary">
+                  {course.chapterCount !== undefined && (
+                    <span className="rounded-full bg-card-surface px-3 py-1">
+                      {course.chapterCount} chương
+                    </span>
+                  )}
+                  {course.lessonCount !== undefined && (
+                    <span className="rounded-full bg-card-surface px-3 py-1">
+                      {course.lessonCount} bài học
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </header>

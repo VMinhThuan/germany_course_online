@@ -184,8 +184,8 @@ export function CourseCard({
         )}
       </div>
       <CardHeader className="flex-1">
-        <div className="flex items-start justify-between gap-3">
-          <CardTitle className="min-w-0">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <CardTitle className="min-w-0 flex-1">
             {href ? (
               <Link
                 className="rounded-sm underline-offset-4 hover:text-action-primary hover:underline focus-visible:outline-2 focus-visible:outline-action-focus"
@@ -197,9 +197,18 @@ export function CourseCard({
               course.title
             )}
           </CardTitle>
-          {!course.title.toLowerCase().includes(course.level.toLowerCase()) && (
-            <CourseLevelBadge level={course.level} />
-          )}
+          <div className="ml-auto flex shrink-0 flex-col items-end gap-2">
+            {course.priceVnd ? (
+              <span className="rounded-xl bg-surface-lime px-3 py-1.5 font-display text-base font-extrabold tabular-nums text-ink-primary">
+                {formatVnd(course.priceVnd)}
+              </span>
+            ) : (
+              <span className="text-sm text-ink-muted">Học phí đang cập nhật</span>
+            )}
+            {!course.title.toLowerCase().includes(course.level.toLowerCase()) && (
+              <CourseLevelBadge level={course.level} />
+            )}
+          </div>
         </div>
         <p className="text-sm leading-6 text-ink-secondary">{course.shortDescription}</p>
         {access?.kind === 'customer-preview' && (
@@ -218,36 +227,38 @@ export function CourseCard({
           </span>
         )}
       </CardContent>
-      <CardFooter className="flex-wrap items-center justify-between border-t border-border-subtle pt-4">
-        {course.priceVnd ? (
-          <span className="rounded-xl bg-surface-lime px-3 py-1.5 font-display text-base font-extrabold tabular-nums text-ink-primary">
-            {formatVnd(course.priceVnd)}
-          </span>
-        ) : (
-          <span className="text-sm text-ink-muted">Học phí đang cập nhật</span>
-        )}
+      <CardFooter className="grid w-full gap-3 border-t border-border-subtle pt-4 sm:grid-cols-2">
         {href ? (
-          <div className="ml-auto flex flex-wrap items-center justify-end gap-3">
-            <Link
+          <>
+            <LinkButton
               to={href}
-              className="inline-flex min-h-11 items-center gap-2 font-semibold text-action-primary underline-offset-4 hover:underline"
+              variant="primary"
+              size="md"
+              className="w-full"
+              endIcon={<ArrowRight aria-hidden="true" />}
             >
-              Tổng quan <ArrowRight aria-hidden="true" className="size-4" />
-            </Link>
+              Tổng quan
+            </LinkButton>
             {previewAvailable && previewHref && (
               <LinkButton
                 to={previewHref}
                 variant="secondary"
-                size="sm"
+                size="md"
+                className="w-full"
                 startIcon={<BookOpenText aria-hidden="true" />}
               >
                 Học thử chương 1
               </LinkButton>
             )}
-          </div>
+          </>
         ) : (
-          <Button className="ml-auto" variant="outline" onClick={onOpen}>
-            Tổng quan <ArrowRight aria-hidden="true" />
+          <Button
+            className="w-full"
+            variant="primary"
+            onClick={onOpen}
+            endIcon={<ArrowRight aria-hidden="true" />}
+          >
+            Tổng quan
           </Button>
         )}
       </CardFooter>
