@@ -17,6 +17,7 @@ import {
   LinkButton,
   Progress,
 } from '@/shared/ui'
+import { cn } from '@/shared/ui/cn'
 import { formatVnd } from '@/shared/lib/format'
 import { DomainState } from '@/domains/shared/presentation'
 import { SemanticHeading, type HeadingLevel } from '@/domains/shared/heading'
@@ -408,6 +409,7 @@ export function CourseSectionAccordion({
   action,
   onLocked,
   onPreviewLesson,
+  className,
 }: {
   section: CourseSectionModel
   preview?: boolean
@@ -415,25 +417,36 @@ export function CourseSectionAccordion({
   action?: (lessonId: string) => void
   onLocked?: () => void
   onPreviewLesson?: (lessonId: string) => void
+  className?: string
 }) {
   return (
-    <Accordion type="single" collapsible className="min-w-0 border-b border-border-subtle">
-      <AccordionItem value={section.id} className="min-w-0">
-        <AccordionTrigger className="min-w-0 gap-3">
-          <span className="flex min-w-0 flex-1 items-start justify-between gap-3 text-left">
+    <Accordion
+      type="single"
+      collapsible
+      className={cn(
+        'min-w-0 overflow-hidden rounded-2xl border border-border-subtle bg-card-surface shadow-soft',
+        className,
+      )}
+    >
+      <AccordionItem value={section.id} className="min-w-0 border-0">
+        <AccordionTrigger className="min-w-0 gap-3 px-5 py-4 sm:px-6">
+          <span className="flex min-w-0 flex-1 items-center gap-3 text-left">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-surface-blue text-action-primary">
+              <BookOpenText aria-hidden="true" className="size-5" />
+            </span>
             <span className="min-w-0">
-              <span className="block truncate">{section.title}</span>
-              <span className="mt-1 block text-xs font-normal text-ink-muted">
+              <span className="block truncate text-base font-bold sm:text-lg">{section.title}</span>
+              <span className="mt-1 block text-xs font-medium text-ink-muted">
                 {section.sectionType === 'CHAPTER' ? 'Chương' : 'Ôn tập'} · {section.lessons.length}{' '}
-                bài
+                bài học
               </span>
             </span>
             {preview && <FreePreviewBadge label={previewLabel} />}
           </span>
         </AccordionTrigger>
-        <AccordionContent>
+        <AccordionContent className="border-t border-border-subtle bg-surface-muted/40 px-5 pt-4 sm:px-6">
           {section.description && <p className="mb-3 leading-6">{section.description}</p>}
-          <ul className="grid gap-1">
+          <ul className="grid gap-2">
             {section.lessons.map((lesson) => (
               <li key={lesson.id}>
                 <button
@@ -443,7 +456,7 @@ export function CourseSectionAccordion({
                     if (preview && onPreviewLesson) return onPreviewLesson(lesson.id)
                     onLocked?.()
                   }}
-                  className="flex min-h-11 w-full items-center justify-between gap-3 rounded-control px-3 text-left hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-action-focus"
+                  className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border border-border-subtle bg-card-surface px-3 text-left transition-colors hover:border-action-primary/30 hover:bg-card-surface focus-visible:outline-2 focus-visible:outline-action-focus sm:px-4"
                 >
                   <span className="min-w-0 truncate text-ink-primary">{lesson.title}</span>
                   <span className="flex shrink-0 items-center gap-2 text-xs text-ink-secondary">
@@ -484,11 +497,15 @@ export function CourseOutline({
   if (sections.length === 0)
     return <DomainState kind="empty" title="Chương trình đang được chuẩn bị" />
   return (
-    <div className="min-w-0 divide-y divide-border-subtle rounded-2xl border border-border-subtle bg-card-surface">
+    <div className="grid min-w-0 gap-4">
       {sections.map((section) => (
-        <div key={section.id} className="px-4 sm:px-5">
+        <div
+          key={section.id}
+          className="min-w-0 overflow-hidden rounded-2xl border border-border-subtle bg-card-surface shadow-soft"
+        >
           <CourseSectionAccordion
             section={section}
+            className="rounded-none border-0 shadow-none"
             previewLabel={previewLabel}
             preview={Boolean(
               (previewManifest && isMockPreviewSection(section, previewManifest)) ||
@@ -511,13 +528,17 @@ export function CourseOutline({
             (section.isPreview ||
               previewSectionIds?.includes(section.id) ||
               (previewManifest && isMockPreviewSection(section, previewManifest))) && (
-              <LinkButton
-                to={`${previewHref}?sectionId=${encodeURIComponent(section.id)}`}
-                variant="link"
-                className="mb-3 ml-3 min-h-10"
-              >
-                Học thử miễn phí <ArrowRight aria-hidden="true" />
-              </LinkButton>
+              <div className="flex justify-end border-t border-border-subtle bg-surface-blue/35 px-5 py-3 sm:px-6">
+                <LinkButton
+                  to={`${previewHref}?sectionId=${encodeURIComponent(section.id)}`}
+                  variant="secondary"
+                  size="sm"
+                  className="w-full sm:w-auto"
+                  endIcon={<ArrowRight aria-hidden="true" />}
+                >
+                  Học thử miễn phí
+                </LinkButton>
+              </div>
             )}
           {previewHref &&
             !(
@@ -525,9 +546,10 @@ export function CourseOutline({
               previewSectionIds?.includes(section.id) ||
               (previewManifest && isMockPreviewSection(section, previewManifest))
             ) && (
-              <p className="mb-3 ml-3 text-xs font-medium text-ink-muted">
-                Nội dung đầy đủ · cần quyền truy cập
-              </p>
+              <div className="flex items-center gap-2 border-t border-border-subtle bg-surface-muted/40 px-5 py-3 text-sm font-medium text-ink-muted sm:px-6">
+                <LockKeyhole aria-hidden="true" className="size-4 shrink-0" />
+                <span>Nội dung đầy đủ · cần quyền truy cập</span>
+              </div>
             )}
         </div>
       ))}
