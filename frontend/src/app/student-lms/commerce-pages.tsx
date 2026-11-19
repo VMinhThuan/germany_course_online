@@ -545,6 +545,7 @@ export function OrderPendingPage() {
   const confirmTransfer = useConfirmTransfer(session?.id ?? '')
   const cancelOrder = useCancelStudentOrder(session?.id ?? '')
   const navigate = useNavigate()
+  const canCancelOrder = order.data?.order.status === 'PENDING' && !order.data.transferReported
   return (
     <ProductPage title="Thanh toán chuyển khoản" backTo="/student/orders">
       {order.isPending ? (
@@ -574,31 +575,62 @@ export function OrderPendingPage() {
             <PaymentInstructions order={order.data} />
           )}
           {(order.data.order.status === 'PENDING' || order.data.order.status === 'REJECTED') && (
-            <Card className="grid gap-3 p-5">
+            <Card className="grid gap-4 p-5 sm:p-6">
               <h2 className="font-display text-lg font-bold">Bạn đã chuyển khoản?</h2>
               <p className="text-sm leading-6 text-ink-secondary">
                 Xác nhận chỉ cập nhật trạng thái báo chuyển khoản. Admin sẽ đối soát riêng; đơn vẫn
                 PENDING cho đến khi được duyệt.
               </p>
-              <Button
-                loading={confirmTransfer.isPending}
-                disabled={
-                  confirmTransfer.isPending ||
-                  (order.data.transferReported && order.data.order.status === 'PENDING')
-                }
-                onClick={() =>
-                  void confirmTransfer
-                    .mutateAsync(id)
-                    .then(() => order.refetch())
-                    .catch(() => undefined)
-                }
+              <div
+                className={`grid gap-3 ${canCancelOrder ? 'sm:grid-cols-[minmax(0,1fr)_minmax(11rem,0.45fr)]' : ''}`}
               >
-                {order.data.order.status === 'REJECTED'
-                  ? 'Gửi lại báo chuyển khoản'
-                  : order.data.transferReported
-                    ? 'Đã gửi báo chuyển khoản'
-                    : 'Tôi đã chuyển khoản'}
-              </Button>
+                <Button
+                  className="w-full"
+                  loading={confirmTransfer.isPending}
+                  disabled={
+                    confirmTransfer.isPending ||
+                    (order.data.transferReported && order.data.order.status === 'PENDING')
+                  }
+                  onClick={() =>
+                    void confirmTransfer
+                      .mutateAsync(id)
+                      .then(() => order.refetch())
+                      .catch(() => undefined)
+                  }
+                >
+                  {order.data.order.status === 'REJECTED'
+                    ? 'Gửi lại báo chuyển khoản'
+                    : order.data.transferReported
+                      ? 'Đã gửi báo chuyển khoản'
+                      : 'Tôi đã chuyển khoản'}
+                </Button>
+                {canCancelOrder && (
+                  <Button
+                    className="w-full"
+                    variant="outline"
+                    disabled={cancelOrder.isPending}
+                    loading={cancelOrder.isPending}
+                    onClick={() =>
+                      dialogs.confirm({
+                        title: 'Hủy đơn hàng này?',
+                        description: 'Bạn có thể hủy đơn trước khi báo chuyển khoản.',
+                        confirmLabel: 'Hủy đơn',
+                        destructive: true,
+                        onConfirm: async () => {
+                          try {
+                            await cancelOrder.mutateAsync(id)
+                            navigate(`/orders/${id}/result`)
+                          } catch {
+                            /* Error is shown with the order actions. */
+                          }
+                        },
+                      })
+                    }
+                  >
+                    Hủy đơn
+                  </Button>
+                )}
+              </div>
               {confirmTransfer.isError && (
                 <ErrorState
                   title="Chưa gửi được thông báo"
@@ -614,31 +646,6 @@ export function OrderPendingPage() {
                       .catch(() => undefined)
                   }
                 />
-              )}
-              {order.data.order.status === 'PENDING' && !order.data.transferReported && (
-                <Button
-                  variant="outline"
-                  disabled={cancelOrder.isPending}
-                  loading={cancelOrder.isPending}
-                  onClick={() =>
-                    dialogs.confirm({
-                      title: 'Hủy đơn hàng này?',
-                      description: 'Bạn có thể hủy đơn trước khi báo chuyển khoản.',
-                      confirmLabel: 'Hủy đơn',
-                      destructive: true,
-                      onConfirm: async () => {
-                        try {
-                          await cancelOrder.mutateAsync(id)
-                          navigate(`/orders/${id}/result`)
-                        } catch {
-                          /* Error is shown with the order actions. */
-                        }
-                      },
-                    })
-                  }
-                >
-                  Hủy đơn
-                </Button>
               )}
               {cancelOrder.isError && (
                 <AdminlessError
