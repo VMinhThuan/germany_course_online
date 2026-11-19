@@ -5,8 +5,7 @@ import { ApiError } from '@/lib/api/client'
 import { apiAuth } from '@/lib/auth/api-auth'
 import { useAuthSession } from '@/app/auth/auth-session'
 import { DecorativeHeading } from '@/domains/shared/decorative-heading'
-import { setBrandPageTitle } from '@/config/brand'
-import { BrandLogo } from '@/shared/brand/BrandLogo'
+import { brandConfig, setBrandPageTitle } from '@/config/brand'
 import { AuthShell } from '@/shared/layouts/shells'
 import {
   Button,
@@ -37,13 +36,10 @@ function authError(error: unknown) {
 function AuthPageFrame({ title, children }: { title: string; children: ReactNode }) {
   return (
     <AuthShell showBrand={false} showPreviewNotice={false} showFooter={false}>
-      <div role="region" aria-label={title} className="mx-auto grid w-full max-w-md gap-4">
-        <div className="flex w-full items-center justify-center px-3 sm:px-0">
-          <BrandLogo
-            className="mx-auto flex w-full justify-center"
-            imageClassName="h-12 w-auto max-w-full"
-          />
-        </div>
+      <div role="region" aria-label={title} className="mx-auto grid w-full max-w-md gap-5">
+        <p className="text-center font-display text-3xl font-extrabold tracking-tight text-action-primary">
+          {brandConfig.name}
+        </p>
         {children}
       </div>
     </AuthShell>
