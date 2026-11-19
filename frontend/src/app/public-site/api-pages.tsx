@@ -654,7 +654,6 @@ export function ApiCoursePreviewPage() {
                     <LessonOutlineAccordion
                       tree={previewTree}
                       currentLessonId={preview.lesson.id}
-                      compact
                       onSelectLesson={(lessonId) => navigate(previewLessonPath(lessonId))}
                       lessonHref={previewLessonPath}
                       exerciseHref={(lessonId) => previewLessonPath(lessonId)}
@@ -674,7 +673,6 @@ export function ApiCoursePreviewPage() {
                 <LessonOutlineAccordion
                   tree={previewTree}
                   currentLessonId={preview.lesson.id}
-                  compact
                   onSelectLesson={(lessonId) => {
                     setOutlineOpen(false)
                     navigate(previewLessonPath(lessonId))
