@@ -27,11 +27,17 @@ async function main() {
       .lean();
     if (sections.length < 2)
       throw new Error("Niveau A1.1 must have at least two CHAPTER sections.");
-    const needsInitialization = typeof course.previewChapterCount !== "number";
+    const needsInitialization = Number(course.previewChapterCount ?? 0) < 1;
     const result =
       apply && needsInitialization
         ? await Course.updateOne(
-            { _id: course._id, previewChapterCount: { $exists: false } },
+            {
+              _id: course._id,
+              $or: [
+                { previewChapterCount: { $exists: false } },
+                { previewChapterCount: { $lt: 1 } },
+              ],
+            },
             { $set: { previewChapterCount: 1 } },
           )
         : { modifiedCount: 0 };

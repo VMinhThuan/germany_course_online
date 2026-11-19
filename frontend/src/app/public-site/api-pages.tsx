@@ -244,24 +244,33 @@ export function ApiCourseDetailPage() {
           Danh sách khóa học
         </Link>
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
-          <header className="flex flex-col justify-center rounded-3xl bg-surface-blue p-6 sm:p-9">
-            {!course.title.toLowerCase().includes(course.level.toLowerCase()) && (
-              <p className="mb-3 text-sm font-bold uppercase tracking-[0.14em] text-action-primary">
-                Trình độ {course.level}
-              </p>
+          <header className="overflow-hidden rounded-3xl bg-surface-blue">
+            {course.thumbnailUrl && (
+              <img
+                src={course.thumbnailUrl}
+                alt=""
+                className="block aspect-[16/7] w-full object-cover object-center"
+              />
             )}
-            <DecorativeHeading text={course.title} level={1} size="lg" />
-            <div className="mt-4 flex flex-wrap gap-2 text-sm text-ink-secondary">
-              {course.chapterCount !== undefined && (
-                <span className="rounded-full bg-card-surface px-3 py-1">
-                  {course.chapterCount} chương
-                </span>
+            <div className="flex flex-col justify-center p-6 sm:p-9">
+              {!course.title.toLowerCase().includes(course.level.toLowerCase()) && (
+                <p className="mb-3 text-sm font-bold uppercase tracking-[0.14em] text-action-primary">
+                  Trình độ {course.level}
+                </p>
               )}
-              {course.lessonCount !== undefined && (
-                <span className="rounded-full bg-card-surface px-3 py-1">
-                  {course.lessonCount} bài học
-                </span>
-              )}
+              <DecorativeHeading text={course.title} level={1} size="lg" />
+              <div className="mt-4 flex flex-wrap gap-2 text-sm text-ink-secondary">
+                {course.chapterCount !== undefined && (
+                  <span className="rounded-full bg-card-surface px-3 py-1">
+                    {course.chapterCount} chương
+                  </span>
+                )}
+                {course.lessonCount !== undefined && (
+                  <span className="rounded-full bg-card-surface px-3 py-1">
+                    {course.lessonCount} bài học
+                  </span>
+                )}
+              </div>
             </div>
           </header>
           <aside>

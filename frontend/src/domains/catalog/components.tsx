@@ -217,20 +217,20 @@ export function CourseCard({
             {course.accessDurationMonths} tháng truy cập
           </span>
         )}
+      </CardContent>
+      <CardFooter className="flex-wrap items-center justify-between border-t border-border-subtle pt-4">
         {course.priceVnd ? (
-          <span className="ml-auto rounded-xl bg-surface-lime px-3 py-1.5 font-display text-base font-extrabold tabular-nums text-ink-primary">
+          <span className="rounded-xl bg-surface-lime px-3 py-1.5 font-display text-base font-extrabold tabular-nums text-ink-primary">
             {formatVnd(course.priceVnd)}
           </span>
         ) : (
-          <span className="ml-auto text-sm text-ink-muted">Học phí đang cập nhật</span>
+          <span className="text-sm text-ink-muted">Học phí đang cập nhật</span>
         )}
-      </CardContent>
-      <CardFooter className="flex-wrap border-t border-border-subtle pt-4">
         {href ? (
-          <>
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-3">
             <Link
               to={href}
-              className="inline-flex min-h-11 flex-1 items-center gap-2 font-semibold text-action-primary underline-offset-4 hover:underline"
+              className="inline-flex min-h-11 items-center gap-2 font-semibold text-action-primary underline-offset-4 hover:underline"
             >
               Xem khóa học <ArrowRight aria-hidden="true" className="size-4" />
             </Link>
@@ -244,9 +244,9 @@ export function CourseCard({
                 Học thử chương 1
               </LinkButton>
             )}
-          </>
+          </div>
         ) : (
-          <Button variant="outline" onClick={onOpen}>
+          <Button className="ml-auto" variant="outline" onClick={onOpen}>
             Xem khóa học <ArrowRight aria-hidden="true" />
           </Button>
         )}
