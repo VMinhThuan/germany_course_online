@@ -51,7 +51,7 @@ async function checkout(page: Page, path: string) {
       new URL(response.url()).pathname === '/api/v1/checkout/quote',
   )
   await page.goto(path)
-  await expect(page.getByRole('heading', { name: 'Đăng ký khóa học' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Mua khóa học' })).toBeVisible()
   return (await (await quotePromise).json()).data as Record<string, string>
 }
 
@@ -149,7 +149,7 @@ test('purchase pricing, coupon reservation, cancellation and Admin reconciliatio
     totalAmount: '1755000',
   })
   await expect(page.getByText(/1\.755\.000/)).toBeVisible()
-  await page.getByRole('button', { name: 'Tạo đăng ký khóa học' }).click()
+  await page.getByRole('button', { name: 'Tiếp tục thanh toán' }).click()
   await expect(page).toHaveURL(/\/orders\/[^/]+\/pending$/)
   const firstOrderId = new URL(page.url()).pathname.split('/')[2]!
   await expect(page.getByText('Đang chờ chuyển khoản')).toBeVisible()
@@ -196,7 +196,7 @@ test('purchase pricing, coupon reservation, cancellation and Admin reconciliatio
   )
   await page.getByRole('button', { name: 'Áp dụng' }).click()
   expect((await (await reusableQuote).json()).data.discountSource).toBe('COUPON')
-  await page.getByRole('button', { name: 'Tạo đăng ký khóa học' }).click()
+  await page.getByRole('button', { name: 'Tiếp tục thanh toán' }).click()
   await expect(page).toHaveURL(/\/orders\/[^/]+\/pending$/)
   const paidOrderId = new URL(page.url()).pathname.split('/')[2]!
   await page.getByRole('button', { name: 'Tôi đã chuyển khoản' }).click()
@@ -284,7 +284,7 @@ test('purchase pricing, coupon reservation, cancellation and Admin reconciliatio
   })
 
   await checkout(page, `/checkout/${ids.courseC}`)
-  await page.getByRole('button', { name: 'Tạo đăng ký khóa học' }).click()
+  await page.getByRole('button', { name: 'Tiếp tục thanh toán' }).click()
   await expect(page).toHaveURL(/\/orders\/[^/]+\/pending$/)
   const adminCancellationOrderId = new URL(page.url()).pathname.split('/')[2]!
   await page.getByRole('button', { name: 'Tôi đã chuyển khoản' }).click()
@@ -354,7 +354,7 @@ test('renewal supports active and expired enrollments, reuses the existing recor
       response.request().method() === 'GET' &&
       new URL(response.url()).pathname === '/api/v1/checkout/quote',
   )
-  await expect(page.getByRole('heading', { name: 'Đăng ký khóa học' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Gia hạn khóa học' })).toBeVisible()
   const renewalQuote = (await (await quotePromise).json()).data
   expect(renewalQuote).toMatchObject({
     orderType: 'RENEWAL',
@@ -365,7 +365,7 @@ test('renewal supports active and expired enrollments, reuses the existing recor
     durationMonths: 3,
   })
   await expect(page.getByText(/450\.000/).first()).toBeVisible()
-  await page.getByRole('button', { name: 'Tạo đăng ký khóa học' }).click()
+  await page.getByRole('button', { name: 'Tiếp tục gia hạn' }).click()
   await expect(page).toHaveURL(/\/orders\/[^/]+\/pending$/)
   const orderId = new URL(page.url()).pathname.split('/')[2]!
   await expect(page.getByText('Đang chờ chuyển khoản')).toBeVisible()
@@ -455,7 +455,7 @@ test('Student resource isolation, server RBAC, account block and reactivation do
   await expect(page).toHaveURL(/\/learn\/quizzes\/[^/]+\/result(?:\?|$)/)
   const attemptId = new URL(page.url()).pathname.split('/')[3]!
   await page.goto(`/checkout/${ids.courseB}`)
-  await page.getByRole('button', { name: 'Tạo đăng ký khóa học' }).click()
+  await page.getByRole('button', { name: 'Tiếp tục thanh toán' }).click()
   await expect(page).toHaveURL(/\/orders\/[^/]+\/pending$/)
   const studentBOrderId = new URL(page.url()).pathname.split('/')[2]!
 

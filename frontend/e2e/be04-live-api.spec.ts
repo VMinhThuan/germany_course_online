@@ -58,7 +58,7 @@ test('guest, student purchase, admin reconciliation and learning use isolated Ex
   await page.getByLabel('Mã ưu đãi').fill('BE04E2E10')
   await page.getByRole('button', { name: 'Áp dụng' }).click()
   await expect(page.getByText('Coupon can be applied.')).toBeVisible()
-  await page.getByRole('button', { name: 'Tạo đăng ký khóa học' }).click()
+  await page.getByRole('button', { name: 'Tiếp tục thanh toán' }).click()
   await expect(page).toHaveURL(/\/orders\/[^/]+\/pending$/)
   const pendingUrl = new URL(page.url())
   const orderId = pendingUrl.pathname.split('/')[2]!
