@@ -267,7 +267,9 @@ export const PUBLIC_PREVIEW_LESSONS: readonly PublicPreviewLessonContent[] = [
       { german: 'Guten Tag!', vietnamese: 'Xin chào! (lịch sự, ban ngày)' },
       { german: 'Hallo!', vietnamese: 'Chào! (thân mật)' },
     ],
+    video: null,
     media: [videoUnavailable],
+    exercises: [],
   },
   {
     courseSlug: 'tieng-duc-a1-1',
@@ -281,7 +283,9 @@ export const PUBLIC_PREVIEW_LESSONS: readonly PublicPreviewLessonContent[] = [
       { german: 'Ich heiße Linh.', vietnamese: 'Tôi tên là Linh.' },
       { german: 'Wie heißen Sie?', vietnamese: 'Bạn tên là gì? (lịch sự)' },
     ],
+    video: null,
     media: [videoUnavailable],
+    exercises: [],
   },
   {
     courseSlug: 'tieng-duc-a1-1',
@@ -295,6 +299,8 @@ export const PUBLIC_PREVIEW_LESSONS: readonly PublicPreviewLessonContent[] = [
       { german: 'Woher kommen Sie?', vietnamese: 'Bạn đến từ đâu? (lịch sự)' },
       { german: 'Ich komme aus Vietnam.', vietnamese: 'Tôi đến từ Việt Nam.' },
     ],
+    video: null,
     media: [videoUnavailable],
+    exercises: [],
   },
 ]

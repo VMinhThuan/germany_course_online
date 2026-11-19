@@ -20,6 +20,7 @@ import {
   usePublicSiteSettings,
 } from '@/data/public-demo'
 import { CourseOutline, CourseGrid } from '@/domains/catalog'
+import { YouTubeLessonPlayer } from '@/domains/learning'
 import { DomainState } from '@/domains/shared/presentation'
 import { DecorativeHeading } from '@/domains/shared/decorative-heading'
 import { PublicShell } from '@/shared/layouts/shells'
@@ -433,6 +434,7 @@ export function ApiCourseDetailPage() {
 export function ApiCoursePreviewPage() {
   const { slug = '' } = useParams()
   const location = useLocation()
+  const navigate = useNavigate()
   const params = new URLSearchParams(location.search)
   const experience = usePreviewExperience(
     slug,
@@ -490,23 +492,26 @@ export function ApiCoursePreviewPage() {
             </Card>
           )}
         {preview && (
-          <div className="grid gap-5 lg:grid-cols-[16rem_minmax(0,1fr)]">
-            <Card className="h-fit p-4">
-              <Badge tone="preview" className="mb-3 w-fit">
-                {preview.sections.length} chương miễn phí
-              </Badge>
-              <div className="grid gap-1">
-                {preview.sections.map((section) => (
-                  <Link
-                    key={section.id}
-                    to={`/courses/${encodeURIComponent(slug)}/preview?sectionId=${encodeURIComponent(section.id)}`}
-                    className={`rounded-control px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-action-focus ${section.id === preview.section.id ? 'bg-surface-blue text-action-primary' : 'hover:bg-surface-muted'}`}
-                  >
-                    {section.title}
-                  </Link>
-                ))}
+          <div className="grid gap-5">
+            <section aria-labelledby="preview-outline-heading" className="grid gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 id="preview-outline-heading" className="font-display text-xl font-bold">
+                  Nội dung học thử
+                </h2>
+                <Badge tone="preview">{preview.sections.length} chương miễn phí</Badge>
               </div>
-            </Card>
+              <CourseOutline
+                sections={preview.sections}
+                previewSectionIds={preview.sections.map((section) => section.id)}
+                previewLabel="Học thử miễn phí"
+                defaultOpenSectionId={preview.section.id}
+                onPreviewLessonSelect={(sectionId, lessonId) =>
+                  navigate(
+                    `/courses/${encodeURIComponent(slug)}/preview?sectionId=${encodeURIComponent(sectionId)}&lessonId=${encodeURIComponent(lessonId)}`,
+                  )
+                }
+              />
+            </section>
             <Card className="grid gap-5 p-6 sm:p-8">
               <div>
                 <p className="text-sm font-bold uppercase tracking-[0.14em] text-action-primary">
@@ -519,11 +524,58 @@ export function ApiCoursePreviewPage() {
                   Nội dung học thử · không cần đăng nhập
                 </p>
               </div>
-              <div className="grid gap-4 leading-7 text-ink-secondary">
-                {preview.content.paragraphs.map((paragraph) => (
-                  <p key={paragraph}>{paragraph}</p>
-                ))}
-              </div>
+              {preview.content.video && (
+                <YouTubeLessonPlayer
+                  video={preview.content.video}
+                  title={preview.lesson.title}
+                  eager
+                />
+              )}
+              {preview.content.paragraphs.length > 0 && (
+                <div className="grid gap-4 leading-7 text-ink-secondary">
+                  {preview.content.paragraphs.map((paragraph) => (
+                    <p key={paragraph}>{paragraph}</p>
+                  ))}
+                </div>
+              )}
+              {preview.content.exercises.length > 0 && (
+                <section
+                  className="grid gap-3 rounded-2xl border border-brand-pink bg-brand-pink/20 p-4 sm:p-5"
+                  aria-label="Bài tập của bài học"
+                >
+                  <h2 className="font-display text-xl font-bold text-ink-primary">Bài tập</h2>
+                  <div className="grid gap-3">
+                    {preview.content.exercises.map((exercise) => (
+                      <article
+                        key={exercise.id}
+                        className="rounded-xl border border-border-subtle bg-card-surface p-4"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <h3 className="font-semibold text-ink-primary">{exercise.title}</h3>
+                          <Badge tone="info">
+                            {exercise.exerciseType === 'QUIZ' ? 'Quiz' : 'Bài thực hành'}
+                          </Badge>
+                        </div>
+                        {exercise.description && (
+                          <p className="mt-2 text-sm leading-6 text-ink-secondary">
+                            {exercise.description}
+                          </p>
+                        )}
+                        <p className="mt-3 whitespace-pre-line text-sm leading-6 text-ink-secondary">
+                          {exercise.instructions}
+                        </p>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              )}
+              {!preview.content.video &&
+                preview.content.paragraphs.length === 0 &&
+                preview.content.exercises.length === 0 && (
+                  <p className="rounded-xl bg-surface-muted p-4 text-sm text-ink-secondary">
+                    Nội dung bài học đang được cập nhật.
+                  </p>
+                )}
               <div className="flex flex-wrap gap-3 border-t border-border-subtle pt-4">
                 <LinkButton to={`/courses/${encodeURIComponent(slug)}`}>
                   Đăng ký để mở toàn bộ khóa học <ArrowRight aria-hidden="true" />

@@ -1,5 +1,6 @@
 import type { CourseDetailModel, CourseSummaryModel } from '@/domains/catalog/models'
 import type { MediaViewModel } from '@/domains/media/models'
+import type { ApiLessonVideo } from '@/lib/api/types'
 
 export interface PublicPreviewManifest {
   courseSlug: string
@@ -13,7 +14,21 @@ export interface PublicPreviewLessonContent {
   lessonId: string
   paragraphs: readonly string[]
   keyPhrases: readonly { german: string; vietnamese: string }[]
+  video: ApiLessonVideo | null
   media: readonly MediaViewModel[]
+  exercises: readonly PublicPreviewExercise[]
+}
+
+export interface PublicPreviewExercise {
+  id: string
+  lessonId: string
+  title: string
+  description?: string | null
+  instructions: string
+  exerciseType: 'FILE_BASED' | 'QUIZ'
+  completionMode: 'MANUAL' | 'QUIZ_SUBMISSION'
+  isRequired: boolean
+  sortOrder: number
 }
 
 export interface PublicCourseRepository {
@@ -29,7 +44,11 @@ export interface PublicCourseRepository {
 
 export interface PublicPreviewSection {
   id: string
+  courseId: string
   title: string
+  sectionType: 'CHAPTER'
+  contentStatus: 'PUBLISHED'
+  sortOrder: number
   lessons: CourseDetailModel['sections'][number]['lessons']
 }
 

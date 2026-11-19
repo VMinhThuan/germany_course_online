@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import {
   Course,
   CourseSection,
+  Exercise,
   Lesson,
   MediaAsset,
   SiteSettings,
@@ -314,6 +315,16 @@ export class PublicCatalogService {
       .select("+content")
       .lean();
     if (!lesson) throw notFound("Preview lesson not found.");
+    const exercises = await Exercise.find({
+      lessonId: lesson._id,
+      status: "PUBLISHED",
+      deletedAt: null,
+    })
+      .select(
+        "_id lessonId title description instructions exerciseType completionMode isRequired sortOrder",
+      )
+      .sort({ sortOrder: 1, _id: 1 })
+      .lean();
     const content = safeLessonContent(lesson.content);
     const paragraphs =
       typeof content === "object" && content !== null && "paragraphs" in content
@@ -336,6 +347,17 @@ export class PublicCatalogService {
       paragraphs,
       video: lesson.video ?? null,
       media: [],
+      exercises: exercises.map((exercise) => ({
+        id: exercise._id.toString(),
+        lessonId: exercise.lessonId.toString(),
+        title: exercise.title,
+        description: exercise.description ?? null,
+        instructions: exercise.instructions,
+        exerciseType: exercise.exerciseType,
+        completionMode: exercise.completionMode,
+        isRequired: exercise.isRequired,
+        sortOrder: exercise.sortOrder,
+      })),
     };
   }
 

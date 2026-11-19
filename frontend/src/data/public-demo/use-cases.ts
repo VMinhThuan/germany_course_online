@@ -25,7 +25,11 @@ export function getPreviewSections(
 
   return sections.map((section) => ({
     id: section!.id,
+    courseId: course.id,
     title: section!.title,
+    sectionType: 'CHAPTER' as const,
+    contentStatus: 'PUBLISHED' as const,
+    sortOrder: section!.sortOrder,
     lessons: section!.lessons.filter((lesson) => lesson.contentStatus === 'PUBLISHED'),
   }))
 }

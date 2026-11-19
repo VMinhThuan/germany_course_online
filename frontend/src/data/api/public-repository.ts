@@ -121,7 +121,9 @@ export const apiPublicRepository: PublicCourseRepository & {
       lessonId: lesson.lessonId,
       paragraphs: lesson.paragraphs,
       keyPhrases: [],
+      video: lesson.video,
       media: [],
+      exercises: lesson.exercises,
     }))
   },
   async getPublicSiteSettings() {

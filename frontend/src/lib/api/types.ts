@@ -74,6 +74,19 @@ export interface ApiPreviewLesson {
   paragraphs: string[]
   video: ApiLessonVideo | null
   media: ApiPublicMedia[]
+  exercises: ApiPreviewExercise[]
+}
+
+export interface ApiPreviewExercise {
+  id: string
+  lessonId: string
+  title: string
+  description?: string | null
+  instructions: string
+  exerciseType: 'FILE_BASED' | 'QUIZ'
+  completionMode: 'MANUAL' | 'QUIZ_SUBMISSION'
+  isRequired: boolean
+  sortOrder: number
 }
 
 export interface ApiCourseDetail {

@@ -47,7 +47,7 @@ describe('catalog components', () => {
       </MemoryRouter>,
     )
 
-    expect(screen.getByRole('link', { name: /Học thử chương 1/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Học thử' })).toHaveAttribute(
       'href',
       `/courses/${A11_COURSE.slug}/preview`,
     )

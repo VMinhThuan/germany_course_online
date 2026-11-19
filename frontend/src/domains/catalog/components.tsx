@@ -248,7 +248,7 @@ export function CourseCard({
                 className="w-full"
                 startIcon={<BookOpenText aria-hidden="true" />}
               >
-                Học thử chương 1
+                Học thử
               </LinkButton>
             )}
           </>
@@ -406,6 +406,7 @@ export function CourseSectionAccordion({
   section,
   preview = false,
   previewLabel = 'Học thử theo yêu cầu',
+  defaultOpen = false,
   action,
   onLocked,
   onPreviewLesson,
@@ -414,6 +415,7 @@ export function CourseSectionAccordion({
   section: CourseSectionModel
   preview?: boolean
   previewLabel?: string
+  defaultOpen?: boolean
   action?: (lessonId: string) => void
   onLocked?: () => void
   onPreviewLesson?: (lessonId: string) => void
@@ -423,6 +425,7 @@ export function CourseSectionAccordion({
     <Accordion
       type="single"
       collapsible
+      defaultValue={defaultOpen ? section.id : undefined}
       className={cn(
         'min-w-0 overflow-hidden rounded-2xl border border-border-subtle bg-card-surface shadow-soft',
         className,
@@ -481,6 +484,7 @@ export function CourseOutline({
   previewSectionIds,
   previewHref,
   previewLabel = 'Học thử theo yêu cầu',
+  defaultOpenSectionId,
   onLessonSelect,
   onLockedSectionSelect,
   onPreviewLessonSelect,
@@ -490,6 +494,7 @@ export function CourseOutline({
   previewSectionIds?: readonly string[]
   previewHref?: string
   previewLabel?: string
+  defaultOpenSectionId?: string
   onLessonSelect?: (lessonId: string) => void
   onLockedSectionSelect?: (sectionId: string) => void
   onPreviewLessonSelect?: (sectionId: string, lessonId: string) => void
@@ -498,36 +503,36 @@ export function CourseOutline({
     return <DomainState kind="empty" title="Chương trình đang được chuẩn bị" />
   return (
     <div className="grid min-w-0 gap-4">
-      {sections.map((section) => (
-        <div
-          key={section.id}
-          className="min-w-0 overflow-hidden rounded-2xl border border-border-subtle bg-card-surface shadow-soft"
-        >
-          <CourseSectionAccordion
-            section={section}
-            className="rounded-none border-0 shadow-none"
-            previewLabel={previewLabel}
-            preview={Boolean(
-              (previewManifest && isMockPreviewSection(section, previewManifest)) ||
-              (section.sectionType === 'CHAPTER' &&
-                (previewSectionIds?.includes(section.id) || section.isPreview)),
-            )}
-            {...(onLessonSelect ? { action: onLessonSelect } : {})}
-            {...(onLockedSectionSelect
-              ? { onLocked: () => onLockedSectionSelect(section.id) }
-              : {})}
-            {...(onPreviewLessonSelect
-              ? {
-                  onPreviewLesson: (lessonId: string) =>
-                    onPreviewLessonSelect(section.id, lessonId),
-                }
-              : {})}
-          />
-          {previewHref &&
-            section.sectionType === 'CHAPTER' &&
-            (section.isPreview ||
-              previewSectionIds?.includes(section.id) ||
-              (previewManifest && isMockPreviewSection(section, previewManifest))) && (
+      {sections.map((section) => {
+        const isPreviewSection = Boolean(
+          (previewManifest && isMockPreviewSection(section, previewManifest)) ||
+          (section.sectionType === 'CHAPTER' &&
+            (previewSectionIds?.includes(section.id) || section.isPreview)),
+        )
+
+        return (
+          <div
+            key={section.id}
+            className="min-w-0 overflow-hidden rounded-2xl border border-border-subtle bg-card-surface shadow-soft"
+          >
+            <CourseSectionAccordion
+              section={section}
+              className="rounded-none border-0 shadow-none"
+              previewLabel={previewLabel}
+              preview={isPreviewSection}
+              defaultOpen={defaultOpenSectionId === section.id}
+              {...(onLessonSelect ? { action: onLessonSelect } : {})}
+              {...(onLockedSectionSelect
+                ? { onLocked: () => onLockedSectionSelect(section.id) }
+                : {})}
+              {...(onPreviewLessonSelect
+                ? {
+                    onPreviewLesson: (lessonId: string) =>
+                      onPreviewLessonSelect(section.id, lessonId),
+                  }
+                : {})}
+            />
+            {previewHref && section.sectionType === 'CHAPTER' && isPreviewSection && (
               <div className="flex justify-end border-t border-border-subtle bg-surface-blue/35 px-5 py-3 sm:px-6">
                 <LinkButton
                   to={`${previewHref}?sectionId=${encodeURIComponent(section.id)}`}
@@ -540,19 +545,15 @@ export function CourseOutline({
                 </LinkButton>
               </div>
             )}
-          {previewHref &&
-            !(
-              section.isPreview ||
-              previewSectionIds?.includes(section.id) ||
-              (previewManifest && isMockPreviewSection(section, previewManifest))
-            ) && (
+            {previewHref && !isPreviewSection && (
               <div className="flex items-center gap-2 border-t border-border-subtle bg-surface-muted/40 px-5 py-3 text-sm font-medium text-ink-muted sm:px-6">
                 <LockKeyhole aria-hidden="true" className="size-4 shrink-0" />
                 <span>Nội dung đầy đủ · cần quyền truy cập</span>
               </div>
             )}
-        </div>
-      ))}
+          </div>
+        )
+      })}
     </div>
   )
 }
