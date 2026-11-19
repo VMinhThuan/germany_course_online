@@ -19,6 +19,13 @@ function lessonStatus(lesson: LessonSummaryModel) {
   return <span className="shrink-0 text-xs text-[#53646c]">Chưa bắt đầu</span>
 }
 
+function lessonContentSummary(lesson: LessonSummaryModel) {
+  const exerciseCount = lesson.exercises?.length ?? 0
+  if (exerciseCount > 0) return `${exerciseCount} bài tập`
+  if (lesson.hasVideo) return 'Có video'
+  return null
+}
+
 export function LessonOutlineAccordion({
   tree,
   currentLessonId,
@@ -86,6 +93,7 @@ export function LessonOutlineAccordion({
               const hasVideo = lesson.hasVideo === true
               const exercises = lesson.exercises ?? []
               const hasItems = hasVideo || exercises.length > 0
+              const contentSummary = lessonContentSummary(lesson)
 
               return (
                 <li key={lesson.id} className="min-w-0">
@@ -104,7 +112,14 @@ export function LessonOutlineAccordion({
                       <span className="line-clamp-2 min-w-0 break-words text-[0.9375rem] leading-snug">
                         {lesson.title}
                       </span>
-                      {lessonStatus(lesson)}
+                      <div className="grid justify-items-end gap-0.5">
+                        {contentSummary && (
+                          <span className="shrink-0 text-xs font-semibold text-action-primary">
+                            {contentSummary}
+                          </span>
+                        )}
+                        {lessonStatus(lesson)}
+                      </div>
                     </button>
                   ) : (
                     <div className="flex min-w-0 items-center gap-1">
@@ -122,7 +137,14 @@ export function LessonOutlineAccordion({
                         <span className="line-clamp-2 min-w-0 break-words text-[0.9375rem] font-medium leading-snug sm:text-base">
                           {lesson.title}
                         </span>
-                        {lessonStatus(lesson)}
+                        <div className="grid justify-items-end gap-0.5">
+                          {contentSummary && (
+                            <span className="shrink-0 text-xs font-semibold text-action-primary">
+                              {contentSummary}
+                            </span>
+                          )}
+                          {lessonStatus(lesson)}
+                        </div>
                         <ChevronDown
                           aria-hidden="true"
                           className={`size-4 text-ink-muted transition-transform motion-reduce:transition-none ${expanded ? 'rotate-180' : ''}`}
