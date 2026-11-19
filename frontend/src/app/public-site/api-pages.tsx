@@ -20,11 +20,20 @@ import {
   usePublicSiteSettings,
 } from '@/data/public-demo'
 import { CourseOutline, CourseGrid } from '@/domains/catalog'
-import { YouTubeLessonPlayer } from '@/domains/learning'
+import { LessonOutlineAccordion, YouTubeLessonPlayer } from '@/domains/learning'
 import { DomainState } from '@/domains/shared/presentation'
 import { DecorativeHeading } from '@/domains/shared/decorative-heading'
-import { PublicShell } from '@/shared/layouts/shells'
-import { Badge, BaseDialog, Button, Card, Container, LinkButton, Pagination } from '@/shared/ui'
+import { PublicShell, StudentShell } from '@/shared/layouts/shells'
+import {
+  Badge,
+  BaseDialog,
+  Button,
+  Card,
+  Container,
+  LinkButton,
+  Pagination,
+  Progress,
+} from '@/shared/ui'
 import { formatVnd } from '@/shared/lib/format'
 import { setBrandPageTitle } from '@/config/brand'
 import '@/features/homepage/homepage.css'
@@ -435,6 +444,7 @@ export function ApiCoursePreviewPage() {
   const { slug = '' } = useParams()
   const location = useLocation()
   const navigate = useNavigate()
+  const { session, logout } = useAuthSession()
   const params = new URLSearchParams(location.search)
   const experience = usePreviewExperience(
     slug,
@@ -450,10 +460,45 @@ export function ApiCoursePreviewPage() {
         : experience.data && experience.data.kind !== 'course-not-found'
           ? (experience.data.course.previewChapterCount ?? 0)
           : 0
+  const previewLessonCount =
+    preview?.sections.reduce((total, section) => total + section.lessons.length, 0) ?? 0
+  const previewLessonPath = (lessonId: string) => {
+    const sectionId =
+      preview?.sections.find((section) => section.lessons.some((lesson) => lesson.id === lessonId))
+        ?.id ?? preview?.section.id
+    return `/courses/${encodeURIComponent(slug)}/preview?sectionId=${encodeURIComponent(sectionId ?? '')}&lessonId=${encodeURIComponent(lessonId)}`
+  }
+  const previewTree = preview
+    ? {
+        courseId: preview.course.id,
+        courseTitle: preview.course.title,
+        currentLessonId: preview.lesson.id,
+        sections: preview.sections.map((section) => ({
+          ...section,
+          lessons: section.lessons.map((lesson) =>
+            lesson.id === preview.lesson.id
+              ? {
+                  ...lesson,
+                  hasVideo: Boolean(preview.content.video),
+                  exercises: preview.content.exercises.map((exercise) => ({
+                    id: exercise.id,
+                    title: exercise.title,
+                    sortOrder: exercise.sortOrder,
+                  })),
+                }
+              : lesson,
+          ),
+        })),
+      }
+    : null
   usePageTitle(preview ? `${preview.course.title} · Học thử` : 'Học thử miễn phí')
   return (
-    <PublicLayout>
-      <Container className="space-y-6 pt-5 pb-10 sm:pt-6 sm:pb-14">
+    <StudentShell
+      productMode
+      displayName={session?.profile.displayName || session?.profile.email || 'Học viên xem thử'}
+      {...(session ? { onLogout: logout } : {})}
+    >
+      <div className="grid min-w-0 gap-4">
         <Link
           to={`/courses/${encodeURIComponent(slug)}`}
           className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-action-primary"
@@ -493,25 +538,26 @@ export function ApiCoursePreviewPage() {
           )}
         {preview && (
           <div className="grid gap-5">
-            <section aria-labelledby="preview-outline-heading" className="grid gap-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 id="preview-outline-heading" className="font-display text-xl font-bold">
-                  Nội dung học thử
-                </h2>
-                <Badge tone="preview">{preview.sections.length} chương miễn phí</Badge>
+            <div className="rounded-2xl border border-brand-pink/70 bg-brand-pink/30 p-4 sm:p-5">
+              <div className="mb-3 flex items-center justify-between gap-3 text-sm font-semibold text-ink-secondary">
+                <span>{preview.course.title}</span>
+                <Badge tone="preview">Học thử miễn phí</Badge>
               </div>
-              <CourseOutline
-                sections={preview.sections}
-                previewSectionIds={preview.sections.map((section) => section.id)}
-                previewLabel="Học thử miễn phí"
-                defaultOpenSectionId={preview.section.id}
-                onPreviewLessonSelect={(sectionId, lessonId) =>
-                  navigate(
-                    `/courses/${encodeURIComponent(slug)}/preview?sectionId=${encodeURIComponent(sectionId)}&lessonId=${encodeURIComponent(lessonId)}`,
-                  )
-                }
+              <Progress
+                value={0}
+                label={`0/${previewLessonCount} bài học đã học`}
+                indicatorClassName="bg-brand-lime"
               />
-            </section>
+            </div>
+            {previewTree && (
+              <LessonOutlineAccordion
+                tree={previewTree}
+                currentLessonId={preview.lesson.id}
+                onSelectLesson={(lessonId) => navigate(previewLessonPath(lessonId))}
+                lessonHref={previewLessonPath}
+                exerciseHref={(lessonId) => previewLessonPath(lessonId)}
+              />
+            )}
             <Card className="grid gap-5 p-6 sm:p-8">
               <div>
                 <p className="text-sm font-bold uppercase tracking-[0.14em] text-action-primary">
@@ -584,7 +630,7 @@ export function ApiCoursePreviewPage() {
             </Card>
           </div>
         )}
-      </Container>
-    </PublicLayout>
+      </div>
+    </StudentShell>
   )
 }

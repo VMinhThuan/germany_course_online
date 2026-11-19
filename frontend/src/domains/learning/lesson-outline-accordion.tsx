@@ -25,12 +25,16 @@ export function LessonOutlineAccordion({
   compact = false,
   onSelectLesson,
   onSelectSection,
+  lessonHref,
+  exerciseHref,
 }: {
   tree: CourseTreeViewModel
   currentLessonId?: string
   compact?: boolean
   onSelectLesson?: (lessonId: string) => void
   onSelectSection?: (sectionId: string) => void
+  lessonHref?: (lessonId: string) => string
+  exerciseHref?: (lessonId: string, exerciseId: string) => string
 }) {
   const [expandedLessonId, setExpandedLessonId] = useState(
     currentLessonId ?? tree.currentLessonId ?? '',
@@ -144,7 +148,7 @@ export function LessonOutlineAccordion({
                     >
                       {hasVideo && (
                         <Link
-                          to={`/learn/lessons/${lesson.id}`}
+                          to={lessonHref?.(lesson.id) ?? `/learn/lessons/${lesson.id}`}
                           className="flex min-h-11 min-w-0 items-center gap-2 rounded-lg border border-[#f0cfcb] bg-[#fff9f7] px-3 py-2 text-sm font-semibold text-[#8f3030] transition-colors hover:bg-[#fff0ec] focus-visible:outline-offset-[-2px]"
                         >
                           <CirclePlay aria-hidden="true" className="size-4 shrink-0" />
@@ -155,7 +159,10 @@ export function LessonOutlineAccordion({
                       {exercises.map((exercise, exerciseIndex) => (
                         <Link
                           key={exercise.id}
-                          to={`/learn/exercises/${exercise.id}`}
+                          to={
+                            exerciseHref?.(lesson.id, exercise.id) ??
+                            `/learn/exercises/${exercise.id}`
+                          }
                           className={`flex min-h-11 min-w-0 items-center gap-2 rounded-lg border border-brand-pink bg-brand-pink/30 px-3 py-2 text-sm font-medium text-ink-primary transition-colors hover:bg-brand-pink/45 focus-visible:outline-offset-[-2px] ${compact ? 'text-[0.8125rem]' : ''}`}
                         >
                           <FileText
