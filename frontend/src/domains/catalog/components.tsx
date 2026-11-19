@@ -232,7 +232,7 @@ export function CourseCard({
               to={href}
               className="inline-flex min-h-11 items-center gap-2 font-semibold text-action-primary underline-offset-4 hover:underline"
             >
-              Xem khóa học <ArrowRight aria-hidden="true" className="size-4" />
+              Tổng quan <ArrowRight aria-hidden="true" className="size-4" />
             </Link>
             {previewAvailable && previewHref && (
               <LinkButton
@@ -247,7 +247,7 @@ export function CourseCard({
           </div>
         ) : (
           <Button className="ml-auto" variant="outline" onClick={onOpen}>
-            Xem khóa học <ArrowRight aria-hidden="true" />
+            Tổng quan <ArrowRight aria-hidden="true" />
           </Button>
         )}
       </CardFooter>

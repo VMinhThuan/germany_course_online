@@ -23,7 +23,7 @@ describe('catalog components', () => {
     expect(screen.queryByText(A11_COURSE.level, { exact: true })).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: A11_COURSE.title })).toBeVisible()
     expect(screen.getByText(/1\.290\.000/)).toBeVisible()
-    expect(screen.getByRole('button', { name: /Xem khóa học/ })).toBeVisible()
+    expect(screen.getByRole('button', { name: /Tổng quan/ })).toBeVisible()
   })
 
   it('shows the level when the course title does not include it', () => {
