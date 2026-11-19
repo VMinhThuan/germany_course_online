@@ -1,4 +1,10 @@
-import { apiRequest, clearAccessToken, restoreAccessToken, setAccessToken } from '@/lib/api/client'
+import {
+  ApiError,
+  apiRequest,
+  clearAccessToken,
+  restoreAccessToken,
+  setAccessToken,
+} from '@/lib/api/client'
 import type { ApiAuthResult, ApiUserProfile } from '@/lib/api/types'
 
 export interface AppSession {
@@ -51,8 +57,16 @@ export const apiAuth = {
   async restoreSession(): Promise<AppSession | null> {
     const token = await restoreAccessToken()
     if (!token) return null
-    const profile = await apiRequest<ApiUserProfile>('/auth/me')
-    return toAppSession(profile)
+    try {
+      const profile = await apiRequest<ApiUserProfile>('/auth/me')
+      return toAppSession(profile)
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        clearAccessToken()
+        return null
+      }
+      throw error
+    }
   },
 
   async register(input: { fullName: string; email: string; password: string }) {

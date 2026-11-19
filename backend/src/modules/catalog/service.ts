@@ -164,6 +164,7 @@ export class PublicCatalogService {
             null,
           price: decimalIntegerString(course.price),
           accessDurationMonths: course.accessDurationMonths,
+          previewChapterCount: Number(course.previewChapterCount ?? 0),
           status: "PUBLISHED" as const,
           chapterCount: counts.sections,
           lessonCount: counts.lessons,
