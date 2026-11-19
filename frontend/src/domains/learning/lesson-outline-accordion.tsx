@@ -30,6 +30,7 @@ export function LessonOutlineAccordion({
   tree,
   currentLessonId,
   compact = false,
+  expandAll = false,
   onSelectLesson,
   onSelectSection,
   lessonHref,
@@ -38,6 +39,7 @@ export function LessonOutlineAccordion({
   tree: CourseTreeViewModel
   currentLessonId?: string
   compact?: boolean
+  expandAll?: boolean
   onSelectLesson?: (lessonId: string) => void
   onSelectSection?: (sectionId: string) => void
   lessonHref?: (lessonId: string) => string
@@ -89,7 +91,7 @@ export function LessonOutlineAccordion({
               const active = lesson.id === activeLessonId
               const expanded = expandedLessonId === lesson.id
               const panelId = `${lesson.id}-outline-items`
-              const shouldShowChildren = compact ? active : expanded
+              const shouldShowChildren = expandAll || (compact ? active : expanded)
               const hasVideo = lesson.hasVideo === true
               const exercises = lesson.exercises ?? []
               const hasItems = hasVideo || exercises.length > 0
@@ -125,9 +127,11 @@ export function LessonOutlineAccordion({
                     <div className="flex min-w-0 items-center gap-1">
                       <button
                         type="button"
-                        aria-expanded={expanded}
+                        aria-expanded={expandAll || expanded}
                         aria-controls={panelId}
-                        onClick={() => setExpandedLessonId(expanded ? '' : lesson.id)}
+                        onClick={() => {
+                          if (!expandAll) setExpandedLessonId(expanded ? '' : lesson.id)
+                        }}
                         title={lesson.title}
                         className={`grid min-h-14 min-w-0 flex-1 grid-cols-[1.5rem_minmax(0,1fr)_auto_1.25rem] items-center gap-2 rounded-lg border-l-2 px-3 py-2.5 text-left transition-colors hover:bg-surface-muted focus-visible:outline-offset-[-2px] sm:px-4 ${active ? 'border-action-primary bg-surface-blue font-semibold text-ink-primary' : 'border-transparent text-ink-secondary'}`}
                       >
