@@ -34,13 +34,13 @@ function accessView(record: StudentCourseRecord): CourseAccessViewModel {
     return {
       kind: 'restricted',
       label: 'Quyền học đã bị thu hồi',
-      reason: 'Enrollment bị thu hồi cần Admin khôi phục trước khi học tiếp.',
+      reason: 'Quyền học hiện chưa khả dụng. Vui lòng liên hệ hỗ trợ để được kiểm tra.',
     }
   }
   if (record.enrollment.accessState === 'expired-display') {
     return {
       kind: 'expired-display',
-      label: 'Enrollment còn lưu nhưng đã hết hạn',
+      label: 'Quyền học đã hết hạn',
       expiresAt: record.enrollment.expiresAt,
     }
   }

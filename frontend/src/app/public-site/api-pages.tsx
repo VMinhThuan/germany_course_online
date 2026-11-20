@@ -73,7 +73,7 @@ function PageFailure({ title, onRetry }: { title: string; onRetry: () => void })
     <DomainState
       kind="error"
       title={title}
-      message="Không tải được dữ liệu từ máy chủ. Kiểm tra kết nối API rồi thử lại."
+      message="Không tải được dữ liệu. Vui lòng kiểm tra kết nối rồi thử lại."
     >
       <Button className="mt-3" variant="outline" onClick={onRetry}>
         Thử tải lại
@@ -129,7 +129,7 @@ export function ApiPublicLandingPage() {
         {settings.isError && (
           <Container className="pt-5">
             <p role="status" className="text-sm text-ink-secondary">
-              Chưa tải được nội dung giới thiệu website từ máy chủ.
+              Chưa tải được nội dung giới thiệu. Vui lòng thử lại sau.
             </p>
           </Container>
         )}
@@ -139,7 +139,9 @@ export function ApiPublicLandingPage() {
         <CoursePricingSection
           courses={catalog.data ?? []}
           loading={catalog.isPending}
-          {...(catalog.isError ? { error: 'Không tải được danh mục khóa học từ máy chủ.' } : {})}
+          {...(catalog.isError
+            ? { error: 'Không tải được danh mục khóa học. Vui lòng thử lại sau.' }
+            : {})}
           onRetry={() => void catalog.refetch()}
         />
         <LearningBenefitsSection />
@@ -408,7 +410,7 @@ export function ApiCourseDetailPage() {
             if (!open) setLockedSectionId(null)
           }}
           title="Chương này cần đăng ký"
-          description="Nội dung đầy đủ được mở sau khi đơn hàng được Admin xác nhận."
+          description="Nội dung đầy đủ sẽ được mở sau khi thanh toán của bạn được xác nhận."
           tone="info"
           footer={
             <>

@@ -63,7 +63,7 @@ export function ProductError({ onRetry }: { onRetry: () => void }) {
   return (
     <ErrorState
       title="Chưa tải được dữ liệu"
-      description="Không thể kết nối hoặc tải dữ liệu từ máy chủ. Kiểm tra kết nối rồi thử lại."
+      description="Không thể tải dữ liệu lúc này. Vui lòng kiểm tra kết nối rồi thử lại."
       onRetry={onRetry}
     />
   )

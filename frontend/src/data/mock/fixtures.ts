@@ -471,8 +471,8 @@ export const MOCK_SCENARIO_FIXTURES: Record<MockScenarioId, MockScenarioFixture>
     order: pendingOrder,
     access: {
       kind: 'restricted',
-      label: 'Đang chờ thanh toán',
-      reason: 'Đơn PENDING chưa cấp quyền học.',
+      label: 'Chờ bạn hoàn tất thanh toán',
+      reason: 'Khóa học sẽ được mở sau khi thanh toán của bạn được xác nhận.',
     },
     progress: progressEmpty,
     lessonProgress: noLessonProgress,

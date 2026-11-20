@@ -27,7 +27,7 @@ export function StudentProfilePage() {
   return (
     <ProductPage
       title="Tài khoản học viên"
-      description="Cập nhật tên hiển thị. Email và trạng thái tài khoản do hệ thống quản lý."
+      description="Cập nhật thông tin cá nhân và quản lý tài khoản học tập."
       backTo="/student"
     >
       <AccountNavigation current="profile" />
@@ -40,7 +40,7 @@ export function StudentProfilePage() {
           <div className="grid content-start gap-4">
             <StudentProfileCard profile={profile.data} />
             <SecurityNotice>
-              Hồ sơ không hiển thị mật khẩu, access token hoặc thông tin phiên nội bộ.
+              Vì lý do bảo mật, mật khẩu và thông tin đăng nhập không hiển thị tại đây.
             </SecurityNotice>
           </div>
           <div className="grid content-start gap-4">
@@ -170,10 +170,11 @@ export function StudentPasswordPage() {
         </form>
         <div className="grid content-start gap-4">
           <SecurityNotice>
-            Mật khẩu được gửi trực tiếp tới API; frontend không lưu mật khẩu vào browser storage.
+            Mật khẩu của bạn được bảo vệ và không được lưu trên trình duyệt.
           </SecurityNotice>
           <Card className="p-4 text-sm leading-6 text-ink-secondary">
-            Backend thu hồi các phiên hoạt động sau khi đổi mật khẩu. Đăng nhập lại để tiếp tục.
+            Sau khi đổi mật khẩu, các phiên đăng nhập khác sẽ được đăng xuất. Vui lòng đăng nhập lại
+            để tiếp tục.
           </Card>
         </div>
       </div>
@@ -192,7 +193,7 @@ export function StudentSessionsPage() {
     if (!session) return
     dialogs.confirm({
       title: 'Kết thúc phiên hiện tại?',
-      description: 'Thao tác này sẽ thu hồi phiên hiện tại ở backend và đăng xuất trình duyệt.',
+      description: 'Bạn sẽ được đăng xuất khỏi trình duyệt này.',
       confirmLabel: 'Kết thúc phiên',
       destructive: true,
       onConfirm: async () => {
@@ -213,15 +214,14 @@ export function StudentSessionsPage() {
       ) : (
         <div className="grid gap-5">
           <SecurityNotice>
-            V3 giới hạn một phiên hoạt động trong bản này. Chỉ thông tin an toàn về thiết bị và thời
-            gian hoạt động được hiển thị.
+            Tài khoản chỉ duy trì một phiên đăng nhập hoạt động để bảo vệ an toàn thông tin của bạn.
           </SecurityNotice>
           <SessionList sessions={sessions.data ?? []} />
           {sessions.data?.some((item) => item.isCurrent && item.status === 'ACTIVE') && (
             <Card className="grid gap-3 p-5">
               <h2 className="font-display text-lg font-bold">Phiên hiện tại</h2>
               <p className="text-sm leading-6 text-ink-secondary">
-                Có thể kết thúc phiên này để xóa dữ liệu bảo vệ khỏi trạng thái đăng nhập hiện tại.
+                Bạn có thể đăng xuất tài khoản khỏi trình duyệt này bất cứ lúc nào.
               </p>
               <Button variant="outline" onClick={endCurrentSession}>
                 Kết thúc phiên hiện tại

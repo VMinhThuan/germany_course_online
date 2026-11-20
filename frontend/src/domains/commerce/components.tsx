@@ -240,7 +240,6 @@ export function OrderSummary({ order }: { order: OrderSummaryViewModel }) {
         <p className="text-sm text-ink-secondary">
           Tạo lúc {formatDateTimeInTimezone(order.createdAt)}
         </p>
-        <p className="text-xs text-ink-muted">Trạng thái giao dịch: {order.paymentStatus}</p>
       </CardContent>
     </Card>
   )

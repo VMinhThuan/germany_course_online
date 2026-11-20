@@ -144,7 +144,7 @@ export function ApiLoginPage() {
         )}
         {status === 'error' && (
           <InlineAlert tone="warning" title="Không khôi phục được phiên trước đó">
-            Bạn vẫn có thể thử đăng nhập lại. Nếu API chưa sẵn sàng, hãy thử sau.
+            Bạn vẫn có thể thử đăng nhập lại. Nếu hệ thống chưa sẵn sàng, hãy thử sau.
           </InlineAlert>
         )}
         {requestError && (
@@ -500,7 +500,7 @@ export function ApiResetPasswordPage() {
         )}
         <p className="inline-flex items-center gap-2 text-xs leading-5 text-ink-muted">
           <MailCheck aria-hidden="true" className="size-4 shrink-0" />
-          Mã đặt lại được xác minh phía máy chủ và chỉ dùng một lần.
+          Mã đặt lại được bảo vệ và chỉ dùng một lần.
         </p>
         <InlineProductLink to="/forgot-password">
           <span className="inline-flex items-center gap-1">

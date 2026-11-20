@@ -350,10 +350,10 @@ function OrderState({ order }: { order: NonNullable<ReturnType<typeof useProduct
   const reported = order.transferReported
   if (status === 'PAID')
     return (
-      <InlineAlert tone="success" title="Đã thanh toán và được xác nhận" role="status">
+      <InlineAlert tone="success" title="Thanh toán thành công" role="status">
         <span className="inline-flex items-center gap-2">
           <CheckCircle2 aria-hidden="true" className="size-4" />
-          Enrollment đã được backend cấp hoặc gia hạn. Tải lại quyền học để tiếp tục.
+          Khóa học đã sẵn sàng. Bạn có thể bắt đầu học ngay.
         </span>
       </InlineAlert>
     )
@@ -364,13 +364,25 @@ function OrderState({ order }: { order: NonNullable<ReturnType<typeof useProduct
     status === 'EXPIRED'
   )
     return (
-      <InlineAlert tone="danger" title={`Đơn ${status}`} role="status">
+      <InlineAlert
+        tone="danger"
+        title={
+          status === 'REJECTED'
+            ? 'Thanh toán cần được kiểm tra lại'
+            : status === 'CANCELLED'
+              ? 'Đơn hàng đã hủy'
+              : status === 'FAILED'
+                ? 'Thanh toán chưa hoàn tất'
+                : 'Đơn hàng đã hết hạn'
+        }
+        role="status"
+      >
         <span className="inline-flex items-center gap-2">
           <XCircle aria-hidden="true" className="size-4" />
           <span>
             {status === 'REJECTED'
-              ? 'Admin chưa xác nhận giao dịch. Bạn có thể kiểm tra lại và gửi lại báo chuyển khoản.'
-              : 'Đơn này không cấp quyền học.'}
+              ? 'Giao dịch chưa được xác nhận. Bạn có thể kiểm tra thông tin và gửi lại xác nhận thanh toán.'
+              : 'Bạn có thể tạo một đơn hàng mới để tiếp tục.'}
             {order.order.rejectionReason ? ` Lý do: ${order.order.rejectionReason}` : ''}
           </span>
         </span>
@@ -379,12 +391,14 @@ function OrderState({ order }: { order: NonNullable<ReturnType<typeof useProduct
   return (
     <InlineAlert
       tone="warning"
-      title={reported ? 'Đã báo chuyển khoản · chờ Admin đối soát' : 'Đang chờ chuyển khoản'}
+      title={reported ? 'Đã nhận xác nhận thanh toán' : 'Chờ bạn hoàn tất thanh toán'}
       role="status"
     >
       <span className="inline-flex items-center gap-2">
         <CircleAlert aria-hidden="true" className="size-4" />
-        Nhấn xác nhận chỉ gửi thông báo tới Admin; đơn vẫn PENDING và chưa cấp quyền học.
+        {reported
+          ? 'Chúng tôi đang kiểm tra giao dịch. Khóa học sẽ được mở ngay sau khi thanh toán được xác nhận.'
+          : 'Vui lòng chuyển khoản theo hướng dẫn, sau đó xác nhận để chúng tôi kiểm tra giao dịch.'}
       </span>
     </InlineAlert>
   )
@@ -452,9 +466,10 @@ function PaymentInstructions({
   if (!instructions)
     return (
       <Card className="grid gap-2 border-dashed p-5">
-        <h2 className="font-display text-lg font-bold">Chưa có cấu hình chuyển khoản</h2>
+        <h2 className="font-display text-lg font-bold">Thông tin thanh toán chưa sẵn sàng</h2>
         <p className="text-sm leading-6 text-ink-secondary">
-          Admin chưa cấu hình ngân hàng hoặc QR. Không có thông tin thanh toán mẫu để hiển thị.
+          Hiện chưa có thông tin chuyển khoản. Vui lòng thử lại sau hoặc liên hệ hỗ trợ để được
+          hướng dẫn.
         </p>
         <p className="text-sm">
           Mã đơn: <strong>{order.order.orderCode}</strong>
@@ -476,9 +491,9 @@ function PaymentInstructions({
         </InlineAlert>
       )}
       {order.transferReported && (
-        <InlineAlert tone="info" title="Đang chờ Admin đối soát">
-          Hệ thống đã ghi nhận báo chuyển khoản. Countdown giữ đơn không còn chạy trong lúc chờ
-          duyệt.
+        <InlineAlert tone="info" title="Đang kiểm tra thanh toán">
+          Chúng tôi đã nhận được xác nhận của bạn. Thời gian giữ đơn được tạm dừng trong lúc kiểm
+          tra giao dịch.
         </InlineAlert>
       )}
       {expiresAt && !order.transferReported && remaining !== null && remaining <= 0 && (
@@ -580,6 +595,8 @@ export function OrderPendingPage() {
   const confirmTransfer = useConfirmTransfer(session?.id ?? '')
   const cancelOrder = useCancelStudentOrder(session?.id ?? '')
   const navigate = useNavigate()
+  const showPendingActions =
+    order.data?.order.status === 'PENDING' || order.data?.order.status === 'REJECTED'
   const canCancelOrder = order.data?.order.status === 'PENDING' && !order.data.transferReported
   return (
     <ProductPage title="Thanh toán chuyển khoản" backTo="/student/orders">
@@ -606,20 +623,18 @@ export function OrderPendingPage() {
             </div>
           </Card>
           <OrderState order={order.data} />
-          {(order.data.order.status === 'PENDING' || order.data.order.status === 'REJECTED') && (
+          {showPendingActions && (
             <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,0.55fr)] lg:items-start">
               <PaymentInstructions order={order.data} />
               <Card className="grid gap-4 p-5 sm:p-6 lg:sticky lg:top-6">
                 <h2 className="font-display text-lg font-bold">Bạn đã chuyển khoản?</h2>
                 <p className="text-sm leading-6 text-ink-secondary">
-                  Xác nhận chỉ cập nhật trạng thái báo chuyển khoản. Admin sẽ đối soát riêng; đơn
-                  vẫn PENDING cho đến khi được duyệt.
+                  Hãy xác nhận sau khi chuyển khoản thành công để chúng tôi kiểm tra và kích hoạt
+                  khóa học cho bạn.
                 </p>
-                <div
-                  className={`grid gap-3 ${canCancelOrder ? 'sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center' : ''}`}
-                >
+                <div className="grid gap-3">
                   <Button
-                    className="w-full"
+                    className="w-full min-w-0 px-3 text-sm sm:px-4 sm:text-base"
                     loading={confirmTransfer.isPending}
                     disabled={
                       confirmTransfer.isPending ||
@@ -638,32 +653,41 @@ export function OrderPendingPage() {
                         ? 'Đã gửi báo chuyển khoản'
                         : 'Tôi đã chuyển khoản'}
                   </Button>
-                  {canCancelOrder && (
-                    <Button
-                      className="w-full sm:min-w-48 sm:w-auto"
+                  <div className={`grid gap-3 ${canCancelOrder ? 'sm:grid-cols-2' : ''}`}>
+                    <LinkButton
+                      to={`/student/orders/${id}`}
                       variant="outline"
-                      disabled={cancelOrder.isPending}
-                      loading={cancelOrder.isPending}
-                      onClick={() =>
-                        dialogs.confirm({
-                          title: 'Hủy đơn hàng này?',
-                          description: 'Bạn có thể hủy đơn trước khi báo chuyển khoản.',
-                          confirmLabel: 'Hủy đơn',
-                          destructive: true,
-                          onConfirm: async () => {
-                            try {
-                              await cancelOrder.mutateAsync(id)
-                              navigate(`/orders/${id}/result`)
-                            } catch {
-                              /* Error is shown with the order actions. */
-                            }
-                          },
-                        })
-                      }
+                      className="w-full min-w-0 px-3 text-sm sm:text-base"
                     >
-                      Hủy đơn
-                    </Button>
-                  )}
+                      Chi tiết đơn hàng
+                    </LinkButton>
+                    {canCancelOrder && (
+                      <Button
+                        className="w-full min-w-0 px-3 text-sm sm:text-base"
+                        variant="outline"
+                        disabled={cancelOrder.isPending}
+                        loading={cancelOrder.isPending}
+                        onClick={() =>
+                          dialogs.confirm({
+                            title: 'Hủy đơn hàng này?',
+                            description: 'Bạn có thể hủy đơn trước khi báo chuyển khoản.',
+                            confirmLabel: 'Hủy đơn',
+                            destructive: true,
+                            onConfirm: async () => {
+                              try {
+                                await cancelOrder.mutateAsync(id)
+                                navigate(`/orders/${id}/result`)
+                              } catch {
+                                /* Error is shown with the order actions. */
+                              }
+                            },
+                          })
+                        }
+                      >
+                        Hủy đơn
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 {confirmTransfer.isError && (
                   <ErrorState
@@ -695,9 +719,11 @@ export function OrderPendingPage() {
               </Card>
             </div>
           )}
-          <LinkButton to={`/student/orders/${id}`} variant="outline">
-            Chi tiết đơn hàng
-          </LinkButton>
+          {!showPendingActions && (
+            <LinkButton to={`/student/orders/${id}`} variant="outline">
+              Chi tiết đơn hàng
+            </LinkButton>
+          )}
         </div>
       )}
     </ProductPage>
@@ -765,7 +791,7 @@ export function StudentOrdersPage() {
   return (
     <ProductPage
       title="Đơn hàng của tôi"
-      description="Trạng thái và số tiền được tải từ hệ thống."
+      description="Theo dõi các khóa học bạn đã đăng ký và thanh toán."
       backTo="/student"
     >
       {orders.isPending ? (
@@ -793,12 +819,12 @@ export function StudentOrdersPage() {
               <span>
                 <strong className="block">{item.order.itemTitle}</strong>
                 <span className="mt-1 block text-sm text-ink-secondary">
-                  {item.order.orderCode} · {item.order.status} ·{' '}
+                  Mã đơn {item.order.orderCode} · {customerOrderStatusLabel(item.order.status)} ·{' '}
                   {formatDateTimeInTimezone(item.order.createdAt)}
                 </span>
                 {item.transferReported && item.order.status === 'PENDING' && (
                   <span className="mt-1 block text-xs text-warning-foreground">
-                    Đã báo chuyển khoản · chờ Admin duyệt
+                    Đã gửi xác nhận thanh toán · đang kiểm tra
                   </span>
                 )}
               </span>
@@ -821,6 +847,23 @@ export function StudentOrdersPage() {
   )
 }
 
+function customerOrderStatusLabel(status: string) {
+  switch (status) {
+    case 'PAID':
+      return 'Đã thanh toán'
+    case 'CANCELLED':
+      return 'Đã hủy'
+    case 'REJECTED':
+      return 'Cần kiểm tra lại'
+    case 'FAILED':
+      return 'Thanh toán chưa hoàn tất'
+    case 'EXPIRED':
+      return 'Đã hết hạn'
+    default:
+      return 'Chờ thanh toán'
+  }
+}
+
 export function StudentOrderDetailPage() {
   const { id = '' } = useParams()
   const { session } = useAuthSession()
@@ -838,10 +881,10 @@ export function StudentOrderDetailPage() {
           <Card className="grid gap-3 p-5">
             <h2 className="font-display text-xl font-bold">{order.data.order.itemTitle}</h2>
             <p className="text-sm text-ink-secondary">
-              Mã đơn: <strong>{order.data.order.orderCode}</strong>
+              Mã đơn hàng: <strong>{order.data.order.orderCode}</strong>
             </p>
             <p className="text-sm text-ink-secondary">
-              Loại đơn: {order.data.order.orderType === 'PURCHASE' ? 'Mua khóa học' : 'Gia hạn'}
+              Hình thức: {order.data.order.orderType === 'PURCHASE' ? 'Mua khóa học' : 'Gia hạn'}
             </p>
             <p className="text-sm text-ink-secondary">
               Giá gốc: {formatVnd(order.data.originalAmountVnd)}
@@ -853,7 +896,7 @@ export function StudentOrderDetailPage() {
               Thời hạn: {order.data.durationMonths} tháng
             </p>
             <p className="text-sm text-ink-secondary">
-              Tạo lúc: {formatDateTimeInTimezone(order.data.order.createdAt)}
+              Ngày đặt: {formatDateTimeInTimezone(order.data.order.createdAt)}
             </p>
           </Card>
           <OrderState order={order.data} />
@@ -892,7 +935,7 @@ export function CourseRenewalPage() {
             <h2 className="font-display text-xl font-bold">{course.data.course.title}</h2>
             <AccessStatePanel access={course.data.access} />
             <p className="text-sm text-ink-secondary">
-              Hạn enrollment hiện tại:{' '}
+              Hạn truy cập hiện tại:{' '}
               {formatDateTimeInTimezone(renewals.data.course.enrollmentExpiresAt)}
             </p>
             <p className="text-sm leading-6 text-ink-secondary">
@@ -902,7 +945,7 @@ export function CourseRenewalPage() {
           </Card>
           {course.data.access.kind === 'restricted' && (
             <Card className="p-4 text-sm leading-6 text-warning-foreground">
-              Enrollment bị thu hồi cần Admin khôi phục trước; không thể gia hạn trực tiếp.
+              Quyền học hiện chưa khả dụng. Vui lòng liên hệ hỗ trợ trước khi gia hạn.
             </Card>
           )}
           {renewals.data.plans.length ? (
@@ -929,7 +972,7 @@ export function CourseRenewalPage() {
             <DomainState
               kind="empty"
               title="Chưa có gói gia hạn"
-              message="Admin chưa cấu hình gói đang bán cho khóa học này."
+              message="Hiện chưa có gói gia hạn phù hợp cho khóa học này. Vui lòng thử lại sau."
             />
           )}
         </div>

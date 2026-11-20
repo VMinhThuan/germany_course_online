@@ -79,7 +79,7 @@ function toCourseRecord(enrollment: ApiEnrollment): StudentCourseRecord {
       percent: enrollment.progressPercent,
       completedLessons: 0,
       totalLessons: 0,
-      completedLabel: 'Tiến độ do máy chủ cung cấp',
+      completedLabel: 'Tiến độ được cập nhật tự động',
     },
   }
 }
@@ -142,7 +142,7 @@ function toAccess(access: string, enrollment?: ApiEnrollment): CourseAccessViewM
     return {
       kind: 'restricted',
       label: 'Quyền học đã bị thu hồi',
-      reason: 'Liên hệ quản trị viên để được hỗ trợ khôi phục.',
+      reason: 'Vui lòng liên hệ hỗ trợ để được kiểm tra và khôi phục quyền học.',
     }
   }
   if (enrollment && effectiveAccess(enrollment) === 'expired-display') {
@@ -157,7 +157,7 @@ function toAccess(access: string, enrollment?: ApiEnrollment): CourseAccessViewM
   return {
     kind: 'restricted',
     label: 'Chưa có quyền học',
-    reason: 'Máy chủ chưa xác nhận enrollment đang hoạt động.',
+    reason: 'Quyền học chưa được xác nhận. Vui lòng thử lại sau hoặc liên hệ hỗ trợ.',
   }
 }
 
@@ -220,8 +220,10 @@ function toOrderDetail(detail: ApiOrderDetail): StudentOrderDetailViewModel {
       : {
           kind: 'restricted',
           label:
-            order.status === 'PAID' ? 'Đang cập nhật quyền học' : 'Đơn hàng chưa cấp quyền học',
-          reason: 'Chỉ thao tác duyệt của Admin mới cập nhật enrollment.',
+            order.status === 'PAID'
+              ? 'Đang kích hoạt khóa học'
+              : 'Khóa học sẽ được mở sau khi thanh toán',
+          reason: 'Khóa học sẽ được mở sau khi thanh toán của bạn được xác nhận.',
         },
   }
 }
@@ -797,7 +799,8 @@ const commerce: StudentCommerceRepository & {
     throw new ApiError({
       status: 410,
       code: 'PAYMENT_SIMULATION_REMOVED',
-      message: 'Xác nhận thanh toán giả đã bị gỡ. Hãy báo đã chuyển khoản và chờ Admin duyệt.',
+      message:
+        'Tính năng thanh toán thử nghiệm đã kết thúc. Hãy chuyển khoản và xác nhận thanh toán để chúng tôi kiểm tra.',
     })
   },
   async confirmTransfer(_sessionId, orderId) {

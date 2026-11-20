@@ -76,8 +76,8 @@ export function PublicHelpPage() {
           <article className="rounded-2xl border border-border-subtle bg-card-surface p-5">
             <h2 className="font-display text-lg font-bold">Làm sao xem nội dung học?</h2>
             <p className="mt-2 text-sm leading-6 text-ink-secondary">
-              Mô tả và đề cương đã xuất bản có thể xem công khai. Bài học riêng chỉ mở khi backend
-              xác nhận enrollment còn hiệu lực.
+              Mô tả và đề cương đã xuất bản có thể xem công khai. Bài học riêng sẽ mở sau khi bạn
+              đăng ký khóa học thành công.
             </p>
           </article>
           <article className="rounded-2xl border border-border-subtle bg-card-surface p-5">
@@ -92,15 +92,15 @@ export function PublicHelpPage() {
           <article className="rounded-2xl border border-border-subtle bg-card-surface p-5">
             <h2 className="font-display text-lg font-bold">Đơn chuyển khoản hoạt động thế nào?</h2>
             <p className="mt-2 text-sm leading-6 text-ink-secondary">
-              Đơn ở trạng thái PENDING. Sau khi chuyển khoản, gửi thông báo trong trang đơn; Admin
-              đối soát riêng trước khi duyệt và cập nhật quyền học.
+              Sau khi chuyển khoản, hãy gửi xác nhận trong trang đơn. Chúng tôi sẽ kiểm tra giao
+              dịch và mở quyền học sau khi thanh toán được xác nhận.
             </p>
           </article>
           <article className="rounded-2xl border border-border-subtle bg-card-surface p-5">
             <h2 className="font-display text-lg font-bold">Video hoặc PDF chưa mở được?</h2>
             <p className="mt-2 text-sm leading-6 text-ink-secondary">
-              Một số tệp cần nhà cung cấp lưu trữ media. Nếu dịch vụ chưa sẵn sàng, website sẽ báo
-              trạng thái unavailable và không thay bằng đường dẫn giả.
+              Một số tệp cần dịch vụ lưu trữ riêng. Nếu nội dung chưa sẵn sàng, website sẽ thông báo
+              để bạn thử lại sau.
             </p>
           </article>
         </div>

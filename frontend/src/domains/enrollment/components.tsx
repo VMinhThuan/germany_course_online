@@ -11,7 +11,7 @@ export function EnrollmentAccessPanel({ enrollment }: { enrollment?: EnrollmentS
         <div>
           <h2 className="font-semibold">Chưa có quyền truy cập khóa học</h2>
           <p className="mt-1 text-sm leading-6 text-ink-secondary">
-            Thông tin enrollment chưa được cung cấp.
+            Quyền học sẽ hiển thị tại đây sau khi thanh toán được xác nhận.
           </p>
         </div>
       </Card>
@@ -40,8 +40,7 @@ export function EnrollmentAccessPanel({ enrollment }: { enrollment?: EnrollmentS
           </Badge>
         </div>
         <p className="mt-1 text-sm text-ink-secondary">
-          Enrollment status: {enrollment.status} · Hạn:{' '}
-          {formatDateTimeInTimezone(enrollment.expiresAt)}
+          Hạn truy cập: {formatDateTimeInTimezone(enrollment.expiresAt)}
         </p>
       </div>
     </Card>

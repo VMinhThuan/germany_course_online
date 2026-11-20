@@ -410,7 +410,7 @@ export function AccessStatePanel({
     'customer-preview': { tone: 'info' as const, title: access.label },
     restricted: { tone: 'warning' as const, title: access.label },
     'expired-display': { tone: 'warning' as const, title: access.label },
-    loading: { tone: 'neutral' as const, title: access.label ?? 'Đang kiểm tra quyền truy cập' },
+    loading: { tone: 'neutral' as const, title: access.label ?? 'Đang kiểm tra quyền học' },
     error: { tone: 'danger' as const, title: access.label },
   }[access.kind]
   return (

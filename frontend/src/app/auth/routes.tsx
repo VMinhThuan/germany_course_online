@@ -63,7 +63,7 @@ export function ProtectedStudentRoute() {
       <main className="mx-auto grid min-h-[60vh] max-w-xl content-center gap-4 px-5 py-12 text-center">
         <DecorativeHeading text="Chưa xác minh được phiên đăng nhập" level={1} size="sm" />
         <p className="text-ink-secondary">
-          Không thể kết nối với API để khôi phục phiên. Thử lại trước khi đăng nhập lại.
+          Không thể khôi phục phiên đăng nhập. Vui lòng thử lại trước khi đăng nhập lại.
         </p>
         <button
           className="mx-auto min-h-11 rounded-xl bg-action-primary px-5 font-semibold text-white"
@@ -100,7 +100,7 @@ export function ProtectedAdminRoute() {
       <main className="mx-auto grid min-h-[60vh] max-w-xl content-center gap-4 px-5 py-12 text-center">
         <DecorativeHeading text="Chưa xác minh được quyền quản trị" level={1} size="sm" />
         <p className="text-ink-secondary">
-          Kết nối API đang lỗi. Hãy thử khôi phục phiên trước khi tiếp tục.
+          Không thể kiểm tra quyền truy cập. Hãy thử khôi phục phiên trước khi tiếp tục.
         </p>
         <button
           className="mx-auto min-h-11 rounded-xl bg-action-primary px-5 font-semibold text-white"

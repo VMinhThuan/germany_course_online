@@ -496,7 +496,7 @@ export function LearningExercisePage() {
             <DomainState
               kind="error"
               title="Chưa có quyền truy cập bài tập"
-              message="Enrollment hiện không cấp quyền xem hoặc hoàn thành nội dung trả phí."
+              message="Bạn chưa có quyền xem hoặc hoàn thành nội dung trả phí này."
             >
               <LinkButton to="/courses" variant="outline">
                 Về trang khóa học
@@ -671,7 +671,7 @@ export function LearningQuizPage() {
           {selectAnswer.isError && (
             <ErrorState
               title="Chưa lưu lựa chọn"
-              description="Chưa lưu được lựa chọn trên máy chủ. Hãy thử lại khi kết nối ổn định."
+              description="Chưa lưu được lựa chọn. Vui lòng kiểm tra kết nối rồi thử lại."
               onRetry={() => attempt.refetch()}
             />
           )}
@@ -779,7 +779,7 @@ export function StudentProgressPage() {
         <DomainState
           kind="empty"
           title="Chưa có khóa học được cấp"
-          message="Khi tài khoản có enrollment, tiến độ và danh sách bài học sẽ xuất hiện tại đây."
+          message="Sau khi đăng ký khóa học, tiến độ và danh sách bài học sẽ xuất hiện tại đây."
         >
           <LinkButton to="/courses" variant="outline">
             Khám phá khóa học
@@ -812,7 +812,7 @@ export function StudentProgressPage() {
           <section className="grid gap-3">
             <SectionHeader
               title="Tiến độ từng bài"
-              description="Tiến độ chỉ tính những bài mà máy chủ đánh dấu là có tham gia tổng tiến độ."
+              description="Tiến độ được tính dựa trên các bài học thuộc chương trình khóa học."
             />
             <LessonProgressList
               lessons={course.data.tree.sections.flatMap((section) =>
