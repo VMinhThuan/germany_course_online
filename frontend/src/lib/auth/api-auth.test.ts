@@ -35,10 +35,7 @@ describe('apiAuth session restoration', () => {
     clientMock.restoreAccessToken.mockResolvedValue('access-token')
     clientMock.apiRequest.mockResolvedValue(profile)
 
-    const [first, second] = await Promise.all([
-      apiAuth.restoreSession(),
-      apiAuth.restoreSession(),
-    ])
+    const [first, second] = await Promise.all([apiAuth.restoreSession(), apiAuth.restoreSession()])
 
     expect(first).toEqual(second)
     expect(first?.profile.email).toBe(profile.email)
