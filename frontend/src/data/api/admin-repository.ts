@@ -47,6 +47,12 @@ async function listAssetAssociations(path: string) {
 }
 
 export const adminRepository = {
+  changePassword(currentPassword: string, newPassword: string) {
+    return apiRequest<void>('/me/password', {
+      method: 'PUT',
+      body: { currentPassword, newPassword },
+    })
+  },
   listCourses(filters: Query = {}) {
     return apiRequest<ApiPage<ApiAdminCourse>>(
       `/admin/courses${queryString({ page: 1, pageSize: 100, ...filters })}`,

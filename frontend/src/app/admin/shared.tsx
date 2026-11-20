@@ -19,6 +19,7 @@ import {
   LayoutDashboard,
   Library,
   ListChecks,
+  LockKeyhole,
   LogOut,
   Menu,
   MessageSquareText,
@@ -201,6 +202,13 @@ export function AdminLayout({
             <span className="hidden max-w-52 truncate text-ink-secondary sm:inline">
               {session?.profile.displayName || session?.profile.email}
             </span>
+            <Link
+              to="/admin/security/password"
+              className="inline-flex min-h-10 items-center gap-2 rounded-xl px-3 font-semibold text-action-primary hover:bg-surface-blue focus-visible:outline-2 focus-visible:outline-action-focus"
+            >
+              <LockKeyhole aria-hidden="true" className="size-4" />
+              <span className="hidden sm:inline">Đổi mật khẩu</span>
+            </Link>
             <Button
               size="sm"
               variant="outline"

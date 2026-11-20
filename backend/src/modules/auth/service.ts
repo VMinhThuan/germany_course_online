@@ -423,12 +423,13 @@ export class AuthService {
     userId: string,
     currentPassword: string,
     newPassword: string,
+    role: "STUDENT" | "ADMIN",
     ipAddress: string | null,
   ): Promise<void> {
     const user = await User.findOne({
       _id: userId,
       status: "ACTIVE",
-      role: "STUDENT",
+      role,
     }).select("+passwordHash");
     if (!user)
       throw unauthorized("UNAUTHORIZED", "Authentication is required.");
@@ -466,7 +467,10 @@ export class AuthService {
         [
           {
             actorUserId: user._id,
-            action: "STUDENT_PASSWORD_CHANGED",
+            action:
+              role === "ADMIN"
+                ? "ADMIN_PASSWORD_CHANGED"
+                : "STUDENT_PASSWORD_CHANGED",
             entityType: "USER",
             entityId: user._id,
             oldValue: null,

@@ -26,6 +26,7 @@ import { AdminEnrollmentsPage, AdminStudentsPage } from './directory-pages'
 import { AdminCouponsPage, AdminOrdersPage, AdminRenewalPlansPage } from './commerce-pages'
 import { AdminAuditLogsPage, AdminMediaPage, AdminSettingsPage } from './media-settings-pages'
 import { AdminLessonCommentsPage } from './lesson-comments-page'
+import { AdminPasswordPage } from './password-page'
 
 function Metric({ label, value, icon }: { label: string; value: number; icon: React.ReactNode }) {
   return (
@@ -165,6 +166,7 @@ function titleFor(path: string) {
   if (path.startsWith('/admin/renewal-plans')) return 'Gói gia hạn'
   if (path.startsWith('/admin/coupons')) return 'Mã ưu đãi'
   if (path.startsWith('/admin/settings')) return 'Cài đặt website'
+  if (path.startsWith('/admin/security/password')) return 'Đổi mật khẩu'
   if (path.startsWith('/admin/audit-logs')) return 'Nhật ký quản trị'
   return 'Không tìm thấy trang'
 }
@@ -213,6 +215,8 @@ export function AdminWorkspacePage() {
     content = <AdminEnrollmentsPage {...(parts[2] ? { enrollmentId: parts[2] } : {})} />
   else if (segment === 'orders')
     content = <AdminOrdersPage {...(parts[2] ? { orderId: parts[2] } : {})} />
+  else if (segment === 'security' && parts.length === 3 && parts[2] === 'password')
+    content = <AdminPasswordPage />
   else if (segment === 'renewal-plans' && parts.length === 2) content = <AdminRenewalPlansPage />
   else if (segment === 'coupons' && parts.length === 2) content = <AdminCouponsPage />
   else if (segment === 'settings' && parts.length === 2) content = <AdminSettingsPage />

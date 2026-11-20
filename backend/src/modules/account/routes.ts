@@ -30,9 +30,9 @@ export function createAccountRouter(
   auth: AuthService,
 ): Router {
   const router = Router();
-  router.use("/me", authenticate(config), requireRole("STUDENT"));
+  router.use("/me", authenticate(config));
 
-  router.get("/me/profile", async (req, res, next) => {
+  router.get("/me/profile", requireRole("STUDENT"), async (req, res, next) => {
     try {
       if (!req.auth) throw unauthorized();
       success(res, await auth.me(req.auth.sub));
@@ -43,6 +43,7 @@ export function createAccountRouter(
 
   router.patch(
     "/me/profile",
+    requireRole("STUDENT"),
     validateRequest({ body: profilePatchSchema }),
     async (req, res, next) => {
       try {
@@ -63,6 +64,7 @@ export function createAccountRouter(
 
   router.put(
     "/me/password",
+    requireRole("STUDENT", "ADMIN"),
     validateRequest({ body: passwordChangeSchema }),
     async (req, res, next) => {
       try {
@@ -73,6 +75,7 @@ export function createAccountRouter(
           req.auth.sub,
           body.currentPassword,
           body.newPassword,
+          req.auth.role,
           req.ip ?? null,
         );
         success(res, {});
@@ -82,7 +85,7 @@ export function createAccountRouter(
     },
   );
 
-  router.get("/me/sessions", async (req, res, next) => {
+  router.get("/me/sessions", requireRole("STUDENT"), async (req, res, next) => {
     try {
       if (!req.auth) throw unauthorized();
       success(res, await auth.listMySessions(req.auth.sub, req.auth.sid));
@@ -93,6 +96,7 @@ export function createAccountRouter(
 
   router.delete(
     "/me/sessions/:sessionId",
+    requireRole("STUDENT"),
     validateRequest({ params: sessionIdSchema }),
     async (req, res, next) => {
       try {

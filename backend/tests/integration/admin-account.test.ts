@@ -1166,6 +1166,26 @@ describe("BE-03B Admin CMS, media, account security, enrollment and audit APIs",
     expect(login.status).toBe(200);
   });
 
+  it("allows an Admin to change their password and revokes the Admin session", async () => {
+    const newPassword = "NewAdminPassword123!";
+    const changed = await as(admin, "put", "/api/v1/me/password").send({
+      currentPassword: admin.password,
+      newPassword,
+    });
+    expect(changed.status).toBe(200);
+    expect(
+      await UserSession.countDocuments({
+        userId: new mongoose.Types.ObjectId(admin.id),
+        status: "ACTIVE",
+      }),
+    ).toBe(0);
+    expect((await as(admin, "get", "/api/v1/admin/courses")).status).toBe(401);
+    const login = await request(app)
+      .post("/api/v1/auth/login")
+      .send({ email: admin.email, password: newPassword });
+    expect(login.status).toBe(200);
+  });
+
   it("searches safe Student records and blocking revokes their active sessions", async () => {
     const listed = await as(admin, "get", "/api/v1/admin/students").query({
       page: 1,
