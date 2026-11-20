@@ -590,7 +590,7 @@ export function OrderPendingPage() {
       ) : !order.data ? (
         <ProductNotFound message="Không tìm thấy đơn hàng thuộc tài khoản hiện tại." />
       ) : (
-        <div className="mx-auto grid w-full max-w-3xl gap-5">
+        <div className="mx-auto grid w-full max-w-6xl gap-5">
           <Card className="flex flex-wrap items-center justify-between gap-3 p-5">
             <div>
               <p className="text-xs font-bold uppercase tracking-widest text-action-primary">
@@ -607,93 +607,93 @@ export function OrderPendingPage() {
           </Card>
           <OrderState order={order.data} />
           {(order.data.order.status === 'PENDING' || order.data.order.status === 'REJECTED') && (
-            <PaymentInstructions order={order.data} />
-          )}
-          {(order.data.order.status === 'PENDING' || order.data.order.status === 'REJECTED') && (
-            <Card className="grid gap-4 p-5 sm:p-6">
-              <h2 className="font-display text-lg font-bold">Bạn đã chuyển khoản?</h2>
-              <p className="text-sm leading-6 text-ink-secondary">
-                Xác nhận chỉ cập nhật trạng thái báo chuyển khoản. Admin sẽ đối soát riêng; đơn vẫn
-                PENDING cho đến khi được duyệt.
-              </p>
-              <div
-                className={`grid gap-3 ${canCancelOrder ? 'sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center' : ''}`}
-              >
-                <Button
-                  className="w-full"
-                  loading={confirmTransfer.isPending}
-                  disabled={
-                    confirmTransfer.isPending ||
-                    (order.data.transferReported && order.data.order.status === 'PENDING')
-                  }
-                  onClick={() =>
-                    void confirmTransfer
-                      .mutateAsync(id)
-                      .then(() => order.refetch())
-                      .catch(() => undefined)
-                  }
+            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,0.55fr)] lg:items-start">
+              <PaymentInstructions order={order.data} />
+              <Card className="grid gap-4 p-5 sm:p-6 lg:sticky lg:top-6">
+                <h2 className="font-display text-lg font-bold">Bạn đã chuyển khoản?</h2>
+                <p className="text-sm leading-6 text-ink-secondary">
+                  Xác nhận chỉ cập nhật trạng thái báo chuyển khoản. Admin sẽ đối soát riêng; đơn
+                  vẫn PENDING cho đến khi được duyệt.
+                </p>
+                <div
+                  className={`grid gap-3 ${canCancelOrder ? 'sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center' : ''}`}
                 >
-                  {order.data.order.status === 'REJECTED'
-                    ? 'Gửi lại báo chuyển khoản'
-                    : order.data.transferReported
-                      ? 'Đã gửi báo chuyển khoản'
-                      : 'Tôi đã chuyển khoản'}
-                </Button>
-                {canCancelOrder && (
                   <Button
-                    className="w-full sm:min-w-48 sm:w-auto"
-                    variant="outline"
-                    disabled={cancelOrder.isPending}
-                    loading={cancelOrder.isPending}
+                    className="w-full"
+                    loading={confirmTransfer.isPending}
+                    disabled={
+                      confirmTransfer.isPending ||
+                      (order.data.transferReported && order.data.order.status === 'PENDING')
+                    }
                     onClick={() =>
-                      dialogs.confirm({
-                        title: 'Hủy đơn hàng này?',
-                        description: 'Bạn có thể hủy đơn trước khi báo chuyển khoản.',
-                        confirmLabel: 'Hủy đơn',
-                        destructive: true,
-                        onConfirm: async () => {
-                          try {
-                            await cancelOrder.mutateAsync(id)
-                            navigate(`/orders/${id}/result`)
-                          } catch {
-                            /* Error is shown with the order actions. */
-                          }
-                        },
-                      })
+                      void confirmTransfer
+                        .mutateAsync(id)
+                        .then(() => order.refetch())
+                        .catch(() => undefined)
                     }
                   >
-                    Hủy đơn
+                    {order.data.order.status === 'REJECTED'
+                      ? 'Gửi lại báo chuyển khoản'
+                      : order.data.transferReported
+                        ? 'Đã gửi báo chuyển khoản'
+                        : 'Tôi đã chuyển khoản'}
                   </Button>
+                  {canCancelOrder && (
+                    <Button
+                      className="w-full sm:min-w-48 sm:w-auto"
+                      variant="outline"
+                      disabled={cancelOrder.isPending}
+                      loading={cancelOrder.isPending}
+                      onClick={() =>
+                        dialogs.confirm({
+                          title: 'Hủy đơn hàng này?',
+                          description: 'Bạn có thể hủy đơn trước khi báo chuyển khoản.',
+                          confirmLabel: 'Hủy đơn',
+                          destructive: true,
+                          onConfirm: async () => {
+                            try {
+                              await cancelOrder.mutateAsync(id)
+                              navigate(`/orders/${id}/result`)
+                            } catch {
+                              /* Error is shown with the order actions. */
+                            }
+                          },
+                        })
+                      }
+                    >
+                      Hủy đơn
+                    </Button>
+                  )}
+                </div>
+                {confirmTransfer.isError && (
+                  <ErrorState
+                    title="Chưa gửi được thông báo"
+                    description={
+                      confirmTransfer.error instanceof Error
+                        ? confirmTransfer.error.message
+                        : 'Đơn vẫn giữ trạng thái hiện tại.'
+                    }
+                    onRetry={() =>
+                      void confirmTransfer
+                        .mutateAsync(id)
+                        .then(() => order.refetch())
+                        .catch(() => undefined)
+                    }
+                  />
                 )}
-              </div>
-              {confirmTransfer.isError && (
-                <ErrorState
-                  title="Chưa gửi được thông báo"
-                  description={
-                    confirmTransfer.error instanceof Error
-                      ? confirmTransfer.error.message
-                      : 'Đơn vẫn giữ trạng thái hiện tại.'
-                  }
-                  onRetry={() =>
-                    void confirmTransfer
-                      .mutateAsync(id)
-                      .then(() => order.refetch())
-                      .catch(() => undefined)
-                  }
-                />
-              )}
-              {cancelOrder.isError && (
-                <AdminlessError
-                  error={cancelOrder.error}
-                  retry={() =>
-                    void cancelOrder
-                      .mutateAsync(id)
-                      .then(() => navigate(`/orders/${id}/result`))
-                      .catch(() => undefined)
-                  }
-                />
-              )}
-            </Card>
+                {cancelOrder.isError && (
+                  <AdminlessError
+                    error={cancelOrder.error}
+                    retry={() =>
+                      void cancelOrder
+                        .mutateAsync(id)
+                        .then(() => navigate(`/orders/${id}/result`))
+                        .catch(() => undefined)
+                    }
+                  />
+                )}
+              </Card>
+            </div>
           )}
           <LinkButton to={`/student/orders/${id}`} variant="outline">
             Chi tiết đơn hàng

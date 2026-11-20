@@ -172,26 +172,37 @@ async function perform<T>(path: string, options: ApiRequestOptions, token: strin
 async function refreshAccessToken() {
   if (!refreshFlight) {
     refreshFlight = (async () => {
-      try {
-        const result = await perform<{ accessToken: string }>(
-          '/auth/refresh',
-          {
-            method: 'POST',
-            auth: false,
-            credentials: 'include',
-            csrfProtection: true,
-            timeoutMs: 12_000,
-          },
-          null,
-        )
-        accessToken = result.accessToken
-        return accessToken
-      } catch (cause) {
-        accessToken = null
-        if (cause instanceof ApiError && cause.code === 'SESSION_REVOKED') {
-          publishSessionRevoked('revoked')
+      const rotateRefreshToken = async () => {
+        try {
+          const result = await perform<{ accessToken: string }>(
+            '/auth/refresh',
+            {
+              method: 'POST',
+              auth: false,
+              credentials: 'include',
+              csrfProtection: true,
+              timeoutMs: 12_000,
+            },
+            null,
+          )
+          accessToken = result.accessToken
+          return accessToken
+        } catch (cause) {
+          accessToken = null
+          if (cause instanceof ApiError && cause.code === 'SESSION_REVOKED') {
+            publishSessionRevoked('revoked')
+          }
+          throw cause
         }
-        throw cause
+      }
+
+      try {
+        // Refresh tokens rotate on every request. Serialize refreshes across tabs so a
+        // second tab cannot submit the token that the first tab has just replaced.
+        if (typeof navigator !== 'undefined' && navigator.locks) {
+          return await navigator.locks.request('paniverse-auth-refresh', rotateRefreshToken)
+        }
+        return await rotateRefreshToken()
       } finally {
         refreshFlight = null
       }
