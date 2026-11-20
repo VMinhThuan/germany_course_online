@@ -433,7 +433,7 @@ export function ApiCourseDetailPage() {
               <LockKeyhole aria-hidden="true" className="size-5 text-action-primary" />
               <span>
                 {(course.previewChapterCount ?? 0) > 0
-                  ? `Học thử ${course.previewChapterCount ?? 0} chương miễn phí`
+                  ? `Học thử ${course.previewChapterCount ?? 0} chương đầu miễn phí`
                   : 'Khóa học này không có chương học thử'}
               </span>
             </div>
