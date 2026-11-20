@@ -63,7 +63,7 @@ test('guest, student purchase, admin reconciliation and learning use isolated Ex
   const pendingUrl = new URL(page.url())
   const orderId = pendingUrl.pathname.split('/')[2]!
   await expect(page.getByText('BANK E2E · TEST ONLY')).toBeVisible()
-  await expect(page.getByText('Đang chờ chuyển khoản')).toBeVisible()
+  await expect(page.getByText('Chờ bạn hoàn tất thanh toán')).toBeVisible()
 
   const deniedLesson = page.waitForResponse(
     (response) =>
@@ -77,8 +77,12 @@ test('guest, student purchase, admin reconciliation and learning use isolated Ex
 
   await page.goto(`/orders/${orderId}/pending`)
   await page.getByRole('button', { name: 'Tôi đã chuyển khoản' }).click()
-  await expect(page.getByText('Đã báo chuyển khoản · chờ Admin đối soát')).toBeVisible()
-  await expect(page.getByText(/đơn vẫn PENDING/i).first()).toBeVisible()
+  await expect(page.getByText('Đang kiểm tra thanh toán')).toBeVisible()
+  await expect(
+    page.getByText(
+      'Chúng tôi đã nhận được xác nhận của bạn. Thời gian giữ đơn được tạm dừng trong lúc kiểm tra giao dịch.',
+    ),
+  ).toBeVisible()
 
   const adminPage = await browser.newPage()
   const adminOperations: string[] = []
