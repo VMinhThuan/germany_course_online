@@ -200,7 +200,7 @@ test('purchase pricing, coupon reservation, cancellation and Admin reconciliatio
   await expect(page).toHaveURL(/\/orders\/[^/]+\/pending$/)
   const paidOrderId = new URL(page.url()).pathname.split('/')[2]!
   await page.getByRole('button', { name: 'Tôi đã chuyển khoản' }).click()
-  await expect(page.getByText('Đã báo chuyển khoản · chờ Admin đối soát')).toBeVisible()
+  await expect(page.getByText('Đang kiểm tra thanh toán')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Hủy đơn' })).toHaveCount(0)
   const afterReportCancellation = await apiPost(
     request,
