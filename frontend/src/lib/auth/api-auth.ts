@@ -21,6 +21,8 @@ export interface AppSession {
   }
 }
 
+let restoreSessionFlight: Promise<AppSession | null> | null = null
+
 function toAppSession(user: ApiUserProfile): AppSession {
   return {
     id: user.id,
@@ -55,18 +57,25 @@ export const apiAuth = {
   },
 
   async restoreSession(): Promise<AppSession | null> {
-    const token = await restoreAccessToken()
-    if (!token) return null
-    try {
-      const profile = await apiRequest<ApiUserProfile>('/auth/me')
-      return toAppSession(profile)
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 401) {
-        clearAccessToken()
-        return null
-      }
-      throw error
+    if (!restoreSessionFlight) {
+      restoreSessionFlight = (async () => {
+        const token = await restoreAccessToken()
+        if (!token) return null
+        try {
+          const profile = await apiRequest<ApiUserProfile>('/auth/me')
+          return toAppSession(profile)
+        } catch (error) {
+          if (error instanceof ApiError && error.status === 401) {
+            clearAccessToken()
+            return null
+          }
+          throw error
+        }
+      })().finally(() => {
+        restoreSessionFlight = null
+      })
     }
+    return restoreSessionFlight
   },
 
   async register(input: { fullName: string; email: string; password: string }) {
