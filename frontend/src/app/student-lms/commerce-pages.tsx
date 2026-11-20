@@ -27,6 +27,7 @@ import {
 import type { CouponValidationViewModel } from '@/domains/commerce/models'
 import { AccessStatePanel, EnrollmentStatusCard } from '@/domains'
 import { DomainState } from '@/domains/shared/presentation'
+import { ApiError } from '@/lib/api/client'
 import { useDialogs } from '@/shared/ui/dialogs'
 import {
   Badge,
@@ -110,8 +111,18 @@ export function CheckoutPage() {
   const [acceptedCoupon, setAcceptedCoupon] = useState<string>()
   const [couponResult, setCouponResult] = useState<CouponValidationViewModel>()
   const quote = useProductCheckout(session?.id ?? '', context, planId, acceptedCoupon)
+  const orders = useProductOrders(session?.id ?? '')
   const validateCoupon = useValidateStudentCoupon(session?.id ?? '')
   const createOrder = useCreateOrder(session?.id ?? '')
+  const pendingOrder = orders.data?.items.find(
+    (item) =>
+      item.courseId === orderContext &&
+      item.order.orderType === orderType &&
+      item.order.status === 'PENDING',
+  )
+  const duplicatePendingOrder =
+    quote.error instanceof ApiError &&
+    ['PENDING_PURCHASE_EXISTS', 'PENDING_RENEWAL_EXISTS'].includes(quote.error.code)
 
   async function applyCoupon(event: FormEvent) {
     event.preventDefault()
@@ -170,7 +181,25 @@ export function CheckoutPage() {
       {quote.isPending ? (
         <ProductLoading title="Đang chuẩn bị thông tin đăng ký" />
       ) : quote.isError ? (
-        <ProductError onRetry={() => void quote.refetch()} />
+        duplicatePendingOrder ? (
+          <ErrorState
+            title="Bạn đã có đơn đang chờ thanh toán"
+            description="Khóa học này đã có một đơn đang chờ xử lý. Mở đơn hiện tại để tiếp tục thanh toán hoặc hủy đơn trước khi tạo đơn mới."
+            action={
+              pendingOrder ? (
+                <LinkButton to={`/orders/${pendingOrder.order.id}/pending`} variant="outline">
+                  Mở đơn đang chờ
+                </LinkButton>
+              ) : (
+                <LinkButton to="/student/orders" variant="outline">
+                  Xem đơn hàng
+                </LinkButton>
+              )
+            }
+          />
+        ) : (
+          <ProductError onRetry={() => void quote.refetch()} />
+        )
       ) : !quote.data ? (
         <ProductNotFound message="Không tìm thấy thông tin đăng ký cho khóa học này." />
       ) : (

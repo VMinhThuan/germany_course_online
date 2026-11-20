@@ -43,7 +43,7 @@ const environmentSchema = z.object({
   APP_ORIGINS: z.string().trim().min(1),
   LESSON_COMMENTS_ENABLED: enabledByDefault,
   COOKIE_SECURE: truthy.default(false),
-  COOKIE_SAME_SITE: z.enum(["lax", "strict", "none"]).default("lax"),
+  COOKIE_SAME_SITE: z.enum(["lax", "strict", "none"]).optional(),
   PASSWORD_RESET_URL: optionalText.pipe(z.string().url().optional()),
   SMTP_HOST: optionalText,
   SMTP_PORT: z.preprocess(
@@ -208,6 +208,8 @@ export function parseEnvironment(
   }
 
   const env = parsed.data;
+  const cookieSameSite =
+    env.COOKIE_SAME_SITE ?? (env.NODE_ENV === "production" ? "none" : "lax");
   const origins = env.APP_ORIGINS.split(",")
     .map((origin) => origin.trim())
     .filter(Boolean);
@@ -278,8 +280,7 @@ export function parseEnvironment(
   }
   if (
     env.NODE_ENV === "production" &&
-    (!env.COOKIE_SECURE ||
-      (env.COOKIE_SAME_SITE === "none" && !env.COOKIE_SECURE))
+    (!env.COOKIE_SECURE || (cookieSameSite === "none" && !env.COOKIE_SECURE))
   ) {
     throw new Error(
       "Invalid environment configuration: production refresh cookies must be Secure",
@@ -428,7 +429,7 @@ export function parseEnvironment(
     allowedOrigins: normalizedOrigins,
     lessonCommentsEnabled: env.LESSON_COMMENTS_ENABLED,
     cookieSecure: env.COOKIE_SECURE,
-    cookieSameSite: env.COOKIE_SAME_SITE,
+    cookieSameSite,
     passwordResetUrl: env.PASSWORD_RESET_URL,
     smtp: anySmtp
       ? {

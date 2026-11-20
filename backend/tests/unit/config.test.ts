@@ -94,8 +94,8 @@ describe("parseEnvironment", () => {
         APP_ORIGINS: "https://app.example.test",
         MONGODB_DB_NAME: "paniverse_lms_prod",
         COOKIE_SECURE: "true",
-      }).cookieSecure,
-    ).toBe(true);
+      }),
+    ).toMatchObject({ cookieSecure: true, cookieSameSite: "none" });
     expect(() =>
       parseEnvironment({
         ...baseEnv,
