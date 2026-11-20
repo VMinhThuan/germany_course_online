@@ -486,82 +486,88 @@ function PaymentInstructions({
           Hãy tạo đơn mới để nhận mã QR và mã chuyển khoản mới.
         </InlineAlert>
       )}
-      {instructions.qrUrl && !qrFailed && (
-        <img
-          key={`${instructions.qrUrl}-${qrRetry}`}
-          src={instructions.qrUrl}
-          alt="Mã QR VietQR cho đơn hàng"
-          className="mx-auto max-h-64 max-w-full rounded-control border border-border-subtle object-contain"
-          loading="lazy"
-          onError={() => setQrFailed(true)}
-        />
-      )}
-      {instructions.qrUrl && qrFailed && (
-        <InlineAlert tone="danger" title="Không tải được mã QR">
-          Bạn vẫn có thể chuyển khoản thủ công theo thông tin bên dưới.
-          <div className="mt-2">
-            <Button
-              variant="outline"
-              size="sm"
-              startIcon={<RefreshCw aria-hidden="true" className="size-4" />}
-              onClick={() => {
-                setQrFailed(false)
-                setQrRetry((value) => value + 1)
-              }}
+      <div className="grid gap-5 md:grid-cols-[minmax(16rem,0.8fr)_minmax(0,1.2fr)] md:items-start">
+        <div className="grid justify-items-center gap-3">
+          {instructions.qrUrl && !qrFailed && (
+            <img
+              key={`${instructions.qrUrl}-${qrRetry}`}
+              src={instructions.qrUrl}
+              alt="Mã QR VietQR cho đơn hàng"
+              className="max-h-72 w-full max-w-sm rounded-control border border-border-subtle object-contain"
+              loading="lazy"
+              onError={() => setQrFailed(true)}
+            />
+          )}
+          {instructions.qrUrl && qrFailed && (
+            <InlineAlert tone="danger" title="Không tải được mã QR">
+              Bạn vẫn có thể chuyển khoản thủ công theo thông tin bên dưới.
+              <div className="mt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  startIcon={<RefreshCw aria-hidden="true" className="size-4" />}
+                  onClick={() => {
+                    setQrFailed(false)
+                    setQrRetry((value) => value + 1)
+                  }}
+                >
+                  Thử tải lại QR
+                </Button>
+              </div>
+            </InlineAlert>
+          )}
+          {instructions.qrUrl && (
+            <a
+              href={instructions.qrUrl}
+              download={`vietqr-${order.order.orderCode}.png`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 text-sm font-semibold text-action-primary hover:underline"
             >
-              Thử tải lại QR
-            </Button>
-          </div>
-        </InlineAlert>
-      )}
-      <dl className="grid gap-2 text-sm">
-        <div className="flex justify-between gap-3">
-          <dt>Ngân hàng</dt>
-          <dd className="text-right font-semibold">{instructions.bankName}</dd>
+              <Download aria-hidden="true" className="size-4" /> Tải ảnh QR
+            </a>
+          )}
         </div>
-        <div className="flex justify-between gap-3">
-          <dt>Số tài khoản</dt>
-          <dd className="flex items-center justify-end gap-1 text-right font-semibold">
-            {instructions.accountNumber}
-            <CopyButton value={instructions.accountNumber} label="số tài khoản" />
-          </dd>
+        <div className="grid gap-4">
+          <dl className="grid gap-2 text-sm">
+            <div className="flex justify-between gap-3">
+              <dt>Ngân hàng</dt>
+              <dd className="text-right font-semibold">{instructions.bankName}</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt>Số tài khoản</dt>
+              <dd className="flex items-center justify-end gap-1 text-right font-semibold">
+                {instructions.accountNumber}
+                <CopyButton value={instructions.accountNumber} label="số tài khoản" />
+              </dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt>Chủ tài khoản</dt>
+              <dd className="text-right font-semibold">{instructions.accountHolderName}</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt>Số tiền</dt>
+              <dd className="flex items-center justify-end gap-1 text-right font-extrabold text-action-primary">
+                {formatVnd(order.totalAmountVnd)}
+                <CopyButton value={order.totalAmountVnd} label="số tiền" />
+              </dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt>Nội dung</dt>
+              <dd className="flex items-center justify-end gap-1 text-right font-mono font-bold">
+                {order.order.orderCode}
+                <CopyButton value={order.order.orderCode} label="mã đơn" />
+              </dd>
+            </div>
+          </dl>
+          <p className="whitespace-pre-line rounded-xl bg-surface-muted p-3 text-sm leading-6 text-ink-secondary">
+            {instructions.transferInstructions}
+          </p>
+          <p className="text-xs leading-5 text-ink-muted">
+            QR là ảnh tĩnh. Hãy kiểm tra số tiền và mã đơn ở trên trước khi chuyển khoản.
+          </p>
         </div>
-        <div className="flex justify-between gap-3">
-          <dt>Chủ tài khoản</dt>
-          <dd className="text-right font-semibold">{instructions.accountHolderName}</dd>
-        </div>
-        <div className="flex justify-between gap-3">
-          <dt>Số tiền</dt>
-          <dd className="flex items-center justify-end gap-1 text-right font-extrabold text-action-primary">
-            {formatVnd(order.totalAmountVnd)}
-            <CopyButton value={order.totalAmountVnd} label="số tiền" />
-          </dd>
-        </div>
-        <div className="flex justify-between gap-3">
-          <dt>Nội dung</dt>
-          <dd className="flex items-center justify-end gap-1 text-right font-mono font-bold">
-            {order.order.orderCode}
-            <CopyButton value={order.order.orderCode} label="mã đơn" />
-          </dd>
-        </div>
-      </dl>
-      <p className="whitespace-pre-line rounded-xl bg-surface-muted p-3 text-sm leading-6 text-ink-secondary">
-        {instructions.transferInstructions}
-      </p>
-      <p className="text-xs leading-5 text-ink-muted">
-        QR là ảnh tĩnh. Hãy kiểm tra số tiền và mã đơn ở trên trước khi chuyển khoản.
-      </p>
-      {instructions.qrUrl && (
-        <a
-          href={instructions.qrUrl}
-          download={`vietqr-${order.order.orderCode}.png`}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-2 text-sm font-semibold text-action-primary hover:underline"
-        >
-          <Download aria-hidden="true" className="size-4" /> Tải ảnh QR
-        </a>
-      )}
+      </div>
     </Card>
   )
 }
