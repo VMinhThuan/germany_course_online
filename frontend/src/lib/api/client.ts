@@ -1,9 +1,16 @@
 import { publishSessionRevoked } from '@/data/student-demo/session-events'
 
-export const API_BASE_URL = (import.meta.env['VITE_API_BASE_URL']?.trim() || '/api/v1').replace(
-  /\/$/,
-  '',
-)
+const configuredApiBaseUrl = import.meta.env['VITE_API_BASE_URL']?.trim()
+const productionApiBaseUrl = 'https://paniversedeutsch-backend.vercel.app/api/v1'
+const apiBaseUrl =
+  import.meta.env.PROD && (!configuredApiBaseUrl || configuredApiBaseUrl.startsWith('/'))
+    ? productionApiBaseUrl
+    : configuredApiBaseUrl || '/api/v1'
+
+// Production auth uses a host-only HttpOnly refresh cookie. Calling the API
+// origin directly keeps that cookie scoped to the host that owns it; local and
+// test builds continue to use the same-origin proxy.
+export const API_BASE_URL = apiBaseUrl.replace(/\/$/, '')
 
 export interface ApiErrorDetail {
   path?: string[]
