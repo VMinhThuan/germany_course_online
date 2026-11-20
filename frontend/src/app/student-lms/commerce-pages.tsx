@@ -582,7 +582,7 @@ export function OrderPendingPage() {
                 PENDING cho đến khi được duyệt.
               </p>
               <div
-                className={`grid gap-3 ${canCancelOrder ? 'sm:grid-cols-[minmax(0,1fr)_minmax(11rem,0.45fr)]' : ''}`}
+                className={`grid gap-3 ${canCancelOrder ? 'sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center' : ''}`}
               >
                 <Button
                   className="w-full"
@@ -606,7 +606,7 @@ export function OrderPendingPage() {
                 </Button>
                 {canCancelOrder && (
                   <Button
-                    className="w-full"
+                    className="w-full sm:min-w-48 sm:w-auto"
                     variant="outline"
                     disabled={cancelOrder.isPending}
                     loading={cancelOrder.isPending}
