@@ -152,7 +152,7 @@ test('purchase pricing, coupon reservation, cancellation and Admin reconciliatio
   await page.getByRole('button', { name: 'Tiếp tục thanh toán' }).click()
   await expect(page).toHaveURL(/\/orders\/[^/]+\/pending$/)
   const firstOrderId = new URL(page.url()).pathname.split('/')[2]!
-  await expect(page.getByText('Đang chờ chuyển khoản')).toBeVisible()
+  await expect(page.getByText('Chờ bạn hoàn tất thanh toán')).toBeVisible()
 
   const pendingPurchaseQuote = await checkout(page, `/checkout/${ids.courseB}`)
   expect(pendingPurchaseQuote).toMatchObject({
@@ -368,7 +368,7 @@ test('renewal supports active and expired enrollments, reuses the existing recor
   await page.getByRole('button', { name: 'Tiếp tục gia hạn' }).click()
   await expect(page).toHaveURL(/\/orders\/[^/]+\/pending$/)
   const orderId = new URL(page.url()).pathname.split('/')[2]!
-  await expect(page.getByText('Đang chờ chuyển khoản')).toBeVisible()
+  await expect(page.getByText('Chờ bạn hoàn tất thanh toán')).toBeVisible()
   await page.getByRole('button', { name: 'Tôi đã chuyển khoản' }).click()
 
   const admin = await adminPage(browser)
