@@ -193,7 +193,7 @@ export function CheckoutPage() {
               <div className="grid gap-4 p-5 sm:p-6">
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded-xl bg-surface-muted px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-ink-secondary">
                       Thời hạn truy cập
                     </p>
                     <p className="mt-1 font-semibold text-ink-primary">
@@ -202,7 +202,7 @@ export function CheckoutPage() {
                   </div>
                   {quote.data.plan && (
                     <div className="rounded-xl bg-surface-muted px-4 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-ink-secondary">
                         Gói đã chọn
                       </p>
                       <p className="mt-1 font-semibold text-ink-primary">{quote.data.plan.title}</p>
