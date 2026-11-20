@@ -20,7 +20,7 @@ import type {
   ApiPage,
 } from '@/lib/api/types'
 import { BaseDialog } from '@/shared/ui/dialogs'
-import { Button, EmptyState } from '@/shared/ui'
+import { Button, Checkbox, EmptyState } from '@/shared/ui'
 import { useDialogs } from '@/shared/ui/dialogs'
 import { useNotifications } from '@/shared/ui/notifications'
 import { parseYouTubeVideoId, YouTubeLessonPlayer } from '@/domains/learning/youtube-lesson-player'
@@ -128,6 +128,17 @@ type ExerciseManagementRow = {
   lesson: ApiAdminLesson
   section: ApiAdminSection
   course: ApiAdminCourse
+}
+
+type PreviewTree = Array<{
+  section: ApiAdminSection
+  lessons: Array<{ lesson: ApiAdminLesson; exercises: ApiAdminExercise[] }>
+}>
+
+type PreviewConfigState = {
+  sections: Record<string, boolean>
+  lessons: Record<string, boolean>
+  exercises: Record<string, boolean>
 }
 
 function useAllSections(courses: ApiAdminCourse[] | undefined) {
@@ -1975,6 +1986,130 @@ export function AdminLessonDetailPage({
   )
 }
 
+function PreviewConfigCard({
+  tree,
+  config,
+  loading,
+  saving,
+  error,
+  success,
+  onToggleSection,
+  onToggleLesson,
+  onToggleExercise,
+  onSave,
+}: {
+  tree: PreviewTree | undefined
+  config: PreviewConfigState
+  loading: boolean
+  saving: boolean
+  error: unknown
+  success: string
+  onToggleSection: (id: string, checked: boolean) => void
+  onToggleLesson: (id: string, checked: boolean) => void
+  onToggleExercise: (id: string, checked: boolean) => void
+  onSave: (event: FormEvent) => void
+}) {
+  const chapters = tree?.filter(({ section }) => section.sectionType === 'CHAPTER') ?? []
+  return (
+    <AdminCard
+      title="Cấu hình học thử"
+      description="Chọn chương, bài giảng và bài tập được mở miễn phí trong phần xem trước khóa học. Học viên đã đăng ký vẫn học đầy đủ nội dung."
+    >
+      {loading ? (
+        <AdminLoading />
+      ) : chapters.length === 0 ? (
+        <p className="rounded-xl bg-surface-muted p-4 text-sm text-ink-secondary">
+          Khóa học chưa có chương để cấu hình học thử.
+        </p>
+      ) : (
+        <form className="grid gap-3" onSubmit={onSave}>
+          <div className="grid gap-3">
+            {chapters.map(({ section, lessons }) => {
+              const sectionEnabled = config.sections[section.id] === true
+              return (
+                <div key={section.id} className="rounded-2xl border border-border-subtle p-4">
+                  <Checkbox
+                    id={`preview-section-${section.id}`}
+                    checked={sectionEnabled}
+                    onCheckedChange={(checked) => onToggleSection(section.id, checked)}
+                    label={
+                      <span>
+                        <span className="block font-semibold">{section.title}</span>
+                        <span className="block text-xs font-normal text-ink-secondary">
+                          {lessons.length} bài học
+                        </span>
+                      </span>
+                    }
+                    description={
+                      sectionEnabled
+                        ? 'Chương đang được mở trong học thử.'
+                        : 'Bật để cho phép học viên xem chương này miễn phí.'
+                    }
+                  />
+
+                  {sectionEnabled && (
+                    <div className="mt-4 grid gap-2 border-l-2 border-brand-pink pl-4">
+                      {lessons.map(({ lesson, exercises }) => {
+                        const lessonEnabled = config.lessons[lesson.id] === true
+                        return (
+                          <div key={lesson.id} className="rounded-xl bg-surface-muted p-3">
+                            <Checkbox
+                              id={`preview-lesson-${lesson.id}`}
+                              checked={lessonEnabled}
+                              onCheckedChange={(checked) => onToggleLesson(lesson.id, checked)}
+                              label={
+                                <span>
+                                  <span className="block font-semibold">{lesson.title}</span>
+                                  <span className="block text-xs font-normal text-ink-secondary">
+                                    {lesson.lessonType === 'LECTURE'
+                                      ? 'Bài giảng'
+                                      : 'Bài thực hành'}
+                                  </span>
+                                </span>
+                              }
+                              description={
+                                lessonEnabled
+                                  ? 'Bài học được mở trong học thử.'
+                                  : 'Bài học đang bị ẩn trong học thử.'
+                              }
+                            />
+                            {lessonEnabled && exercises.length > 0 && (
+                              <div className="mt-3 grid gap-2 border-l border-border-strong pl-4">
+                                {exercises.map(({ id, title }) => (
+                                  <Checkbox
+                                    key={id}
+                                    id={`preview-exercise-${id}`}
+                                    checked={config.exercises[id] === true}
+                                    onCheckedChange={(checked) => onToggleExercise(id, checked)}
+                                    label={title}
+                                    description={
+                                      config.exercises[id] === true
+                                        ? 'Bài tập hiển thị trong học thử.'
+                                        : 'Bài tập đang bị ẩn trong học thử.'
+                                    }
+                                  />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          <AdminFeedback error={error} success={success} />
+          <Button type="submit" loading={saving}>
+            Lưu cấu hình học thử
+          </Button>
+        </form>
+      )}
+    </AdminCard>
+  )
+}
+
 export function AdminCourseEditorPage({ courseId }: { courseId: string }) {
   const dialogs = useDialogs()
   const notifications = useNotifications()
@@ -1991,13 +2126,43 @@ export function AdminCourseEditorPage({ courseId }: { courseId: string }) {
     enabled: Boolean(courseId),
     retry: false,
   })
+  const previewTree = useQuery<PreviewTree>({
+    queryKey: ['admin', 'course-preview-tree', courseId, sections.data?.map((item) => item.id)],
+    queryFn: async () =>
+      mapConcurrent(sections.data ?? [], 4, async (section) => ({
+        section,
+        lessons: await (async () => {
+          const lessons = await loadAllPages((page) =>
+            adminRepository.listLessons(section.id, { page, pageSize: 100 }),
+          )
+          return mapConcurrent(lessons, 4, async (lesson) => ({
+            lesson,
+            exercises: await loadAllPages((page) =>
+              adminRepository.listExercises(lesson.id, { page, pageSize: 100 }),
+            ),
+          }))
+        })(),
+      })),
+    enabled: Boolean(sections.data),
+    retry: false,
+  })
   const update = useAdminMutation((input: Record<string, unknown>) =>
     adminRepository.updateCourse(courseId, input),
+  )
+  const updatePreview = useAdminMutation(
+    (input: { chapterIds: string[]; lessonIds: string[]; exerciseIds: string[] }) =>
+      adminRepository.updatePreviewConfig(courseId, input),
   )
   const publish = useAdminMutation(() => adminRepository.publishCourse(courseId))
   const remove = useAdminMutation(() => adminRepository.deleteCourse(courseId))
   const [form, setForm] = useState<Partial<ApiAdminCourse>>({})
   const [success, setSuccess] = useState('')
+  const [previewSuccess, setPreviewSuccess] = useState('')
+  const [previewConfig, setPreviewConfig] = useState<PreviewConfigState>({
+    sections: {},
+    lessons: {},
+    exercises: {},
+  })
   const [bannerFile, setBannerFile] = useState<File | null>(null)
   const [bannerProgress, setBannerProgress] = useState<number | null>(null)
 
@@ -2007,6 +2172,43 @@ export function AdminCourseEditorPage({ courseId }: { courseId: string }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setForm(course.data)
   }, [course.data])
+
+  useEffect(() => {
+    if (!previewTree.data || !course.data) return
+    const chapters = previewTree.data.filter(({ section }) => section.sectionType === 'CHAPTER')
+    const hasExplicitSelection = chapters.some(
+      ({ section }) => typeof section.previewEnabled === 'boolean',
+    )
+    const fallbackIds = new Set(
+      chapters
+        .slice()
+        .sort((left, right) => left.section.sortOrder - right.section.sortOrder)
+        .slice(0, course.data.previewChapterCount)
+        .map(({ section }) => section.id),
+    )
+    // The preview controls are a local draft initialized from server-owned data.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPreviewConfig({
+      sections: Object.fromEntries(
+        chapters.map(({ section }) => [
+          section.id,
+          hasExplicitSelection ? section.previewEnabled === true : fallbackIds.has(section.id),
+        ]),
+      ),
+      lessons: Object.fromEntries(
+        previewTree.data.flatMap(({ lessons }) =>
+          lessons.map(({ lesson }) => [lesson.id, lesson.previewEnabled !== false]),
+        ),
+      ),
+      exercises: Object.fromEntries(
+        previewTree.data.flatMap(({ lessons }) =>
+          lessons.flatMap(({ exercises }) =>
+            exercises.map((exercise) => [exercise.id, exercise.previewEnabled !== false]),
+          ),
+        ),
+      ),
+    })
+  }, [course.data, previewTree.data])
 
   if (course.isPending) return <AdminLoading />
   if (course.isError || !course.data)
@@ -2023,20 +2225,6 @@ export function AdminCourseEditorPage({ courseId }: { courseId: string }) {
     setSuccess('')
     let uploadedBannerAssetId: string | undefined
     try {
-      const previewCount = Number(form.previewChapterCount ?? 0)
-      const activeChapterCount = (sections.data ?? []).filter(
-        (section) => section.sectionType === 'CHAPTER' && section.status !== 'HIDDEN',
-      ).length
-      if (!Number.isInteger(previewCount) || previewCount < 0) {
-        notifications.error('Số chương học thử phải là số nguyên không âm.')
-        return
-      }
-      if (previewCount > activeChapterCount) {
-        notifications.error(
-          `Số chương học thử không được vượt quá ${activeChapterCount} chương CHAPTER còn hiệu lực.`,
-        )
-        return
-      }
       if (bannerFile)
         uploadedBannerAssetId = await uploadCourseBanner(bannerFile, setBannerProgress)
       await update.mutateAsync({
@@ -2049,7 +2237,6 @@ export function AdminCourseEditorPage({ courseId }: { courseId: string }) {
         level: form.level,
         price: form.price,
         accessDurationMonths: form.accessDurationMonths,
-        previewChapterCount: previewCount,
         sortOrder: form.sortOrder,
         bannerAssetId: uploadedBannerAssetId ?? form.bannerAssetId ?? null,
       })
@@ -2064,6 +2251,58 @@ export function AdminCourseEditorPage({ courseId }: { courseId: string }) {
     } finally {
       setBannerProgress(null)
     }
+  }
+
+  async function savePreviewConfig(event: FormEvent) {
+    event.preventDefault()
+    setPreviewSuccess('')
+    const selectedChapterIds = Object.entries(previewConfig.sections)
+      .filter(([, enabled]) => enabled)
+      .map(([id]) => id)
+    const selectedLessonIds = (previewTree.data ?? [])
+      .filter(({ section }) => selectedChapterIds.includes(section.id))
+      .flatMap(({ lessons }) =>
+        lessons.filter(({ lesson }) => previewConfig.lessons[lesson.id] === true),
+      )
+      .map(({ lesson }) => lesson.id)
+    const selectedLessonIdSet = new Set(selectedLessonIds)
+    const selectedExerciseIds = (previewTree.data ?? [])
+      .flatMap(({ lessons }) => lessons)
+      .filter(({ lesson }) => selectedLessonIdSet.has(lesson.id))
+      .flatMap(({ exercises }) => exercises)
+      .filter(({ id }) => previewConfig.exercises[id] === true)
+      .map(({ id }) => id)
+    try {
+      await updatePreview.mutateAsync({
+        chapterIds: selectedChapterIds,
+        lessonIds: selectedLessonIds,
+        exerciseIds: selectedExerciseIds,
+      })
+      setPreviewSuccess('Đã lưu cấu hình học thử.')
+    } catch {
+      /* Error is shown below the configuration form. */
+    }
+  }
+
+  function togglePreviewSection(id: string, checked: boolean) {
+    setPreviewConfig((old) => ({
+      ...old,
+      sections: { ...old.sections, [id]: checked },
+    }))
+  }
+
+  function togglePreviewLesson(id: string, checked: boolean) {
+    setPreviewConfig((old) => ({
+      ...old,
+      lessons: { ...old.lessons, [id]: checked },
+    }))
+  }
+
+  function togglePreviewExercise(id: string, checked: boolean) {
+    setPreviewConfig((old) => ({
+      ...old,
+      exercises: { ...old.exercises, [id]: checked },
+    }))
   }
 
   function confirmDelete() {
@@ -2159,28 +2398,7 @@ export function AdminCourseEditorPage({ courseId }: { courseId: string }) {
               max={120}
               required
             />
-            <AdminField
-              label="Số chương học thử miễn phí"
-              value={String(form.previewChapterCount ?? 0)}
-              onChange={(value) =>
-                setForm((old) => ({ ...old, previewChapterCount: Number(value) }))
-              }
-              type="number"
-              min={0}
-              {...(sections.data
-                ? {
-                    max: sections.data.filter(
-                      (section) => section.sectionType === 'CHAPTER' && section.status !== 'HIDDEN',
-                    ).length,
-                  }
-                : {})}
-              step={1}
-              required
-            />
           </div>
-          <p className="-mt-1 text-xs leading-5 text-ink-secondary">
-            Số chương đầu tiên mà học viên có thể trải nghiệm miễn phí trước khi đăng ký khóa học.
-          </p>
           <AdminField
             label="Mô tả ngắn"
             value={form.shortDescription ?? ''}
@@ -2246,6 +2464,19 @@ export function AdminCourseEditorPage({ courseId }: { courseId: string }) {
           </Button>
         </form>
       </AdminCard>
+
+      <PreviewConfigCard
+        tree={previewTree.data}
+        config={previewConfig}
+        loading={previewTree.isPending}
+        saving={updatePreview.isPending}
+        error={updatePreview.error}
+        success={previewSuccess}
+        onToggleSection={togglePreviewSection}
+        onToggleLesson={togglePreviewLesson}
+        onToggleExercise={togglePreviewExercise}
+        onSave={(event) => void savePreviewConfig(event)}
+      />
 
       <AdminCard title="Hiển thị với học viên">
         <p className="text-sm leading-6 text-ink-secondary">

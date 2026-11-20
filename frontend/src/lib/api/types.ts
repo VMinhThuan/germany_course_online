@@ -432,6 +432,7 @@ export interface ApiAdminSection {
   sectionType: 'CHAPTER' | 'EXAM_PREP'
   sortOrder: number
   status: 'DRAFT' | 'PUBLISHED' | 'HIDDEN'
+  previewEnabled?: boolean | null
   createdAt: string
   updatedAt: string
   deletedAt: string | null
@@ -450,6 +451,7 @@ export interface ApiAdminLesson {
   countsTowardProgress: boolean
   sortOrder: number
   status: 'DRAFT' | 'PUBLISHED' | 'HIDDEN'
+  previewEnabled?: boolean
   createdAt: string
   updatedAt: string
   deletedAt: string | null
@@ -464,6 +466,7 @@ export interface ApiAdminExercise {
   exerciseType: 'FILE_BASED' | 'QUIZ'
   completionMode: 'MANUAL' | 'QUIZ_SUBMISSION'
   isRequired: boolean
+  previewEnabled?: boolean
   sortOrder: number
   status: 'DRAFT' | 'PUBLISHED' | 'HIDDEN'
   createdAt: string

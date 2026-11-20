@@ -403,7 +403,7 @@ export function AdminCoursesPage() {
               required
             />
             <AdminField
-              label="Số chương học thử miễn phí"
+              label="Số chương học thử mặc định"
               value={previewChapterCount}
               onChange={setPreviewChapterCount}
               type="number"
@@ -413,8 +413,8 @@ export function AdminCoursesPage() {
             />
           </div>
           <p className="-mt-1 text-xs leading-5 text-ink-secondary">
-            Số chương đầu tiên mà học viên có thể trải nghiệm miễn phí trước khi đăng ký khóa học.
-            Khóa học mới chưa có chương nên bắt đầu với 0.
+            Đây là cấu hình mặc định khi tạo khóa học. Bạn có thể chọn chính xác chương, bài giảng
+            và bài tập ở trang chỉnh sửa khóa học. Khóa học mới chưa có chương nên bắt đầu với 0.
           </p>
           <AdminField
             label="Mô tả ngắn"

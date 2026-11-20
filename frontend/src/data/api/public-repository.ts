@@ -108,7 +108,7 @@ export const apiPublicRepository: PublicCourseRepository & {
     return {
       courseSlug: slug,
       sectionIds,
-      notice: `${sectionIds.length} chương đầu được mở miễn phí. Các chương còn lại cần đăng ký khóa học.`,
+      notice: `${sectionIds.length} chương được chọn để học thử miễn phí. Các nội dung còn lại cần đăng ký khóa học.`,
     }
   },
   async getPreviewLesson(slug, sectionId, lessonId) {

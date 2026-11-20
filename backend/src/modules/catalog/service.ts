@@ -38,6 +38,7 @@ type PublicLesson = {
   lessonType: "LECTURE" | "PRACTICE";
   estimatedMinutes: number | null;
   sortOrder: number;
+  previewEnabled: boolean;
 };
 
 type PublicSection = {
@@ -205,7 +206,7 @@ export class PublicCatalogService {
       status: "PUBLISHED",
       deletedAt: null,
     })
-      .select("_id title description sectionType sortOrder")
+      .select("_id title description sectionType sortOrder previewEnabled")
       .sort({ sortOrder: 1, _id: 1 })
       .lean();
     const previewSectionIds = new Set(
@@ -219,7 +220,7 @@ export class PublicCatalogService {
           deletedAt: null,
         })
           .select(
-            "_id sectionId title description lessonType estimatedMinutes sortOrder",
+            "_id sectionId title description lessonType estimatedMinutes sortOrder previewEnabled",
           )
           .sort({ sortOrder: 1, _id: 1 })
           .lean()
@@ -235,12 +236,15 @@ export class PublicCatalogService {
         lessonType: lesson.lessonType as PublicLesson["lessonType"],
         estimatedMinutes: lesson.estimatedMinutes ?? null,
         sortOrder: lesson.sortOrder,
+        previewEnabled: lesson.previewEnabled !== false,
       });
       lessonsBySection.set(key, list);
     }
 
     const publicSections: PublicSection[] = sections.map((section) => {
-      const sectionLessons = lessonsBySection.get(String(section._id)) ?? [];
+      const sectionLessons = (
+        lessonsBySection.get(String(section._id)) ?? []
+      ).filter((lesson) => lesson.previewEnabled !== false);
       return {
         id: String(section._id),
         title: section.title,
@@ -297,7 +301,7 @@ export class PublicCatalogService {
       status: "PUBLISHED",
       deletedAt: null,
     })
-      .select("_id sectionType sortOrder")
+      .select("_id sectionType sortOrder previewEnabled")
       .sort({ sortOrder: 1, _id: 1 })
       .lean();
     const previewSectionIds = new Set(
@@ -319,6 +323,7 @@ export class PublicCatalogService {
       _id: new mongoose.Types.ObjectId(lessonId),
       sectionId: section._id,
       status: "PUBLISHED",
+      previewEnabled: { $ne: false },
       deletedAt: null,
     })
       .select("_id sectionId title content video lessonType estimatedMinutes")
@@ -328,6 +333,7 @@ export class PublicCatalogService {
     const exercises = await Exercise.find({
       lessonId: lesson._id,
       status: "PUBLISHED",
+      previewEnabled: { $ne: false },
       deletedAt: null,
     })
       .select(

@@ -2,6 +2,7 @@ export type PreviewSectionRecord = {
   _id: unknown;
   sectionType?: string;
   sortOrder?: number;
+  previewEnabled?: boolean | null;
 };
 
 /**
@@ -16,8 +17,16 @@ export function getPreviewSectionIds(
   if (!Number.isInteger(previewChapterCount) || previewChapterCount <= 0)
     return [];
 
-  return sections
-    .filter((section) => section.sectionType === "CHAPTER")
+  const hasExplicitSelection = sections.some(
+    (section) => typeof section.previewEnabled === "boolean",
+  );
+  const chapters = sections.filter(
+    (section) =>
+      section.sectionType === "CHAPTER" &&
+      (!hasExplicitSelection || section.previewEnabled === true),
+  );
+
+  return chapters
     .slice()
     .sort((left, right) => {
       const sortDifference = (left.sortOrder ?? 0) - (right.sortOrder ?? 0);

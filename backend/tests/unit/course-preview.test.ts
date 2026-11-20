@@ -6,6 +6,7 @@ import {
 import {
   coursePatchSchema,
   createCourseSchema,
+  previewConfigSchema,
 } from "../../src/modules/admin/schemas.js";
 
 describe("course preview chapter configuration", () => {
@@ -29,6 +30,18 @@ describe("course preview chapter configuration", () => {
     expect(getPreviewSectionIds(sections, 0)).toEqual([]);
     expect(getPreviewSectionIds(sections, -1)).toEqual([]);
     expect(getPreviewSectionIds(sections, 1.5)).toEqual([]);
+  });
+
+  it("uses explicit chapter selection when the Admin has saved one", () => {
+    expect(
+      getPreviewSectionIds(
+        sections.map((section) => ({
+          ...section,
+          previewEnabled: section._id === "late",
+        })),
+        1,
+      ),
+    ).toEqual(["late"]);
   });
 
   it("normalizes only non-negative integers", () => {
@@ -61,5 +74,12 @@ describe("course preview chapter configuration", () => {
     expect(
       coursePatchSchema.safeParse({ previewChapterCount: 1.5 }).success,
     ).toBe(false);
+    expect(
+      previewConfigSchema.safeParse({
+        chapterIds: ["507f1f77bcf86cd799439011"],
+        lessonIds: [],
+        exerciseIds: [],
+      }).success,
+    ).toBe(true);
   });
 });

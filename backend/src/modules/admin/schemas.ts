@@ -83,6 +83,12 @@ export const coursePatchSchema = z
   })
   .refine((value) => Object.keys(value).length > 0);
 
+export const previewConfigSchema = z.strictObject({
+  chapterIds: z.array(objectId).max(10_000),
+  lessonIds: z.array(objectId).max(50_000),
+  exerciseIds: z.array(objectId).max(100_000),
+});
+
 export const courseIdParamsSchema = z.strictObject({ courseId: objectId });
 export const sectionIdParamsSchema = z.strictObject({ sectionId: objectId });
 export const lessonIdParamsSchema = z.strictObject({ lessonId: objectId });
@@ -123,6 +129,7 @@ export const sectionPatchSchema = z
     sectionType: z.enum(["CHAPTER", "EXAM_PREP"]).optional(),
     sortOrder: z.number().int().min(0).max(1_000_000).optional(),
     status: contentStatus.optional(),
+    previewEnabled: z.boolean().nullable().optional(),
   })
   .refine((value) => Object.keys(value).length > 0);
 
@@ -173,6 +180,7 @@ export const lessonPatchSchema = z
     countsTowardProgress: z.boolean().optional(),
     sortOrder: z.number().int().min(0).max(1_000_000).optional(),
     status: contentStatus.optional(),
+    previewEnabled: z.boolean().optional(),
   })
   .refine((value) => Object.keys(value).length > 0)
   .superRefine((value, ctx) => {
@@ -229,6 +237,7 @@ export const exercisePatchSchema = z
     isRequired: exerciseFields.isRequired.optional(),
     sortOrder: exerciseFields.sortOrder.optional(),
     status: exerciseFields.status.optional(),
+    previewEnabled: z.boolean().optional(),
   })
   .refine((value) => Object.keys(value).length > 0)
   .superRefine(validateExercise);

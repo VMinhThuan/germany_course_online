@@ -74,6 +74,15 @@ export const adminRepository = {
       body: input,
     })
   },
+  updatePreviewConfig(
+    courseId: string,
+    input: { chapterIds: string[]; lessonIds: string[]; exerciseIds: string[] },
+  ) {
+    return apiRequest<ApiAdminCourse>(`/admin/courses/${pathId(courseId)}/preview-config`, {
+      method: 'PATCH',
+      body: input,
+    })
+  },
   publishCourse(courseId: string) {
     return apiRequest<ApiAdminCourse>(`/admin/courses/${pathId(courseId)}/publish`, {
       method: 'POST',

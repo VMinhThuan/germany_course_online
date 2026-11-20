@@ -316,12 +316,12 @@ export function ApiCourseDetailPage() {
                 </Button>
                 {previewAvailable && (
                   <LinkButton to={previewHref} variant="outline" className="w-full">
-                    Học thử chương 1 miễn phí <ArrowRight aria-hidden="true" />
+                    Học thử miễn phí <ArrowRight aria-hidden="true" />
                   </LinkButton>
                 )}
                 <p className="text-xs leading-5 text-ink-muted">
                   {previewAvailable
-                    ? 'Trải nghiệm chương đầu miễn phí trước khi quyết định đăng ký.'
+                    ? 'Trải nghiệm nội dung được chọn miễn phí trước khi quyết định đăng ký.'
                     : session
                       ? 'Bài học sẽ mở sau khi đăng ký được xác nhận.'
                       : 'Đăng nhập hoặc tạo tài khoản để đăng ký khóa học.'}
@@ -383,7 +383,7 @@ export function ApiCourseDetailPage() {
             </h2>
             <p className="text-sm leading-6 text-ink-secondary">
               {previewAvailable
-                ? 'Xem trước chương 1 miễn phí, sau đó đăng ký để mở toàn bộ lộ trình.'
+                ? 'Xem trước nội dung được chọn miễn phí, sau đó đăng ký để mở toàn bộ lộ trình.'
                 : 'Các chương và bài học được sắp xếp theo từng bước để bạn dễ theo dõi.'}
             </p>
           </div>
@@ -433,7 +433,7 @@ export function ApiCourseDetailPage() {
               <LockKeyhole aria-hidden="true" className="size-5 text-action-primary" />
               <span>
                 {(course.previewChapterCount ?? 0) > 0
-                  ? `Học thử ${course.previewChapterCount ?? 0} chương đầu miễn phí`
+                  ? `Học thử ${course.previewChapterCount ?? 0} chương miễn phí`
                   : 'Khóa học này không có chương học thử'}
               </span>
             </div>
@@ -528,7 +528,7 @@ export function ApiCoursePreviewPage() {
               </h1>
               <p className="leading-7 text-ink-secondary">
                 {previewCount > 0
-                  ? `${previewCount} chương đầu được mở miễn phí. Chương đang chọn chưa được cấu hình để học thử.`
+                  ? `${previewCount} chương được chọn để học thử miễn phí. Chương đang chọn chưa được cấu hình để học thử.`
                   : 'Khóa học này chưa được cấu hình chương học thử. Hãy đăng ký để mở toàn bộ nội dung.'}
               </p>
               <Link

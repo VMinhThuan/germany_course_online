@@ -28,6 +28,7 @@ const courseSectionSchema = new Schema(
       enum: ["DRAFT", "PUBLISHED", "HIDDEN"],
       required: true,
     },
+    previewEnabled: { type: Boolean, default: null },
     deletedAt: { type: Date, default: null },
   },
   { collection: "course_sections", timestamps: true, strict: "throw" },

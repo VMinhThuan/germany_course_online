@@ -42,6 +42,7 @@ import {
   mediaListQuerySchema,
   lessonAssetParamsSchema,
   exerciseAssetParamsSchema,
+  previewConfigSchema,
   quizWriteSchema,
   renewalPlanCreateSchema,
   renewalPlanIdParamsSchema,
@@ -89,6 +90,20 @@ export function createAdminRouter(
     validateRequest({ params: courseIdParamsSchema, body: coursePatchSchema }),
     endpoint((req, res) =>
       admin.updateCourse(
+        param(res, "courseId"),
+        value(res, "body"),
+        actor(req),
+      ),
+    ),
+  );
+  router.patch(
+    "/admin/courses/:courseId/preview-config",
+    validateRequest({
+      params: courseIdParamsSchema,
+      body: previewConfigSchema,
+    }),
+    endpoint((req, res) =>
+      admin.updatePreviewConfig(
         param(res, "courseId"),
         value(res, "body"),
         actor(req),

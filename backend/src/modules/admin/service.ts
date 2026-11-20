@@ -62,6 +62,7 @@ import type {
   exerciseListQuerySchema,
   lessonListQuerySchema,
   mediaListQuerySchema,
+  previewConfigSchema,
   quizWriteSchema,
   renewalPlanCreateSchema,
   renewalPlanListQuerySchema,
@@ -99,6 +100,7 @@ type SectionQuery = typeof sectionListQuerySchema._output;
 type LessonQuery = typeof lessonListQuerySchema._output;
 type ExerciseQuery = typeof exerciseListQuerySchema._output;
 type MediaQuery = typeof mediaListQuerySchema._output;
+type PreviewConfig = typeof previewConfigSchema._output;
 type StudentQuery = typeof studentListQuerySchema._output;
 type EnrollmentQuery = typeof enrollmentListQuerySchema._output;
 type RenewalPlanQuery = typeof renewalPlanListQuerySchema._output;
@@ -264,6 +266,123 @@ export class AdminService {
       mapDuplicate(error, "Course code or slug already exists.");
       throw error;
     }
+  }
+
+  async updatePreviewConfig(
+    courseId: string,
+    input: PreviewConfig,
+    actor: Actor,
+  ) {
+    const courseObjectId = objectId(courseId);
+    const uniqueIds = (values: string[]) =>
+      [...new Set(values.map((value) => objectId(value).toString()))].map(
+        (value) => new Types.ObjectId(value),
+      );
+
+    return withTransaction(async (session) => {
+      const course = await Course.findOne({
+        _id: courseObjectId,
+        deletedAt: null,
+      }).session(session);
+      if (!course) throw notFound("Course not found.");
+
+      const sections = await CourseSection.find({
+        courseId: courseObjectId,
+        deletedAt: null,
+      })
+        .select("_id sectionType")
+        .session(session)
+        .lean();
+      const chapterIds = uniqueIds(input.chapterIds);
+      const selectedChapters = sections.filter(
+        (section) =>
+          section.sectionType === "CHAPTER" &&
+          chapterIds.some((id) => id.equals(section._id)),
+      );
+      if (selectedChapters.length !== chapterIds.length)
+        throw notFound("Một hoặc nhiều chương học không thuộc khóa học này.");
+
+      const sectionIds = sections.map((section) => section._id);
+      const lessons = await Lesson.find({
+        sectionId: { $in: sectionIds },
+        deletedAt: null,
+      })
+        .select("_id sectionId")
+        .session(session)
+        .lean();
+      const lessonIds = uniqueIds(input.lessonIds);
+      if (
+        lessonIds.some((id) => !lessons.some((lesson) => id.equals(lesson._id)))
+      )
+        throw notFound("Một hoặc nhiều bài học không thuộc khóa học này.");
+
+      const lessonObjectIds = lessons.map((lesson) => lesson._id);
+      const exercises = await Exercise.find({
+        lessonId: { $in: lessonObjectIds },
+        deletedAt: null,
+      })
+        .select("_id lessonId")
+        .session(session)
+        .lean();
+      const exerciseIds = uniqueIds(input.exerciseIds);
+      if (
+        exerciseIds.some(
+          (id) => !exercises.some((exercise) => id.equals(exercise._id)),
+        )
+      )
+        throw notFound("Một hoặc nhiều bài tập không thuộc khóa học này.");
+
+      await CourseSection.updateMany(
+        { courseId: courseObjectId, deletedAt: null, sectionType: "CHAPTER" },
+        { $set: { previewEnabled: false } },
+        { session },
+      );
+      if (chapterIds.length)
+        await CourseSection.updateMany(
+          { _id: { $in: chapterIds } },
+          { $set: { previewEnabled: true } },
+          { session },
+        );
+      await Lesson.updateMany(
+        { sectionId: { $in: sectionIds }, deletedAt: null },
+        { $set: { previewEnabled: false } },
+        { session },
+      );
+      if (lessonIds.length)
+        await Lesson.updateMany(
+          { _id: { $in: lessonIds } },
+          { $set: { previewEnabled: true } },
+          { session },
+        );
+      await Exercise.updateMany(
+        { lessonId: { $in: lessonObjectIds }, deletedAt: null },
+        { $set: { previewEnabled: false } },
+        { session },
+      );
+      if (exerciseIds.length)
+        await Exercise.updateMany(
+          { _id: { $in: exerciseIds } },
+          { $set: { previewEnabled: true } },
+          { session },
+        );
+
+      course.set("previewChapterCount", chapterIds.length);
+      await course.save({ session, validateModifiedOnly: true });
+      await audit(
+        actor,
+        "COURSE_PREVIEW_CONFIG_UPDATED",
+        "COURSE",
+        courseObjectId,
+        ["previewChapterCount", "previewEnabled"],
+        session,
+        {
+          chapterCount: chapterIds.length,
+          lessonCount: lessonIds.length,
+          exerciseCount: exerciseIds.length,
+        },
+      );
+      return courseDto(course.toObject() as unknown as Doc);
+    });
   }
 
   async deleteCourse(courseId: string, actor: Actor) {

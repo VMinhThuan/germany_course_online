@@ -40,7 +40,7 @@ describe('ApiCourseDetailPage', () => {
     expect(screen.getByRole('heading', { name: 'Sau khóa học, bạn có thể' })).toBeVisible()
     expect(screen.getByRole('heading', { name: 'Bạn cần chuẩn bị gì?' })).toBeVisible()
     expect(screen.getAllByRole('button', { name: 'Đăng ký khóa học' })).toHaveLength(1)
-    expect(screen.getByRole('link', { name: /Học thử chương 1 miễn phí/ })).toBeVisible()
+    expect(screen.getByRole('link', { name: /Học thử miễn phí/ })).toBeVisible()
     expect(screen.queryByText('enrollment')).not.toBeInTheDocument()
     expect(screen.queryByText(PUBLIC_DEMO_COURSE.level, { exact: true })).not.toBeInTheDocument()
   })

@@ -53,6 +53,7 @@ const lessonSchema = new Schema(
       enum: ["DRAFT", "PUBLISHED", "HIDDEN"],
       required: true,
     },
+    previewEnabled: { type: Boolean, default: true },
     deletedAt: { type: Date, default: null },
     mediaAssociationRevision: {
       type: Number,
