@@ -2237,6 +2237,7 @@ export function AdminCourseEditorPage({ courseId }: { courseId: string }) {
         level: form.level,
         price: form.price,
         accessDurationMonths: form.accessDurationMonths,
+        previewChapterCount: form.previewChapterCount,
         sortOrder: form.sortOrder,
         bannerAssetId: uploadedBannerAssetId ?? form.bannerAssetId ?? null,
       })
@@ -2396,6 +2397,17 @@ export function AdminCourseEditorPage({ courseId }: { courseId: string }) {
               type="number"
               min={1}
               max={120}
+              required
+            />
+            <AdminField
+              label="Số chương học thử miễn phí"
+              value={String(form.previewChapterCount ?? 0)}
+              onChange={(value) =>
+                setForm((old) => ({ ...old, previewChapterCount: Number(value) }))
+              }
+              type="number"
+              min={0}
+              step={1}
               required
             />
           </div>
