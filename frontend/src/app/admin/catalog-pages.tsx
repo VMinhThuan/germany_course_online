@@ -265,11 +265,11 @@ export function AdminCoursesPage() {
       label: 'Thao tác',
       className: 'text-right',
       render: (course) => (
-        <div className="flex justify-end gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <Link
             to={coursePath(course.id)}
             aria-label={`Sửa khóa học ${course.title}`}
-            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border-subtle px-3 text-sm font-semibold hover:bg-surface-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary"
+            className="inline-flex min-h-9 w-36 items-center justify-center gap-1.5 rounded-lg border border-border-subtle px-3 text-sm font-semibold hover:bg-surface-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary"
           >
             <Pencil aria-hidden="true" className="size-4" />
             Sửa
@@ -278,6 +278,7 @@ export function AdminCoursesPage() {
             type="button"
             size="sm"
             variant="outline"
+            className="w-36"
             loading={toggleStatus.isPending && toggleStatus.variables?.courseId === course.id}
             onClick={() => void changeVisibility(course)}
             startIcon={
@@ -298,6 +299,7 @@ export function AdminCoursesPage() {
             type="button"
             size="sm"
             variant="outline"
+            className="w-36"
             loading={remove.isPending && remove.variables === course.id}
             onClick={() => confirmDelete(course)}
             startIcon={<Trash2 aria-hidden="true" className="size-4" />}
