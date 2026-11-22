@@ -546,7 +546,7 @@ export class CommerceService {
               recipientType: "ADMIN",
               recipientEmail: null,
               templateType: "TRANSFER_SUBMITTED_ADMIN",
-              subject: `Bank transfer reported: ${order.orderCode}`,
+              subject: `[LMS] Cần đối soát giao dịch · ${order.orderCode}`,
               templateData: {
                 orderId: order._id.toString(),
                 orderCode: order.orderCode,

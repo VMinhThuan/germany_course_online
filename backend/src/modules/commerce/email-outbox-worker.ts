@@ -176,40 +176,50 @@ export class EmailOutboxWorker {
         ? [this.adminNotificationEmail]
         : [...new Set(admins.map((admin) => admin.email).filter(Boolean))];
       if (!recipients.length) throw new MissingRecipientError();
+      const orderCode = requiredText(data.orderCode);
+      const studentName = requiredText(data.studentName);
+      const studentEmail = requiredText(data.studentEmail);
+      const courseTitle = requiredText(data.courseTitle);
+      const amount = formatVndAmount(requiredText(data.amount));
+      const bankName = requiredText(data.bankName);
+      const accountNumber = requiredText(data.accountNumber);
+      const transferContent = requiredText(data.transferContent);
+      const submittedAt = formatEmailDate(requiredText(data.submittedAt));
+      const attemptNumber = data.attemptNumber
+        ? requiredText(data.attemptNumber)
+        : undefined;
       const reviewUrl = `${this.frontendBaseUrl}/admin/orders/${encodeURIComponent(requiredText(data.orderId))}`;
       return {
         to: recipients,
-        subject: `[LMS] Giao dịch đang chờ xác nhận - ${requiredText(data.orderCode)}`,
+        subject: `[LMS] Cần đối soát giao dịch · ${orderCode}`,
         text: [
           "Có giao dịch chuyển khoản cần đối soát thủ công.",
-          `Học viên: ${requiredText(data.studentName)} (${requiredText(data.studentEmail)})`,
-          `Khóa học: ${requiredText(data.courseTitle)}`,
-          `Mã đơn: ${requiredText(data.orderCode)}`,
-          `Số tiền: ${requiredText(data.amount)} VND`,
-          `Ngân hàng nhận: ${requiredText(data.bankName)}`,
-          `Số tài khoản nhận: ${requiredText(data.accountNumber)}`,
-          `Nội dung chuyển khoản: ${requiredText(data.transferContent)}`,
-          `Khách xác nhận lúc: ${requiredText(data.submittedAt)}`,
+          `Học viên: ${studentName} (${studentEmail})`,
+          `Khóa học: ${courseTitle}`,
+          `Mã đơn: ${orderCode}`,
+          `Số tiền: ${amount}`,
+          `Ngân hàng nhận: ${bankName}`,
+          `Số tài khoản nhận: ${accountNumber}`,
+          `Nội dung chuyển khoản: ${transferContent}`,
+          `Khách xác nhận lúc: ${submittedAt}`,
+          ...(attemptNumber ? [`Lần xác nhận: ${attemptNumber}`] : []),
           "Trạng thái: Chờ admin kiểm tra",
           `XEM VÀ DUYỆT GIAO DỊCH: ${reviewUrl}`,
           "Link chỉ mở giao dịch; không tự động phê duyệt.",
         ].join("\n"),
-        html: `
-          <h2>Có giao dịch chuyển khoản cần đối soát</h2>
-          <p><strong>Trạng thái:</strong> Chờ admin kiểm tra</p>
-          <dl>
-            <dt>Học viên</dt><dd>${escapeHtml(requiredText(data.studentName))} (${escapeHtml(requiredText(data.studentEmail))})</dd>
-            <dt>Khóa học</dt><dd>${escapeHtml(requiredText(data.courseTitle))}</dd>
-            <dt>Mã đơn</dt><dd>${escapeHtml(requiredText(data.orderCode))}</dd>
-            <dt>Số tiền</dt><dd>${escapeHtml(requiredText(data.amount))} VND</dd>
-            <dt>Ngân hàng nhận</dt><dd>${escapeHtml(requiredText(data.bankName))}</dd>
-            <dt>Số tài khoản nhận</dt><dd>${escapeHtml(requiredText(data.accountNumber))}</dd>
-            <dt>Nội dung chuyển khoản</dt><dd>${escapeHtml(requiredText(data.transferContent))}</dd>
-            <dt>Khách xác nhận lúc</dt><dd>${escapeHtml(requiredText(data.submittedAt))}</dd>
-          </dl>
-          <p><a href="${escapeHtml(reviewUrl)}">Xem và duyệt giao dịch</a></p>
-          <p>Link chỉ mở giao dịch; không tự động phê duyệt.</p>
-        `.trim(),
+        html: buildAdminTransferNotificationHtml({
+          orderCode,
+          studentName,
+          studentEmail,
+          courseTitle,
+          amount,
+          bankName,
+          accountNumber,
+          transferContent,
+          submittedAt,
+          ...(attemptNumber ? { attemptNumber } : {}),
+          reviewUrl,
+        }),
       };
     }
 
@@ -349,4 +359,122 @@ function escapeHtml(value: string): string {
         "'": "&#39;",
       })[character] ?? character,
   );
+}
+
+function formatVndAmount(value: string): string {
+  return /^\d+$/.test(value)
+    ? `${value.replace(/\B(?=(\d{3})+(?!\d))/g, ".")} ₫`
+    : `${value} VND`;
+}
+
+function formatEmailDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Asia/Ho_Chi_Minh",
+  }).format(date);
+}
+
+function emailDetailRow(label: string, value: string): string {
+  return `
+    <tr>
+      <td style="padding:12px 0;border-bottom:1px solid #e5eef0;color:#60747c;font-size:13px;line-height:20px;width:38%;vertical-align:top;">${escapeHtml(label)}</td>
+      <td style="padding:12px 0;border-bottom:1px solid #e5eef0;color:#203039;font-size:14px;font-weight:600;line-height:20px;text-align:right;vertical-align:top;word-break:break-word;">${escapeHtml(value)}</td>
+    </tr>`;
+}
+
+function buildAdminTransferNotificationHtml(input: {
+  orderCode: string;
+  studentName: string;
+  studentEmail: string;
+  courseTitle: string;
+  amount: string;
+  bankName: string;
+  accountNumber: string;
+  transferContent: string;
+  submittedAt: string;
+  attemptNumber?: string;
+  reviewUrl: string;
+}): string {
+  const attemptRow = input.attemptNumber
+    ? emailDetailRow("Lần xác nhận", input.attemptNumber)
+    : "";
+  const preheader = `Giao dịch ${input.orderCode} đang chờ Admin đối soát.`;
+
+  return `
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${escapeHtml(preheader)}</title>
+  </head>
+  <body style="margin:0;background:#f4f9fa;color:#203039;font-family:Arial,Helvetica,sans-serif;">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${escapeHtml(preheader)}</div>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f4f9fa;">
+      <tr>
+        <td align="center" style="padding:28px 12px 40px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:640px;background:#ffffff;border:1px solid #dce9eb;border-radius:20px;overflow:hidden;">
+            <tr>
+              <td style="padding:28px 32px;background:#006b70;color:#ffffff;">
+                <div style="font-size:20px;font-weight:700;letter-spacing:.2px;">PAniverseDeutsch</div>
+                <div style="margin-top:7px;color:#c9f2f0;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Thông báo quản trị</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:32px;">
+                <div style="display:inline-block;padding:7px 11px;border-radius:999px;background:#fff1d8;color:#8a5a00;font-size:12px;font-weight:700;">● Chờ đối soát</div>
+                <h1 style="margin:18px 0 10px;color:#203039;font-size:25px;line-height:34px;">Có giao dịch cần kiểm tra</h1>
+                <p style="margin:0;color:#60747c;font-size:15px;line-height:24px;">Học viên đã gửi xác nhận chuyển khoản. Vui lòng đối soát giao dịch trong ngân hàng trước khi phê duyệt quyền học.</p>
+
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top:24px;border:1px solid #f2cbd8;border-radius:14px;background:#fff7fa;">
+                  <tr>
+                    <td style="padding:18px 20px;">
+                      <div style="color:#8b6470;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;">Số tiền cần đối soát</div>
+                      <div style="margin-top:5px;color:#006b70;font-size:28px;font-weight:700;line-height:36px;">${escapeHtml(input.amount)}</div>
+                      <div style="margin-top:4px;color:#60747c;font-size:13px;">Mã đơn: <strong style="color:#203039;">${escapeHtml(input.orderCode)}</strong></div>
+                    </td>
+                  </tr>
+                </table>
+
+                <h2 style="margin:28px 0 4px;color:#203039;font-size:17px;line-height:25px;">Thông tin giao dịch</h2>
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                  ${emailDetailRow("Học viên", `${input.studentName} (${input.studentEmail})`)}
+                  ${emailDetailRow("Khóa học", input.courseTitle)}
+                  ${emailDetailRow("Ngân hàng nhận", input.bankName)}
+                  ${emailDetailRow("Số tài khoản", input.accountNumber)}
+                  ${emailDetailRow("Nội dung chuyển khoản", input.transferContent)}
+                  ${emailDetailRow("Khách xác nhận lúc", input.submittedAt)}
+                  ${attemptRow}
+                </table>
+
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top:28px;">
+                  <tr>
+                    <td align="center">
+                      <a href="${escapeHtml(input.reviewUrl)}" style="display:inline-block;padding:14px 24px;border-radius:10px;background:#006b70;color:#ffffff;font-size:15px;font-weight:700;line-height:22px;text-decoration:none;">Xem và duyệt giao dịch</a>
+                    </td>
+                  </tr>
+                </table>
+
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top:22px;background:#f4f9fa;border-radius:12px;">
+                  <tr>
+                    <td style="padding:14px 16px;color:#60747c;font-size:12px;line-height:19px;">Nút trên chỉ mở trang chi tiết giao dịch. Hệ thống không tự động phê duyệt thanh toán.</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:18px 32px;border-top:1px solid #e5eef0;color:#8a9aa0;font-size:12px;line-height:19px;">Email tự động từ PAniverseDeutsch · Vui lòng không trả lời email này.</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`.trim();
 }

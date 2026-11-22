@@ -7,6 +7,7 @@ import {
   Eye,
   EyeOff,
   ExternalLink,
+  Pencil,
   Plus,
   Search,
   Trash2,
@@ -404,6 +405,14 @@ export function AdminSectionsPage() {
       className: 'text-right',
       render: (row) => (
         <div className="flex justify-end gap-2">
+          <Link
+            to={sectionPath(row.course.id, row.section.id)}
+            aria-label={`Sửa chương ${row.section.title}`}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border-subtle px-3 text-sm font-semibold hover:bg-surface-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary"
+          >
+            <Pencil aria-hidden="true" className="size-4" />
+            Sửa
+          </Link>
           <VisibilityButton
             status={row.section.status}
             onClick={() => toggle(row.section)}
@@ -626,6 +635,14 @@ export function AdminLessonsPage() {
       className: 'text-right',
       render: (row) => (
         <div className="flex justify-end gap-2">
+          <Link
+            to={lessonPath(row.course.id, row.section.id, row.lesson.id)}
+            aria-label={`Sửa bài học ${row.lesson.title}`}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border-subtle px-3 text-sm font-semibold hover:bg-surface-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary"
+          >
+            <Pencil aria-hidden="true" className="size-4" />
+            Sửa
+          </Link>
           <VisibilityButton
             status={row.lesson.status}
             onClick={() => toggle(row.lesson)}
@@ -874,6 +891,14 @@ export function AdminExercisesPage() {
       className: 'text-right',
       render: (row) => (
         <div className="flex flex-wrap justify-end gap-2">
+          <Link
+            to={exercisePath(row.course.id, row.section.id, row.lesson.id, row.exercise.id)}
+            aria-label={`Sửa bài tập ${row.exercise.title}`}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border-subtle px-3 text-sm font-semibold hover:bg-surface-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary"
+          >
+            <Pencil aria-hidden="true" className="size-4" />
+            Sửa
+          </Link>
           <VisibilityButton
             status={row.exercise.status}
             onClick={() => toggle(row.exercise)}

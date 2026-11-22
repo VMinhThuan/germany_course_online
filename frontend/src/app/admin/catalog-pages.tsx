@@ -1,7 +1,7 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, Eye, EyeOff, FileUp, Plus, Search, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Eye, EyeOff, FileUp, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { adminRepository } from '@/data/api/admin-repository'
 import type {
   ApiAdminCourse,
@@ -266,6 +266,14 @@ export function AdminCoursesPage() {
       className: 'text-right',
       render: (course) => (
         <div className="flex justify-end gap-2">
+          <Link
+            to={coursePath(course.id)}
+            aria-label={`Sửa khóa học ${course.title}`}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border-subtle px-3 text-sm font-semibold hover:bg-surface-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary"
+          >
+            <Pencil aria-hidden="true" className="size-4" />
+            Sửa
+          </Link>
           <Button
             type="button"
             size="sm"
