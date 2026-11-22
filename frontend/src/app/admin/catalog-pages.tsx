@@ -268,7 +268,8 @@ export function AdminCoursesPage() {
         <div className="flex flex-wrap items-center justify-end gap-2">
           <Link
             to={coursePath(course.id)}
-            aria-label={`Sửa khóa học ${course.title}`}
+            aria-label="Sửa khóa học"
+            title={`Sửa khóa học ${course.title}`}
             className="inline-flex min-h-9 w-36 items-center justify-center gap-1.5 rounded-lg border border-border-subtle px-3 text-sm font-semibold hover:bg-surface-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary"
           >
             <Pencil aria-hidden="true" className="size-4" />
