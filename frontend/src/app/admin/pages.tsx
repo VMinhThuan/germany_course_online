@@ -45,16 +45,7 @@ function Metric({ label, value, icon }: { label: string; value: number; icon: Re
 export function AdminDashboardPage() {
   const summary = useQuery({
     queryKey: ['admin', 'dashboard-summary'],
-    queryFn: async () => {
-      const [courses, students, enrollments, pendingOrders, recentOrders] = await Promise.all([
-        adminRepository.listCourses(),
-        adminRepository.listStudents(),
-        adminRepository.listEnrollments(),
-        adminRepository.listOrders({ status: 'PENDING' }),
-        adminRepository.listOrders({ pageSize: 8 }),
-      ])
-      return { courses, students, enrollments, pendingOrders, recentOrders }
-    },
+    queryFn: () => adminRepository.getDashboardSummary(),
     retry: false,
   })
   return (
@@ -74,22 +65,22 @@ export function AdminDashboardPage() {
           >
             <Metric
               label="Khóa học"
-              value={summary.data.courses.total}
+              value={summary.data.courses}
               icon={<BookOpenText aria-hidden="true" className="size-5" />}
             />
             <Metric
               label="Học viên"
-              value={summary.data.students.total}
+              value={summary.data.students}
               icon={<UsersRound aria-hidden="true" className="size-5" />}
             />
             <Metric
               label="Enrollment"
-              value={summary.data.enrollments.total}
+              value={summary.data.enrollments}
               icon={<GraduationCap aria-hidden="true" className="size-5" />}
             />
             <Metric
               label="Đơn PENDING"
-              value={summary.data.pendingOrders.total}
+              value={summary.data.pendingOrders}
               icon={<CircleDollarSign aria-hidden="true" className="size-5" />}
             />
           </section>

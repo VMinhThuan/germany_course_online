@@ -208,6 +208,14 @@ export function createCommerceRouter(
     },
   );
 
+  router.get("/admin/dashboard-summary", async (_req, res, next) => {
+    try {
+      success(res, await commerce.getAdminDashboardSummary());
+    } catch (error) {
+      next(error);
+    }
+  });
+
   router.get(
     "/admin/email-outbox",
     validateRequest({ query: emailOutboxQuerySchema }),

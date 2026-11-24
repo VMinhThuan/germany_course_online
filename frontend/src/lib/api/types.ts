@@ -602,6 +602,16 @@ export interface ApiAdminOrderDetail extends ApiAdminOrderSummary {
   } | null
 }
 
+export type ApiAdminOrderPreview = Pick<ApiAdminOrderSummary, 'order' | 'student' | 'course'>
+
+export interface ApiAdminDashboardSummary {
+  courses: number
+  students: number
+  enrollments: number
+  pendingOrders: number
+  recentOrders: ApiPage<ApiAdminOrderPreview>
+}
+
 export interface ApiAdminEmailOutbox {
   id: string
   recipientType: 'ADMIN' | 'STUDENT'

@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiPublicRepository } from '@/data/api/public-repository'
-import { API_BASE_URL, clearAccessToken, restoreAccessToken, setAccessToken } from './client'
+import {
+  API_BASE_URL,
+  clearAccessToken,
+  resolveApiBaseUrl,
+  restoreAccessToken,
+  setAccessToken,
+} from './client'
 
 function jsonResponse(status: number, payload: unknown): Response {
   return {
@@ -62,5 +68,17 @@ describe('API client public and refresh boundaries', () => {
     expect(init?.credentials).toBe('include')
     expect(headers.get('X-CSRF-Protection')).toBe('1')
     expect(headers.has('Authorization')).toBe(false)
+  })
+
+  it('keeps production auth on the same-origin proxy even when Vercel has a stale API env', () => {
+    expect(
+      resolveApiBaseUrl('https://paniversedeutsch-backend.vercel.app/api/v1', true),
+    ).toBe('/api/v1')
+  })
+
+  it('allows an explicit API origin outside production', () => {
+    expect(resolveApiBaseUrl('http://localhost:4000/api/v1/', false)).toBe(
+      'http://localhost:4000/api/v1',
+    )
   })
 })

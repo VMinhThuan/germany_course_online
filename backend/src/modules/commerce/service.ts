@@ -1037,6 +1037,37 @@ export class CommerceService {
     return pageResult(context, query, total);
   }
 
+  async getAdminDashboardSummary() {
+    // The dashboard only needs four counters and the latest eight orders. The
+    // old client loaded five separate paginated lists (and transferred up to
+    // 100 rows from each one) just to calculate those counters.
+    await this.expirePendingOrders();
+    const [courses, students, enrollments, pendingOrders, recentOrders] =
+      await Promise.all([
+        Course.countDocuments({ deletedAt: null }),
+        User.countDocuments({ role: "STUDENT" }),
+        Enrollment.countDocuments({}),
+        Order.countDocuments({ status: "PENDING" }),
+        Order.find({})
+          .sort({ createdAt: -1, _id: -1 })
+          .limit(8)
+          .lean(),
+      ]);
+    return {
+      courses,
+      students,
+      enrollments,
+      pendingOrders,
+      recentOrders: {
+        items: await this.adminOrderPreviewContext(recentOrders),
+        page: 1,
+        pageSize: 8,
+        total: recentOrders.length,
+        hasMore: false,
+      },
+    };
+  }
+
   async getAdminOrder(orderId: string) {
     await this.expirePendingOrder(new Types.ObjectId(orderId));
     const order = await Order.findById(new Types.ObjectId(orderId)).lean();
@@ -1248,6 +1279,53 @@ export class CommerceService {
           : null,
         paymentInstructions: this.paymentInstructions(settings?.payment, order),
         paymentConfirmations: paymentConfirmationHistory,
+      };
+    });
+  }
+
+  private async adminOrderPreviewContext(
+    orders: Array<OrderFields & { _id: Types.ObjectId }>,
+  ) {
+    if (!orders.length) return [];
+    const [users, courses] = await Promise.all([
+      User.find({ _id: { $in: orders.map((order) => order.userId) } })
+        .select("fullName email")
+        .lean(),
+      Course.find({ _id: { $in: orders.map((order) => order.courseId) } })
+        .select("code title status deletedAt")
+        .lean(),
+    ]);
+    const usersById = new Map(users.map((user) => [user._id.toString(), user]));
+    const coursesById = new Map(
+      courses.map((course) => [course._id.toString(), course]),
+    );
+    return orders.map((order) => {
+      const user = usersById.get(order.userId.toString());
+      const course = coursesById.get(order.courseId.toString());
+      return {
+        order: orderDto(order, true),
+        student: user
+          ? {
+              id: user._id.toString(),
+              fullName: user.fullName,
+              email: user.email,
+            }
+          : null,
+        course: course
+          ? {
+              id: course._id.toString(),
+              code: course.code,
+              title: course.title,
+              status: course.status,
+              deleted: course.deletedAt !== null,
+            }
+          : {
+              id: order.courseId.toString(),
+              code: null,
+              title: order.courseTitleSnapshot,
+              status: "ARCHIVED",
+              deleted: true,
+            },
       };
     });
   }

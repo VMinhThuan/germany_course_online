@@ -20,6 +20,7 @@ import type {
   ApiAuditLog,
   ApiAssetAssociation,
   ApiAdminCoupon,
+  ApiAdminDashboardSummary,
   ApiMediaUploadIntent,
   ApiPage,
   ApiRenewalPlan,
@@ -47,6 +48,9 @@ async function listAssetAssociations(path: string) {
 }
 
 export const adminRepository = {
+  getDashboardSummary() {
+    return apiRequest<ApiAdminDashboardSummary>('/admin/dashboard-summary')
+  },
   changePassword(currentPassword: string, newPassword: string) {
     return apiRequest<void>('/me/password', {
       method: 'PUT',

@@ -1,8 +1,7 @@
 import {
-  ApiError,
   apiRequest,
   clearAccessToken,
-  restoreAccessToken,
+  restoreAuthResult,
   setAccessToken,
 } from '@/lib/api/client'
 import type { ApiAuthResult, ApiUserProfile } from '@/lib/api/types'
@@ -59,18 +58,8 @@ export const apiAuth = {
   async restoreSession(): Promise<AppSession | null> {
     if (!restoreSessionFlight) {
       restoreSessionFlight = (async () => {
-        const token = await restoreAccessToken()
-        if (!token) return null
-        try {
-          const profile = await apiRequest<ApiUserProfile>('/auth/me')
-          return toAppSession(profile)
-        } catch (error) {
-          if (error instanceof ApiError && error.status === 401) {
-            clearAccessToken()
-            return null
-          }
-          throw error
-        }
+        const result = await restoreAuthResult()
+        return result ? toAppSession(result.user) : null
       })().finally(() => {
         restoreSessionFlight = null
       })

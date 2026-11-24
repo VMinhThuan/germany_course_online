@@ -1,12 +1,28 @@
 import { publishSessionRevoked } from '@/data/student-demo/session-events'
+import type { ApiAuthResult } from './types'
 
 const configuredApiBaseUrl = import.meta.env['VITE_API_BASE_URL']?.trim()
-const apiBaseUrl = configuredApiBaseUrl || '/api/v1'
 
-// Keep the production API same-origin so the HttpOnly refresh cookie belongs to
-// the frontend host instead of becoming a third-party cookie on the API host.
-// Vercel forwards /api/* to the backend through frontend/vercel.json.
-export const API_BASE_URL = apiBaseUrl.replace(/\/$/, '')
+/**
+ * Production is intentionally pinned to the same-origin proxy.
+ *
+ * A stale VITE_API_BASE_URL can remain in a Vercel project's environment after
+ * a deployment. If we honor that value in production, login writes the
+ * HttpOnly refresh cookie on the backend host while the SPA is served from a
+ * different host. The browser can then lose that cookie on reload or reject it
+ * depending on its cross-site cookie policy. The frontend rewrite is the
+ * canonical production transport, so the cookie stays on the SPA host.
+ */
+export function resolveApiBaseUrl(
+  configuredBaseUrl: string | undefined,
+  isProduction: boolean,
+) {
+  const fallback = '/api/v1'
+  const normalized = configuredBaseUrl?.trim()
+  return (isProduction ? fallback : normalized || fallback).replace(/\/$/, '')
+}
+
+export const API_BASE_URL = resolveApiBaseUrl(configuredApiBaseUrl, import.meta.env.PROD)
 
 export interface ApiErrorDetail {
   path?: string[]
@@ -68,7 +84,7 @@ interface ApiErrorEnvelope {
 }
 
 let accessToken: string | null = null
-let refreshFlight: Promise<string | null> | null = null
+let refreshFlight: Promise<ApiAuthResult> | null = null
 
 export function setAccessToken(token: string | null) {
   accessToken = token
@@ -172,12 +188,12 @@ async function perform<T>(path: string, options: ApiRequestOptions, token: strin
   }
 }
 
-async function refreshAccessToken() {
+async function refreshAuthResult() {
   if (!refreshFlight) {
     refreshFlight = (async () => {
       const rotateRefreshToken = async () => {
         try {
-          const result = await perform<{ accessToken: string }>(
+          const result = await perform<ApiAuthResult>(
             '/auth/refresh',
             {
               method: 'POST',
@@ -189,7 +205,7 @@ async function refreshAccessToken() {
             null,
           )
           accessToken = result.accessToken
-          return accessToken
+          return result
         } catch (cause) {
           accessToken = null
           if (cause instanceof ApiError && cause.code === 'SESSION_REVOKED') {
@@ -214,14 +230,22 @@ async function refreshAccessToken() {
   return refreshFlight
 }
 
-export async function restoreAccessToken() {
+async function refreshAccessToken() {
+  return (await refreshAuthResult()).accessToken
+}
+
+export async function restoreAuthResult(): Promise<ApiAuthResult | null> {
   try {
-    return await refreshAccessToken()
+    return await refreshAuthResult()
   } catch (cause) {
     if (cause instanceof ApiError && cause.status === 401 && cause.code !== 'SESSION_REVOKED')
       return null
     throw cause
   }
+}
+
+export async function restoreAccessToken() {
+  return (await restoreAuthResult())?.accessToken ?? null
 }
 
 export async function apiRequest<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {

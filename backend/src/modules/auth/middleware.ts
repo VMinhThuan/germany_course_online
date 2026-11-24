@@ -18,26 +18,32 @@ export function authenticate(config: AppConfig): RequestHandler {
       return;
     }
     try {
-      const session = await UserSession.findOne({
-        _id: claims.sid,
-        userId: claims.sub,
-      });
+      // These checks are independent. Running them together removes one full
+      // database round trip from every protected API request.
+      const [session, user] = await Promise.all([
+        UserSession.findOne({
+          _id: claims.sid,
+          userId: claims.sub,
+        })
+          .select("status expiresAt roleAtIssue")
+          .lean(),
+        User.findById(claims.sub).select("status role").lean(),
+      ]);
       if (
         !session ||
-        session.get("status") !== "ACTIVE" ||
-        (session.get("expiresAt") as Date).getTime() <= Date.now()
+        session.status !== "ACTIVE" ||
+        session.expiresAt.getTime() <= Date.now()
       ) {
         return next(
           unauthorized("SESSION_REVOKED", "This session is no longer active."),
         );
       }
-      const user = await User.findById(claims.sub);
       if (!user) return next(unauthorized());
-      if (user.get("status") !== "ACTIVE")
+      if (user.status !== "ACTIVE")
         return next(forbidden("ACCOUNT_BLOCKED", "This account is blocked."));
       if (
-        user.get("role") !== claims.role ||
-        session.get("roleAtIssue") !== claims.role
+        user.role !== claims.role ||
+        session.roleAtIssue !== claims.role
       )
         return next(
           unauthorized("SESSION_REVOKED", "This session is no longer valid."),

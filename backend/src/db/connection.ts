@@ -75,7 +75,10 @@ export function createVercelMongoConnection(
   config: AppConfig,
 ): () => Promise<void> {
   return createLazyConnection(
-    () => connectMongo(config, 5_000, 5),
+    // The Admin dashboard loads several protected resources in parallel. Keep
+    // enough pooled connections for those reads so requests do not queue
+    // behind the refresh/authentication request in a warm Vercel instance.
+    () => connectMongo(config, 5_000, 10),
     isMongoReady,
   );
 }
