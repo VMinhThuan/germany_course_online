@@ -1048,10 +1048,7 @@ export class CommerceService {
         User.countDocuments({ role: "STUDENT" }),
         Enrollment.countDocuments({}),
         Order.countDocuments({ status: "PENDING" }),
-        Order.find({})
-          .sort({ createdAt: -1, _id: -1 })
-          .limit(8)
-          .lean(),
+        Order.find({}).sort({ createdAt: -1, _id: -1 }).limit(8).lean(),
       ]);
     return {
       courses,

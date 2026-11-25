@@ -41,10 +41,7 @@ export function authenticate(config: AppConfig): RequestHandler {
       if (!user) return next(unauthorized());
       if (user.status !== "ACTIVE")
         return next(forbidden("ACCOUNT_BLOCKED", "This account is blocked."));
-      if (
-        user.role !== claims.role ||
-        session.roleAtIssue !== claims.role
-      )
+      if (user.role !== claims.role || session.roleAtIssue !== claims.role)
         return next(
           unauthorized("SESSION_REVOKED", "This session is no longer valid."),
         );

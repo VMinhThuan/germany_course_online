@@ -71,9 +71,9 @@ describe('API client public and refresh boundaries', () => {
   })
 
   it('keeps production auth on the same-origin proxy even when Vercel has a stale API env', () => {
-    expect(
-      resolveApiBaseUrl('https://paniversedeutsch-backend.vercel.app/api/v1', true),
-    ).toBe('/api/v1')
+    expect(resolveApiBaseUrl('https://paniversedeutsch-backend.vercel.app/api/v1', true)).toBe(
+      '/api/v1',
+    )
   })
 
   it('allows an explicit API origin outside production', () => {

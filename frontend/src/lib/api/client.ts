@@ -13,10 +13,7 @@ const configuredApiBaseUrl = import.meta.env['VITE_API_BASE_URL']?.trim()
  * depending on its cross-site cookie policy. The frontend rewrite is the
  * canonical production transport, so the cookie stays on the SPA host.
  */
-export function resolveApiBaseUrl(
-  configuredBaseUrl: string | undefined,
-  isProduction: boolean,
-) {
+export function resolveApiBaseUrl(configuredBaseUrl: string | undefined, isProduction: boolean) {
   const fallback = '/api/v1'
   const normalized = configuredBaseUrl?.trim()
   return (isProduction ? fallback : normalized || fallback).replace(/\/$/, '')

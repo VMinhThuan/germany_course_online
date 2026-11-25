@@ -1,9 +1,4 @@
-import {
-  apiRequest,
-  clearAccessToken,
-  restoreAuthResult,
-  setAccessToken,
-} from '@/lib/api/client'
+import { apiRequest, clearAccessToken, restoreAuthResult, setAccessToken } from '@/lib/api/client'
 import type { ApiAuthResult, ApiUserProfile } from '@/lib/api/types'
 
 export interface AppSession {
