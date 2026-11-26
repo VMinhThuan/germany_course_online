@@ -83,6 +83,39 @@ export const adminOrderQuerySchema = pageQuerySchema
   .strict();
 
 export const orderIdParamsSchema = z.object({ orderId: objectId }).strict();
+export const paymentProofAssetParamsSchema = z
+  .object({ orderId: objectId, assetId: objectId })
+  .strict();
+
+const paymentProofMimeType = z.enum(["image/jpeg", "image/png", "image/webp"]);
+export const paymentProofUploadIntentSchema = z
+  .strictObject({
+    originalName: z.string().trim().min(1).max(255),
+    mimeType: paymentProofMimeType,
+    fileSize: z
+      .number()
+      .int()
+      .min(1)
+      .max(5 * 1024 * 1024),
+  })
+  .superRefine((value, context) => {
+    const extension = value.originalName.split(".").at(-1)?.toLowerCase();
+    const extensionMime: Record<string, string> = {
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      png: "image/png",
+      webp: "image/webp",
+    };
+    if (!extension || extensionMime[extension] !== value.mimeType)
+      context.addIssue({
+        code: "custom",
+        path: ["originalName"],
+        message: "Ảnh phải có phần mở rộng khớp với MIME type.",
+      });
+  });
+export const paymentProofCompleteSchema = z
+  .strictObject({ assetId: objectId })
+  .strict();
 
 export const emailOutboxQuerySchema = z
   .object({
@@ -168,3 +201,6 @@ export type PageQuery = z.infer<typeof pageQuerySchema>;
 export type AdminOrderQuery = z.infer<typeof adminOrderQuerySchema>;
 export type SiteSettingsPatch = z.infer<typeof siteSettingsPatchSchema>;
 export type BankTransferPatch = z.infer<typeof bankTransferPatchSchema>;
+export type PaymentProofUploadIntentInput = z.infer<
+  typeof paymentProofUploadIntentSchema
+>;

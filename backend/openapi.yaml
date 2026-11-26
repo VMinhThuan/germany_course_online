@@ -4107,6 +4107,120 @@ paths:
         validation: Order remains PENDING
       security:
         - AccessToken: []
+  /orders/{orderId}/payment-proof/upload-intents:
+    post:
+      operationId: createPaymentProofUploadIntent
+      summary: Create a private payment proof upload intent
+      tags: [Commerce]
+      description: "Access: STUDENT. JPG, PNG, or WebP up to 5 MiB; the order owner only."
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentProofUploadIntentRequest"
+      responses:
+        "201":
+          description: Signed upload instructions.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentProofUploadIntentResponse"
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/UnauthorizedError" }
+        "409": { $ref: "#/components/responses/ConflictError" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+      security: [{ AccessToken: [] }]
+  /orders/{orderId}/payment-proof/complete:
+    post:
+      operationId: completePaymentProofUpload
+      summary: Complete and validate a private payment proof upload
+      tags: [Commerce]
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentProofCompleteRequest"
+      responses:
+        "200":
+          description: Validated payment proof attached to the order.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success: { type: boolean, const: true }
+                  data: { $ref: "#/components/schemas/OrderDetail" }
+        "401": { $ref: "#/components/responses/UnauthorizedError" }
+        "404": { $ref: "#/components/responses/NotFoundError" }
+        "409": { $ref: "#/components/responses/ConflictError" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+      security: [{ AccessToken: [] }]
+  /orders/{orderId}/payment-proof:
+    delete:
+      operationId: deletePaymentProof
+      summary: Remove an editable payment proof
+      tags: [Commerce]
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200":
+          description: Order with the proof removed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success: { type: boolean, const: true }
+                  data: { $ref: "#/components/schemas/OrderDetail" }
+        "401": { $ref: "#/components/responses/UnauthorizedError" }
+        "409": { $ref: "#/components/responses/ConflictError" }
+      security: [{ AccessToken: [] }]
+    get:
+      operationId: getPaymentProof
+      summary: Get a short-lived private payment proof URL
+      tags: [Commerce]
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200":
+          description: Short-lived authenticated read URL.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaymentProofAccessResponse" }
+        "401": { $ref: "#/components/responses/UnauthorizedError" }
+        "404": { $ref: "#/components/responses/NotFoundError" }
+      security: [{ AccessToken: [] }]
+  /admin/orders/{orderId}/payment-proofs/{assetId}:
+    get:
+      operationId: getHistoricalPaymentProof
+      summary: Get a historical payment proof URL for reconciliation
+      tags: [Commerce]
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+        - name: assetId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^[a-fA-F0-9]{24}$
+      responses:
+        "200":
+          description: Short-lived authenticated read URL.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaymentProofAccessResponse" }
+        "401": { $ref: "#/components/responses/UnauthorizedError" }
+        "403": { $ref: "#/components/responses/ForbiddenError" }
+        "404": { $ref: "#/components/responses/NotFoundError" }
+      security: [{ AccessToken: [] }]
   /admin/courses:
     get:
       operationId: adminListCourses
@@ -10349,6 +10463,14 @@ components:
       type: apiKey
       in: cookie
       name: refreshToken
+  parameters:
+    OrderId:
+      name: orderId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: ^[a-fA-F0-9]{24}$
   responses:
     ValidationError:
       description: Standard validation error envelope.
@@ -12001,6 +12123,60 @@ components:
         - accountHolderName
         - qrUrl
         - transferInstructions
+    PaymentProofUploadIntentRequest:
+      type: object
+      properties:
+        originalName:
+          type: string
+          minLength: 1
+          maxLength: 255
+        mimeType:
+          type: string
+          enum: [image/jpeg, image/png, image/webp]
+        fileSize:
+          type: integer
+          minimum: 1
+          maximum: 5242880
+      additionalProperties: false
+      required: [originalName, mimeType, fileSize]
+    PaymentProofUploadIntentResponse:
+      type: object
+      properties:
+        success: { type: boolean, const: true }
+        data:
+          type: object
+          properties:
+            assetId: { type: string, pattern: "^[a-fA-F0-9]{24}$" }
+            provider: { type: string, enum: [S3_COMPATIBLE, CLOUDINARY] }
+            uploadUrl: { type: string, format: uri }
+            uploadMethod: { type: string, enum: [PUT, POST] }
+            uploadHeaders: { type: object, additionalProperties: { type: string } }
+            uploadFields: { type: object, additionalProperties: { type: string } }
+            expiresAt: { type: string, format: date-time }
+          additionalProperties: false
+          required: [assetId, provider, uploadUrl, uploadMethod, uploadHeaders, uploadFields, expiresAt]
+      additionalProperties: false
+      required: [success, data]
+    PaymentProofCompleteRequest:
+      type: object
+      properties:
+        assetId: { type: string, pattern: "^[a-fA-F0-9]{24}$" }
+      additionalProperties: false
+      required: [assetId]
+    PaymentProofAccessResponse:
+      type: object
+      properties:
+        success: { type: boolean, const: true }
+        data:
+          type: object
+          properties:
+            url: { type: string, format: uri }
+            expiresAt: { type: string, format: date-time }
+            mimeType: { type: string, enum: [image/jpeg, image/png, image/webp] }
+          additionalProperties: false
+          required: [url, expiresAt, mimeType]
+      additionalProperties: false
+      required: [success, data]
     BankTransferSettings:
       type: object
       properties:
@@ -12211,6 +12387,12 @@ components:
             - type: "null"
         durationMonthsSnapshot:
           type: integer
+        paymentProofRequired:
+          type: boolean
+        paymentProof:
+          oneOf:
+            - $ref: "#/components/schemas/PaymentProofSummary"
+            - type: "null"
         paymentSubmittedAt:
           oneOf:
             - type: string
@@ -12261,6 +12443,8 @@ components:
         - totalAmount
         - couponId
         - durationMonthsSnapshot
+        - paymentProofRequired
+        - paymentProof
         - paymentSubmittedAt
         - paidAt
         - expiresAt
@@ -12334,6 +12518,12 @@ components:
             - type: "null"
         durationMonthsSnapshot:
           type: integer
+        paymentProofRequired:
+          type: boolean
+        paymentProof:
+          oneOf:
+            - $ref: "#/components/schemas/PaymentProofSummary"
+            - type: "null"
         paymentSubmittedAt:
           oneOf:
             - type: string
@@ -12518,6 +12708,17 @@ components:
         - couponReservation
         - paymentInstructions
         - paymentConfirmations
+    PaymentProofSummary:
+      type: object
+      properties:
+        assetId: { type: string, pattern: "^[a-fA-F0-9]{24}$" }
+        mimeType: { type: string, enum: [image/jpeg, image/png, image/webp] }
+        fileSize: { type: integer, minimum: 1, maximum: 5242880 }
+        uploadedAt: { type: [string, "null"], format: date-time }
+        submittedAt: { type: [string, "null"], format: date-time }
+        needsReplacement: { type: boolean }
+      additionalProperties: false
+      required: [assetId, mimeType, fileSize, uploadedAt, submittedAt, needsReplacement]
     PaymentConfirmation:
       type: object
       properties:
@@ -12530,6 +12731,11 @@ components:
         submittedAt:
           type: string
           format: date-time
+        paymentProofAssetId:
+          oneOf:
+            - type: string
+              pattern: ^[a-fA-F0-9]{24}$
+            - type: "null"
         status:
           type: string
           enum: [PENDING, APPROVED, REJECTED]
@@ -12548,7 +12754,7 @@ components:
             - string
             - "null"
       additionalProperties: false
-      required: [id, attemptNumber, submittedAt, status, reviewedById, reviewedAt, rejectionReason]
+      required: [id, attemptNumber, submittedAt, paymentProofAssetId, status, reviewedById, reviewedAt, rejectionReason]
     AdminOrderStudentSummary:
       type: object
       properties:

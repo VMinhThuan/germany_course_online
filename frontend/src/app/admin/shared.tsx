@@ -204,6 +204,7 @@ export function AdminLayout({
             </span>
             <Link
               to="/admin/security/password"
+              aria-label="Đổi mật khẩu"
               className="inline-flex min-h-10 items-center gap-2 rounded-xl px-3 font-semibold text-action-primary hover:bg-surface-blue focus-visible:outline-2 focus-visible:outline-action-focus"
             >
               <LockKeyhole aria-hidden="true" className="size-4" />

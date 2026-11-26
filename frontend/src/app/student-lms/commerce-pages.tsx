@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import {
   ArrowRight,
   Check,
@@ -7,8 +7,11 @@ import {
   Copy,
   CreditCard,
   Download,
+  Image,
   QrCode,
   RefreshCw,
+  Trash2,
+  Upload,
   XCircle,
 } from 'lucide-react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
@@ -17,11 +20,13 @@ import {
   useCancelStudentOrder,
   useConfirmTransfer,
   useCreateOrder,
+  useDeletePaymentProof,
   useProductCheckout,
   useProductCourse,
   useProductOrder,
   useProductOrders,
   useProductRenewalPlans,
+  useUploadPaymentProof,
   useValidateStudentCoupon,
 } from '@/data/student-demo/product-queries'
 import type { CouponValidationViewModel } from '@/domains/commerce/models'
@@ -391,13 +396,13 @@ function OrderState({ order }: { order: NonNullable<ReturnType<typeof useProduct
   return (
     <InlineAlert
       tone="warning"
-      title={reported ? 'Đã nhận xác nhận thanh toán' : 'Chờ bạn hoàn tất thanh toán'}
+      title={reported ? 'Đang chờ xác nhận thanh toán' : 'Chờ bạn hoàn tất thanh toán'}
       role="status"
     >
       <span className="inline-flex items-center gap-2">
         <CircleAlert aria-hidden="true" className="size-4" />
         {reported
-          ? 'Chúng tôi đang kiểm tra giao dịch. Khóa học sẽ được mở ngay sau khi thanh toán được xác nhận.'
+          ? 'Yêu cầu của bạn đã được gửi. Quản trị viên sẽ kiểm tra và chỉ mở khóa học sau khi xác nhận đã thực nhận khoản tiền.'
           : 'Vui lòng chuyển khoản theo hướng dẫn, sau đó xác nhận để chúng tôi kiểm tra giao dịch.'}
       </span>
     </InlineAlert>
@@ -587,6 +592,170 @@ function PaymentInstructions({
   )
 }
 
+function PaymentProofUpload({
+  sessionId,
+  orderId,
+  order,
+  onUpdated,
+}: {
+  sessionId: string
+  orderId: string
+  order: NonNullable<ReturnType<typeof useProductOrder>['data']>
+  onUpdated: () => Promise<unknown>
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [fileName, setFileName] = useState<string | null>(null)
+  const [progress, setProgress] = useState(0)
+  const [localError, setLocalError] = useState('')
+  const upload = useUploadPaymentProof(sessionId)
+  const remove = useDeletePaymentProof(sessionId)
+  const proof = order.paymentProof
+  const proofReady = Boolean(proof && !proof.needsReplacement)
+  const editable =
+    (order.order.status === 'PENDING' || order.order.status === 'REJECTED') &&
+    !order.transferReported
+
+  function chooseFile(file: File | undefined) {
+    if (!file) return
+    setLocalError('')
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setLocalError('Vui lòng chọn ảnh JPG, JPEG, PNG hoặc WebP.')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setLocalError('Ảnh minh chứng không được vượt quá 5MB.')
+      return
+    }
+    if (previewUrl) URL.revokeObjectURL(previewUrl)
+    setPreviewUrl(URL.createObjectURL(file))
+    setFileName(file.name)
+    setProgress(1)
+    upload.mutate(
+      { orderId, file, onProgress: setProgress },
+      {
+        onSuccess: async () => {
+          setProgress(100)
+          await onUpdated()
+        },
+        onError: (error) => {
+          setProgress(0)
+          setLocalError(error instanceof Error ? error.message : 'Tải ảnh thất bại.')
+        },
+      },
+    )
+  }
+
+  return (
+    <section className="grid gap-3 rounded-2xl border border-dashed border-action-primary/45 bg-surface-blue/30 p-4">
+      <div>
+        <div className="flex items-center gap-2">
+          <Image aria-hidden="true" className="size-5 text-action-primary" />
+          <h3 className="font-display font-bold">Minh chứng chuyển khoản</h3>
+        </div>
+        <p className="mt-1 text-sm leading-6 text-ink-secondary">
+          Vui lòng tải lên ảnh chụp giao dịch chuyển khoản thành công để quản trị viên kiểm tra và
+          xác nhận thanh toán.
+        </p>
+      </div>
+      {previewUrl ? (
+        <div className="grid gap-3 sm:grid-cols-[7rem_minmax(0,1fr)] sm:items-center">
+          <img
+            src={previewUrl}
+            alt="Xem trước minh chứng chuyển khoản"
+            className="h-28 w-28 rounded-xl border border-border-subtle object-cover"
+          />
+          <div className="grid gap-1 text-sm">
+            <strong className="truncate">{fileName}</strong>
+            {upload.isPending && <progress className="h-2 w-full" value={progress} max={100} />}
+            <span className="text-ink-secondary">
+              {upload.isPending
+                ? `Đang tải lên ${progress}%`
+                : proofReady
+                  ? 'Ảnh đã được backend xác nhận hợp lệ.'
+                  : 'Đang chờ backend kiểm tra ảnh.'}
+            </span>
+          </div>
+        </div>
+      ) : proofReady ? (
+        <div className="flex items-center gap-3 rounded-xl border border-success/25 bg-success/5 p-3 text-sm">
+          <CheckCircle2 aria-hidden="true" className="size-5 shrink-0 text-success" />
+          <span>
+            Đã tải lên minh chứng hợp lệ
+            {proof?.uploadedAt ? ` lúc ${formatDateTimeInTimezone(proof.uploadedAt)}` : ''}.
+          </span>
+        </div>
+      ) : (
+        <button
+          type="button"
+          className="grid min-h-28 place-items-center gap-1 rounded-xl border border-dashed border-border-subtle bg-card-surface px-4 py-5 text-center text-sm hover:border-action-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary"
+          onClick={() => inputRef.current?.click()}
+          disabled={!editable || upload.isPending}
+        >
+          <Upload aria-hidden="true" className="size-6 text-action-primary" />
+          <span className="font-semibold">
+            {proof?.needsReplacement ? 'Tải ảnh minh chứng mới' : 'Chọn ảnh giao dịch thành công'}
+          </span>
+          <span className="text-xs text-ink-muted">JPG, JPEG, PNG, WebP · tối đa 5MB</span>
+        </button>
+      )}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="sr-only"
+        onChange={(event) => {
+          chooseFile(event.target.files?.[0])
+          event.currentTarget.value = ''
+        }}
+      />
+      {editable && (previewUrl || proof) && (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            startIcon={<Upload aria-hidden="true" className="size-4" />}
+            disabled={upload.isPending || remove.isPending}
+            onClick={() => inputRef.current?.click()}
+          >
+            Thay đổi ảnh
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            startIcon={<Trash2 aria-hidden="true" className="size-4" />}
+            disabled={upload.isPending || remove.isPending}
+            loading={remove.isPending}
+            onClick={() => {
+              void remove
+                .mutateAsync(orderId)
+                .then(async () => {
+                  if (previewUrl) URL.revokeObjectURL(previewUrl)
+                  setPreviewUrl(null)
+                  setFileName(null)
+                  setProgress(0)
+                  await onUpdated()
+                })
+                .catch((error) =>
+                  setLocalError(error instanceof Error ? error.message : 'Không thể xóa ảnh.'),
+                )
+            }}
+          >
+            Xóa ảnh
+          </Button>
+        </div>
+      )}
+      {localError && (
+        <p role="alert" className="text-sm text-danger-foreground">
+          {localError}
+        </p>
+      )}
+    </section>
+  )
+}
+
 export function OrderPendingPage() {
   const { id = '' } = useParams()
   const { session } = useAuthSession()
@@ -598,6 +767,8 @@ export function OrderPendingPage() {
   const showPendingActions =
     order.data?.order.status === 'PENDING' || order.data?.order.status === 'REJECTED'
   const canCancelOrder = order.data?.order.status === 'PENDING' && !order.data.transferReported
+  const proofRequired = order.data?.paymentProofRequired !== false
+  const proofReady = Boolean(order.data?.paymentProof && !order.data.paymentProof.needsReplacement)
   return (
     <ProductPage title="Thanh toán chuyển khoản" backTo="/student/orders">
       {order.isPending ? (
@@ -632,13 +803,22 @@ export function OrderPendingPage() {
                   Hãy xác nhận sau khi chuyển khoản thành công để chúng tôi kiểm tra và kích hoạt
                   khóa học cho bạn.
                 </p>
+                {proofRequired && (
+                  <PaymentProofUpload
+                    sessionId={session?.id ?? ''}
+                    orderId={id}
+                    order={order.data}
+                    onUpdated={() => order.refetch()}
+                  />
+                )}
                 <div className="grid gap-3">
                   <Button
                     className="w-full min-w-0 px-3 text-sm sm:px-4 sm:text-base"
                     loading={confirmTransfer.isPending}
                     disabled={
                       confirmTransfer.isPending ||
-                      (order.data.transferReported && order.data.order.status === 'PENDING')
+                      (order.data.transferReported && order.data.order.status === 'PENDING') ||
+                      (proofRequired && !proofReady)
                     }
                     onClick={() =>
                       void confirmTransfer
@@ -648,10 +828,10 @@ export function OrderPendingPage() {
                     }
                   >
                     {order.data.order.status === 'REJECTED'
-                      ? 'Gửi lại báo chuyển khoản'
+                      ? 'Gửi lại yêu cầu xác nhận'
                       : order.data.transferReported
-                        ? 'Đã gửi báo chuyển khoản'
-                        : 'Tôi đã chuyển khoản'}
+                        ? 'Đã gửi yêu cầu xác nhận'
+                        : 'Gửi yêu cầu xác nhận thanh toán'}
                   </Button>
                   <div className={`grid gap-3 ${canCancelOrder ? 'sm:grid-cols-2' : ''}`}>
                     <LinkButton

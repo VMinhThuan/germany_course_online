@@ -87,6 +87,23 @@ const orderSchema = new Schema(
       default: "PENDING",
     },
     paymentSubmittedAt: { type: Date, default: null },
+    // Explicitly written on new orders. Missing means a legacy order created
+    // before proof upload was introduced and remains reviewable for regression
+    // compatibility.
+    paymentProofRequired: { type: Boolean, default: undefined },
+    // Payment proof is intentionally nullable for legacy orders created before
+    // proof upload was introduced. New confirmation submissions must have a
+    // READY proof linked to this order.
+    paymentProofAssetId: {
+      type: Schema.Types.ObjectId,
+      ref: "MediaAsset",
+      default: null,
+    },
+    paymentProofStorageKey: { type: String, default: null, select: false },
+    paymentProofMimeType: { type: String, default: null, maxlength: 160 },
+    paymentProofFileSize: { type: Number, default: null, min: 1 },
+    paymentProofUploadedAt: { type: Date, default: null },
+    paymentProofSubmittedAt: { type: Date, default: null },
     reviewedById: { type: Schema.Types.ObjectId, ref: "User", default: null },
     reviewedAt: { type: Date, default: null },
     reviewNote: { type: String, default: null, maxlength: 1000 },
@@ -139,6 +156,10 @@ orderSchema.index(
 orderSchema.index(
   { status: 1, paymentSubmittedAt: 1, expiresAt: 1 },
   { name: "ix_orders_pending_expiration" },
+);
+orderSchema.index(
+  { paymentProofAssetId: 1 },
+  { name: "ix_orders_payment_proof_asset" },
 );
 orderSchema.index(
   { courseId: 1, userId: 1, createdAt: -1 },

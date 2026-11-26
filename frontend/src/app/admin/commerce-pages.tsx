@@ -50,6 +50,12 @@ export function AdminOrdersPage({ orderId }: { orderId?: string }) {
     enabled: Boolean(orderId),
     retry: false,
   })
+  const proofAccess = useQuery({
+    queryKey: ['admin', 'order', orderId, 'payment-proof'],
+    queryFn: () => adminRepository.getPaymentProofAccess(orderId!),
+    enabled: Boolean(orderId && detail.data?.order.paymentProof),
+    retry: false,
+  })
   const failedEmails = useQuery({
     queryKey: ['admin', 'email-outbox'],
     queryFn: () => adminRepository.listFailedEmailOutbox(),
@@ -292,6 +298,43 @@ export function AdminOrdersPage({ orderId }: { orderId?: string }) {
               </AdminCard>
             )}
           </AdminCard>
+          <AdminCard
+            title="Minh chứng chuyển khoản"
+            description="Ảnh chỉ là tài liệu để kiểm tra; chỉ duyệt sau khi đối soát khoản tiền thực nhận trên ngân hàng."
+          >
+            {order.paymentProof ? (
+              proofAccess.isPending ? (
+                <p className="text-sm text-ink-secondary">Đang tải minh chứng…</p>
+              ) : proofAccess.isError ? (
+                <p className="text-sm text-danger-foreground">Không thể mở minh chứng đã lưu.</p>
+              ) : proofAccess.data ? (
+                <a
+                  href={proofAccess.data.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="group block max-w-sm"
+                >
+                  <img
+                    src={proofAccess.data.url}
+                    alt="Minh chứng chuyển khoản của học viên"
+                    className="max-h-80 w-full rounded-xl border border-border-subtle object-contain transition group-hover:border-action-primary"
+                  />
+                  <span className="mt-2 block text-sm font-semibold text-action-primary">
+                    Mở ảnh kích thước lớn
+                  </span>
+                </a>
+              ) : null
+            ) : (
+              <div className="rounded-xl border border-dashed border-border-subtle p-4 text-sm text-ink-secondary">
+                Đơn hàng cũ hoặc học viên chưa tải lên minh chứng.
+              </div>
+            )}
+            {order.paymentProof?.uploadedAt && (
+              <p className="mt-3 text-sm text-ink-secondary">
+                Tải lên lúc: {formatDateTimeInTimezone(order.paymentProof.uploadedAt)}
+              </p>
+            )}
+          </AdminCard>
         </div>
         <div className="grid content-start gap-5">
           <AdminCard
@@ -438,6 +481,7 @@ export function AdminOrdersPage({ orderId }: { orderId?: string }) {
                   <th className="p-3">Số tiền</th>
                   <th className="p-3">Trạng thái</th>
                   <th className="p-3">Chuyển khoản</th>
+                  <th className="p-3">Minh chứng</th>
                   <th className="p-3">Chi tiết</th>
                 </tr>
               </thead>
@@ -472,6 +516,12 @@ export function AdminOrdersPage({ orderId }: { orderId?: string }) {
                                     ? 'Thất bại'
                                     : 'Đã hết hạn'
                         }
+                      />
+                    </td>
+                    <td className="p-3">
+                      <StatusBadge
+                        status={order.paymentProof ? 'success' : 'neutral'}
+                        label={order.paymentProof ? 'Đã tải lên' : 'Chưa có'}
                       />
                     </td>
                     <td className="p-3">

@@ -100,6 +100,15 @@ export interface StudentOrderDetailViewModel {
     transferInstructions: string
   } | null
   transferReported?: boolean
+  paymentProof?: {
+    assetId: string
+    mimeType: string | null
+    fileSize: number | null
+    uploadedAt: string | null
+    submittedAt: string | null
+    needsReplacement: boolean
+  } | null
+  paymentProofRequired?: boolean
   enrollment?: EnrollmentSummaryViewModel
   access: CourseAccessViewModel
 }
@@ -178,6 +187,13 @@ export interface StudentCommerceRepository {
   ): Promise<DemoPaymentResultViewModel>
   confirmTransfer?(sessionId: string, orderId: string): Promise<StudentOrderDetailViewModel>
   cancelOrder?(sessionId: string, orderId: string): Promise<StudentOrderDetailViewModel>
+  uploadPaymentProof?(
+    sessionId: string,
+    orderId: string,
+    file: File,
+    onProgress?: (progress: number) => void,
+  ): Promise<StudentOrderDetailViewModel>
+  deletePaymentProof?(sessionId: string, orderId: string): Promise<StudentOrderDetailViewModel>
 }
 
 export interface StudentAccountRepository {

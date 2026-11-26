@@ -271,6 +271,11 @@ export const adminRepository = {
   getOrder(orderId: string) {
     return apiRequest<ApiAdminOrderDetail>(`/admin/orders/${pathId(orderId)}`)
   },
+  getPaymentProofAccess(orderId: string) {
+    return apiRequest<{ url: string; expiresAt: string; mimeType: string }>(
+      `/admin/orders/${pathId(orderId)}/payment-proof`,
+    )
+  },
   approveOrder(orderId: string, reviewNote: string) {
     return apiRequest<ApiAdminOrderDetail>(`/admin/orders/${pathId(orderId)}/approve`, {
       method: 'POST',

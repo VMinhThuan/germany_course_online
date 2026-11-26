@@ -111,6 +111,7 @@ export function createApp(
       await emailOutboxWorker.processMessage(messageId);
     },
     async (messageId) => emailOutboxWorker.retryMessage(messageId),
+    mediaStorage,
   );
   const adminService = new AdminService(mediaStorage);
   const databaseMiddleware = createDatabaseMiddleware(

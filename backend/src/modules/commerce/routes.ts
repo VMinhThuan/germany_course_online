@@ -17,6 +17,9 @@ import {
   orderApprovalSchema,
   orderCreateSchema,
   orderIdParamsSchema,
+  paymentProofAssetParamsSchema,
+  paymentProofCompleteSchema,
+  paymentProofUploadIntentSchema,
   pageQuerySchema,
   siteSettingsPatchSchema,
 } from "./schemas.js";
@@ -193,6 +196,92 @@ export function createCommerceRouter(
     },
   );
 
+  router.post(
+    "/orders/:orderId/payment-proof/upload-intents",
+    validateRequest({
+      params: orderIdParamsSchema,
+      body: paymentProofUploadIntentSchema,
+    }),
+    async (req, res, next) => {
+      try {
+        if (!req.auth) throw unauthorized();
+        success(
+          res,
+          await commerce.createPaymentProofUploadIntent(
+            req.auth.sub,
+            res.locals.validated.params.orderId,
+            res.locals.validated.body,
+          ),
+          201,
+        );
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  router.post(
+    "/orders/:orderId/payment-proof/complete",
+    validateRequest({
+      params: orderIdParamsSchema,
+      body: paymentProofCompleteSchema,
+    }),
+    async (req, res, next) => {
+      try {
+        if (!req.auth) throw unauthorized();
+        success(
+          res,
+          await commerce.completePaymentProof(
+            req.auth.sub,
+            res.locals.validated.params.orderId,
+            res.locals.validated.body.assetId,
+          ),
+        );
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  router.delete(
+    "/orders/:orderId/payment-proof",
+    validateRequest({ params: orderIdParamsSchema }),
+    async (req, res, next) => {
+      try {
+        if (!req.auth) throw unauthorized();
+        success(
+          res,
+          await commerce.deletePaymentProof(
+            req.auth.sub,
+            res.locals.validated.params.orderId,
+          ),
+        );
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  router.get(
+    "/orders/:orderId/payment-proof",
+    validateRequest({ params: orderIdParamsSchema }),
+    async (req, res, next) => {
+      try {
+        if (!req.auth) throw unauthorized();
+        res.setHeader("Cache-Control", "private, no-store");
+        success(
+          res,
+          await commerce.getPaymentProofAccess(
+            res.locals.validated.params.orderId,
+            req.auth.sub,
+          ),
+        );
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
   router.get(
     "/admin/orders",
     validateRequest({ query: adminOrderQuerySchema }),
@@ -259,6 +348,44 @@ export function createCommerceRouter(
         success(
           res,
           await commerce.getAdminOrder(res.locals.validated.params.orderId),
+        );
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  router.get(
+    "/admin/orders/:orderId/payment-proof",
+    validateRequest({ params: orderIdParamsSchema }),
+    async (_req, res, next) => {
+      try {
+        res.setHeader("Cache-Control", "private, no-store");
+        success(
+          res,
+          await commerce.getPaymentProofAccess(
+            res.locals.validated.params.orderId,
+          ),
+        );
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  router.get(
+    "/admin/orders/:orderId/payment-proofs/:assetId",
+    validateRequest({ params: paymentProofAssetParamsSchema }),
+    async (_req, res, next) => {
+      try {
+        res.setHeader("Cache-Control", "private, no-store");
+        success(
+          res,
+          await commerce.getPaymentProofAccess(
+            res.locals.validated.params.orderId,
+            undefined,
+            res.locals.validated.params.assetId,
+          ),
         );
       } catch (error) {
         next(error);

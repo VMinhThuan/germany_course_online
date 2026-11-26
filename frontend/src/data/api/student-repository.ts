@@ -214,6 +214,8 @@ function toOrderDetail(detail: ApiOrderDetail): StudentOrderDetailViewModel {
     ...(order.renewalPlanId ? { planId: order.renewalPlanId } : {}),
     paymentInstructions: detail.paymentInstructions,
     transferReported: Boolean(order.paymentSubmittedAt),
+    paymentProof: order.paymentProof,
+    paymentProofRequired: order.paymentProofRequired,
     ...(enrollment ? { enrollment } : {}),
     access: enrollment
       ? toAccess(enrollment.status, detail.enrollment ?? undefined)
@@ -810,6 +812,38 @@ const commerce: StudentCommerceRepository & {
     )
     return toOrderDetail(detail)
   },
+  async uploadPaymentProof(_sessionId, orderId, file, onProgress) {
+    const intent = await apiRequest<{
+      assetId: string
+      provider: 'S3_COMPATIBLE' | 'CLOUDINARY'
+      uploadUrl: string
+      uploadMethod: 'PUT' | 'POST'
+      uploadHeaders: Record<string, string>
+      uploadFields: Record<string, string>
+    }>(`/orders/${encodeURIComponent(orderId)}/payment-proof/upload-intents`, {
+      method: 'POST',
+      body: { originalName: file.name, mimeType: file.type, fileSize: file.size },
+    })
+    const uploadResponse = await uploadDirect(intent, file, onProgress)
+    if (!uploadResponse.ok)
+      throw new ApiError({
+        status: uploadResponse.status,
+        code: 'PAYMENT_PROOF_UPLOAD_FAILED',
+        message: 'Không thể tải ảnh minh chứng lên kho lưu trữ.',
+      })
+    const detail = await apiRequest<ApiOrderDetail>(
+      `/orders/${encodeURIComponent(orderId)}/payment-proof/complete`,
+      { method: 'POST', body: { assetId: intent.assetId } },
+    )
+    return toOrderDetail(detail)
+  },
+  async deletePaymentProof(_sessionId, orderId) {
+    const detail = await apiRequest<ApiOrderDetail>(
+      `/orders/${encodeURIComponent(orderId)}/payment-proof`,
+      { method: 'DELETE' },
+    )
+    return toOrderDetail(detail)
+  },
   async cancelOrder(_sessionId, orderId) {
     const detail = await apiRequest<ApiOrderDetail>(
       `/orders/${encodeURIComponent(orderId)}/cancel`,
@@ -817,6 +851,41 @@ const commerce: StudentCommerceRepository & {
     )
     return toOrderDetail(detail)
   },
+}
+
+async function uploadDirect(
+  intent: {
+    uploadUrl: string
+    uploadMethod: 'PUT' | 'POST'
+    uploadHeaders: Record<string, string>
+    uploadFields: Record<string, string>
+  },
+  file: File,
+  onProgress?: (progress: number) => void,
+): Promise<Response> {
+  return new Promise<Response>((resolve, reject) => {
+    const request = new XMLHttpRequest()
+    request.open(intent.uploadMethod, intent.uploadUrl)
+    Object.entries(intent.uploadHeaders).forEach(([key, value]) =>
+      request.setRequestHeader(key, value),
+    )
+    request.upload.onprogress = (event) => {
+      if (event.lengthComputable)
+        onProgress?.(Math.max(1, Math.round((event.loaded / event.total) * 100)))
+    }
+    request.onload = () =>
+      resolve(new Response(null, { status: request.status, statusText: request.statusText }))
+    request.onerror = () => reject(new Error('Mất kết nối khi tải ảnh minh chứng lên.'))
+    request.onabort = () => reject(new Error('Tải ảnh minh chứng đã bị hủy.'))
+    if (intent.uploadMethod === 'POST') {
+      const form = new FormData()
+      Object.entries(intent.uploadFields).forEach(([key, value]) => form.append(key, value))
+      form.append('file', file)
+      request.send(form)
+    } else {
+      request.send(file)
+    }
+  })
 }
 
 const account: StudentAccountRepository = {

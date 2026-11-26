@@ -89,6 +89,8 @@ export interface MediaStorageAdapter {
   verifyUpload?(
     input: VerifyMediaInput,
   ): Promise<UploadedObjectMetadata | null>;
+  /** Read the bounded object and validate its image container, not just its MIME label. */
+  verifyImageSignature?(input: VerifyMediaInput): Promise<boolean>;
   deleteObject?(storageKey: string): Promise<void>;
   deleteAsset?(input: DeleteMediaInput): Promise<void>;
 }
@@ -115,6 +117,10 @@ export class UnconfiguredMediaStorage implements MediaStorageAdapter {
   async verifyUpload(
     _input: VerifyMediaInput,
   ): Promise<UploadedObjectMetadata | null> {
+    throw mediaUnavailable();
+  }
+
+  async verifyImageSignature(_input: VerifyMediaInput): Promise<boolean> {
     throw mediaUnavailable();
   }
 
@@ -203,6 +209,25 @@ export class S3CompatibleMediaStorage implements MediaStorageAdapter {
     input: VerifyMediaInput,
   ): Promise<UploadedObjectMetadata | null> {
     return this.headObject(input.storageKey);
+  }
+
+  async verifyImageSignature(input: VerifyMediaInput): Promise<boolean> {
+    validateStorageKey(input.storageKey);
+    try {
+      const result = await this.client.send(
+        new GetObjectCommand({
+          Bucket: this.config.bucket,
+          Key: input.storageKey,
+        }),
+      );
+      const bytes = await readObjectBytes(result.Body, input.fileSize);
+      return bytes ? matchesImageSignature(input.mimeType, bytes) : false;
+    } catch (error) {
+      if (getHttpStatus(error) === 404) return false;
+      throw mediaUnavailable(
+        "Uploaded image content could not be inspected with the configured provider.",
+      );
+    }
   }
 
   async deleteObject(storageKey: string): Promise<void> {
@@ -477,6 +502,31 @@ export class CloudinaryMediaStorage implements MediaStorageAdapter {
     return metadata;
   }
 
+  async verifyImageSignature(input: VerifyMediaInput): Promise<boolean> {
+    const signed = await this.signRead({
+      storageKey: input.storageKey,
+      mimeType: input.mimeType,
+      mediaType: input.mediaType,
+      resourceType: input.resourceType ?? null,
+      deliveryType: input.deliveryType ?? null,
+      format: formatForMime(input.mimeType) ?? null,
+    });
+    try {
+      const response = await fetch(signed.url);
+      if (!response.ok) return false;
+      const contentLength = Number(response.headers.get("content-length"));
+      if (Number.isFinite(contentLength) && contentLength !== input.fileSize)
+        return false;
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      if (bytes.byteLength !== input.fileSize) return false;
+      return matchesImageSignature(input.mimeType, bytes);
+    } catch {
+      throw mediaUnavailable(
+        "Uploaded image content could not be inspected with the configured provider.",
+      );
+    }
+  }
+
   async deleteObject(storageKey: string): Promise<void> {
     const resourceType = this.resourceTypeFromKey(storageKey);
     if (!resourceType) throw invalidMediaKey();
@@ -613,6 +663,14 @@ export class MediaStorageRouter implements MediaStorageAdapter {
       : this.active.headObject!(input.storageKey);
   }
 
+  verifyImageSignature(input: VerifyMediaInput): Promise<boolean> {
+    if (!this.active.verifyImageSignature)
+      throw mediaUnavailable(
+        "Image signature verification is unavailable for the media provider.",
+      );
+    return this.active.verifyImageSignature(input);
+  }
+
   deleteObject(storageKey: string): Promise<void> {
     return this.active.deleteObject!(storageKey);
   }
@@ -706,6 +764,130 @@ function mimeForFormat(format: string): string | null {
   if (["wav", "wave"].includes(format)) return "audio/wav";
   if (["ogg", "oga"].includes(format)) return "audio/ogg";
   return null;
+}
+
+export function matchesImageSignature(
+  mimeType: string,
+  bytes: Uint8Array,
+): boolean {
+  const startsWith = (signature: number[]) =>
+    signature.every((value, index) => bytes[index] === value);
+  if (mimeType === "image/jpeg")
+    return (
+      bytes.byteLength >= 5 &&
+      startsWith([0xff, 0xd8, 0xff]) &&
+      bytes[bytes.byteLength - 2] === 0xff &&
+      bytes[bytes.byteLength - 1] === 0xd9
+    );
+  if (mimeType === "image/png") {
+    if (
+      bytes.byteLength < 33 ||
+      !startsWith([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+    )
+      return false;
+    let offset = 8;
+    let hasHeader = false;
+    let hasData = false;
+    let hasEnd = false;
+    while (offset + 12 <= bytes.byteLength) {
+      const length = readUInt32BE(bytes, offset);
+      const chunkEnd = offset + 12 + length;
+      if (chunkEnd > bytes.byteLength) return false;
+      const type = String.fromCharCode(
+        bytes[offset + 4] ?? 0,
+        bytes[offset + 5] ?? 0,
+        bytes[offset + 6] ?? 0,
+        bytes[offset + 7] ?? 0,
+      );
+      if (type === "IHDR") {
+        if (
+          length !== 13 ||
+          readUInt32BE(bytes, offset + 8) === 0 ||
+          readUInt32BE(bytes, offset + 12) === 0
+        )
+          return false;
+        hasHeader = true;
+      }
+      if (type === "IEND") {
+        if (length !== 0 || !hasHeader || !hasData) return false;
+        hasEnd = true;
+        return chunkEnd === bytes.byteLength;
+      }
+      if (type === "IDAT" && length > 0) hasData = true;
+      offset = chunkEnd;
+    }
+    return hasHeader && hasEnd;
+  }
+  if (mimeType === "image/webp") {
+    if (
+      bytes.byteLength < 20 ||
+      !startsWith([0x52, 0x49, 0x46, 0x46]) ||
+      bytes[8] !== 0x57 ||
+      bytes[9] !== 0x45 ||
+      bytes[10] !== 0x42 ||
+      bytes[11] !== 0x50
+    )
+      return false;
+    if (readUInt32LE(bytes, 4) + 8 !== bytes.byteLength) return false;
+    let offset = 12;
+    while (offset + 8 <= bytes.byteLength) {
+      const type = String.fromCharCode(
+        bytes[offset] ?? 0,
+        bytes[offset + 1] ?? 0,
+        bytes[offset + 2] ?? 0,
+        bytes[offset + 3] ?? 0,
+      );
+      const length = readUInt32LE(bytes, offset + 4);
+      const chunkEnd = offset + 8 + length + (length % 2);
+      if (chunkEnd > bytes.byteLength) return false;
+      if (type === "VP8 " || type === "VP8L" || type === "VP8X") return true;
+      offset = chunkEnd;
+    }
+  }
+  return false;
+}
+
+async function readObjectBytes(
+  body: unknown,
+  expectedLength: number,
+): Promise<Uint8Array | null> {
+  if (!body || typeof body !== "object" || !(Symbol.asyncIterator in body))
+    return null;
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  for await (const chunk of body as AsyncIterable<Uint8Array | string>) {
+    const value =
+      typeof chunk === "string" ? new TextEncoder().encode(chunk) : chunk;
+    chunks.push(value);
+    length += value.byteLength;
+    if (length > expectedLength || length > 5 * 1024 * 1024) return null;
+  }
+  if (length !== expectedLength) return null;
+  const output = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    output.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return output;
+}
+
+function readUInt32BE(bytes: Uint8Array, offset: number): number {
+  return (
+    (bytes[offset] ?? 0) * 0x1000000 +
+    (bytes[offset + 1] ?? 0) * 0x10000 +
+    (bytes[offset + 2] ?? 0) * 0x100 +
+    (bytes[offset + 3] ?? 0)
+  );
+}
+
+function readUInt32LE(bytes: Uint8Array, offset: number): number {
+  return (
+    (bytes[offset] ?? 0) +
+    (bytes[offset + 1] ?? 0) * 0x100 +
+    (bytes[offset + 2] ?? 0) * 0x10000 +
+    (bytes[offset + 3] ?? 0) * 0x1000000
+  );
 }
 
 function formatMatchesMedia(

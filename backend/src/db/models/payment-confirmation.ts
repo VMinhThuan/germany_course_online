@@ -23,6 +23,18 @@ const paymentConfirmationSchema = new Schema(
     },
     attemptNumber: { type: Number, required: true, min: 1, immutable: true },
     submittedAt: { type: Date, required: true, immutable: true },
+    paymentProofAssetId: {
+      type: Schema.Types.ObjectId,
+      ref: "MediaAsset",
+      default: null,
+      immutable: true,
+    },
+    paymentProofStorageKey: {
+      type: String,
+      default: null,
+      select: false,
+      immutable: true,
+    },
     status: {
       type: String,
       enum: ["PENDING", "APPROVED", "REJECTED"],

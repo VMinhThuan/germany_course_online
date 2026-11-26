@@ -14,6 +14,7 @@ import {
   EnrollmentAdjustment,
   LessonNote,
   LessonProgress,
+  MediaAsset,
   Order,
   SiteSettings,
   User,
@@ -108,6 +109,44 @@ async function setupPayment() {
   });
 }
 
+async function attachValidPaymentProof(orderId: string, userId: string) {
+  const uploadedAt = new Date();
+  const asset = await MediaAsset.create({
+    originalName: "transfer-proof.png",
+    mediaType: "IMAGE",
+    mimeType: "image/png",
+    fileSize: 128,
+    provider: "S3_COMPATIBLE",
+    storageKey: `payment-proofs/test/${randomUUID()}.png`,
+    resourceType: null,
+    deliveryType: null,
+    format: "png",
+    providerAssetId: null,
+    externalMediaId: null,
+    durationSeconds: null,
+    uploadedById: new Types.ObjectId(userId),
+    paymentProofOrderId: new Types.ObjectId(orderId),
+    visibility: "ENROLLED",
+    uploadStatus: "READY",
+    uploadExpiresAt: null,
+    deletedAt: null,
+    referenceRevision: 0,
+  });
+  await Order.updateOne(
+    { _id: new Types.ObjectId(orderId), userId: new Types.ObjectId(userId) },
+    {
+      $set: {
+        paymentProofAssetId: asset._id,
+        paymentProofStorageKey: asset.storageKey,
+        paymentProofMimeType: asset.mimeType,
+        paymentProofFileSize: asset.fileSize,
+        paymentProofUploadedAt: uploadedAt,
+        paymentProofSubmittedAt: null,
+      },
+    },
+  );
+}
+
 function as(
   actor: Actor,
   method: "get" | "post" | "patch" | "delete",
@@ -144,6 +183,10 @@ describe("BE-03C renewal, coupon, cancellation, and Admin enrollment transaction
       courseId: previouslyPurchasedCourse.id,
       orderType: "PURCHASE",
     });
+    await attachValidPaymentProof(
+      previousPurchase.body.data.order.id as string,
+      student.userId,
+    );
     await as(
       student,
       "post",
@@ -275,6 +318,7 @@ describe("BE-03C renewal, coupon, cancellation, and Admin enrollment transaction
       price: "650000",
       durationMonths: 18,
     });
+    await attachValidPaymentProof(orderId, student.userId);
     await as(
       student,
       "post",
@@ -414,6 +458,7 @@ describe("BE-03C renewal, coupon, cancellation, and Admin enrollment transaction
       couponCode: "SAVE10",
     });
     const secondId = second.body.data.order.id as string;
+    await attachValidPaymentProof(secondId, student.userId);
     await as(
       student,
       "post",
@@ -468,6 +513,7 @@ describe("BE-03C renewal, coupon, cancellation, and Admin enrollment transaction
     });
     expect(paidOrder.status).toBe(201);
     const paidOrderId = paidOrder.body.data.order.id as string;
+    await attachValidPaymentProof(paidOrderId, student.userId);
     await as(
       student,
       "post",
@@ -516,6 +562,10 @@ describe("BE-03C renewal, coupon, cancellation, and Admin enrollment transaction
       orderType: "PURCHASE",
     });
     expect(firstOrder.body.data.order.discountAmount).toBe("0");
+    await attachValidPaymentProof(
+      firstOrder.body.data.order.id as string,
+      student.userId,
+    );
     await as(
       student,
       "post",

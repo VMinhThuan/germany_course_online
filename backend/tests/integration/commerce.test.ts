@@ -11,6 +11,7 @@ import {
   Enrollment,
   EnrollmentAdjustment,
   Lesson,
+  MediaAsset,
   Order,
   PaymentConfirmation,
   SiteSettings,
@@ -114,6 +115,44 @@ async function setupPaymentSettings() {
     payment: paymentSettings,
     updatedAt: new Date(),
   });
+}
+
+async function attachValidPaymentProof(orderId: string, userId: string) {
+  const uploadedAt = new Date();
+  const asset = await MediaAsset.create({
+    originalName: "transfer-proof.png",
+    mediaType: "IMAGE",
+    mimeType: "image/png",
+    fileSize: 128,
+    provider: "S3_COMPATIBLE",
+    storageKey: `payment-proofs/test/${randomUUID()}.png`,
+    resourceType: null,
+    deliveryType: null,
+    format: "png",
+    providerAssetId: null,
+    externalMediaId: null,
+    durationSeconds: null,
+    uploadedById: new Types.ObjectId(userId),
+    paymentProofOrderId: new Types.ObjectId(orderId),
+    visibility: "ENROLLED",
+    uploadStatus: "READY",
+    uploadExpiresAt: null,
+    deletedAt: null,
+    referenceRevision: 0,
+  });
+  await Order.updateOne(
+    { _id: new Types.ObjectId(orderId), userId: new Types.ObjectId(userId) },
+    {
+      $set: {
+        paymentProofAssetId: asset._id,
+        paymentProofStorageKey: asset.storageKey,
+        paymentProofMimeType: asset.mimeType,
+        paymentProofFileSize: asset.fileSize,
+        paymentProofUploadedAt: uploadedAt,
+        paymentProofSubmittedAt: null,
+      },
+    },
+  );
 }
 
 function as(actor: Actor, method: "get" | "post" | "patch", path: string) {
@@ -229,6 +268,14 @@ describe("BE-03A purchase, manual approval, enrollment, and email outbox", () =>
       `/api/v1/orders/${orderId}/confirm-transfer`,
     ).send({});
     expect(foreignConfirmation.status).toBe(404);
+    const missingProof = await as(
+      student,
+      "post",
+      `/api/v1/orders/${orderId}/confirm-transfer`,
+    ).send({});
+    expect(missingProof.status).toBe(422);
+    expect(missingProof.body.error.code).toBe("PAYMENT_PROOF_REQUIRED");
+    await attachValidPaymentProof(orderId, student.userId);
     const beforePayment = await as(
       student,
       "get",
@@ -495,6 +542,7 @@ describe("BE-03A purchase, manual approval, enrollment, and email outbox", () =>
       orderType: "PURCHASE",
     });
     const orderId = created.body.data.order.id as string;
+    await attachValidPaymentProof(orderId, student.userId);
 
     const firstConfirmation = await as(
       student,
@@ -517,6 +565,8 @@ describe("BE-03A purchase, manual approval, enrollment, and email outbox", () =>
     expect(emailService.notificationDeliveries[1]?.html).toContain(
       `/student/orders/${orderId}`,
     );
+
+    await attachValidPaymentProof(orderId, student.userId);
 
     const resubmitted = await as(
       student,
@@ -547,6 +597,7 @@ describe("BE-03A purchase, manual approval, enrollment, and email outbox", () =>
       orderType: "PURCHASE",
     });
     const orderId = created.body.data.order.id as string;
+    await attachValidPaymentProof(orderId, student.userId);
     await as(
       student,
       "post",
@@ -663,6 +714,7 @@ describe("BE-03A purchase, manual approval, enrollment, and email outbox", () =>
       orderType: "PURCHASE",
     });
     const orderId = created.body.data.order.id as string;
+    await attachValidPaymentProof(orderId, student.userId);
     await as(
       student,
       "post",
@@ -718,6 +770,7 @@ describe("BE-03A purchase, manual approval, enrollment, and email outbox", () =>
       orderType: "PURCHASE",
     });
     const orderId = created.body.data.order.id as string;
+    await attachValidPaymentProof(orderId, student.userId);
     emailService.notificationFailuresRemaining = 5;
     await as(
       student,
@@ -840,6 +893,7 @@ describe("BE-03A purchase, manual approval, enrollment, and email outbox", () =>
       orderType: "PURCHASE",
     });
     const reportedOrderId = reported.body.data.order.id as string;
+    await attachValidPaymentProof(reportedOrderId, student.userId);
     const confirmation = await as(
       student,
       "post",

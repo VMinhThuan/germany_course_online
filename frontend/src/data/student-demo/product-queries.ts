@@ -248,6 +248,25 @@ export function useConfirmTransfer(sessionId: string) {
     apiStudentRepositories.commerce.confirmTransfer!(sessionId, orderId),
   )
 }
+export function useUploadPaymentProof(sessionId: string) {
+  return useProductMutation(
+    sessionId,
+    ({
+      orderId,
+      file,
+      onProgress,
+    }: {
+      orderId: string
+      file: File
+      onProgress?: (value: number) => void
+    }) => apiStudentRepositories.commerce.uploadPaymentProof!(sessionId, orderId, file, onProgress),
+  )
+}
+export function useDeletePaymentProof(sessionId: string) {
+  return useProductMutation(sessionId, (orderId: string) =>
+    apiStudentRepositories.commerce.deletePaymentProof!(sessionId, orderId),
+  )
+}
 export function useCancelStudentOrder(sessionId: string) {
   return useProductMutation(sessionId, (orderId: string) =>
     apiStudentRepositories.commerce.cancelOrder!(sessionId, orderId),

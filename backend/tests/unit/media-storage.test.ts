@@ -4,6 +4,7 @@ import { parseEnvironment } from "../../src/config/env.js";
 import {
   CloudinaryMediaStorage,
   createMediaStorageAdapter,
+  matchesImageSignature,
   S3CompatibleMediaStorage,
   UnconfiguredMediaStorage,
 } from "../../src/modules/learning/media-storage.js";
@@ -31,6 +32,26 @@ const baseEnvironment = {
 };
 
 describe("learning media storage adapters", () => {
+  it("rejects MIME-spoofed, truncated, and structurally incomplete image bytes", () => {
+    const png = Uint8Array.from(
+      Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+        "base64",
+      ),
+    );
+    expect(matchesImageSignature("image/png", png)).toBe(true);
+    expect(matchesImageSignature("image/png", png.subarray(0, 16))).toBe(false);
+    expect(matchesImageSignature("image/jpeg", png)).toBe(false);
+    expect(
+      matchesImageSignature(
+        "image/webp",
+        Uint8Array.from([
+          0x52, 0x49, 0x46, 0x46, 4, 0, 0, 0, 0x57, 0x45, 0x42, 0x50,
+        ]),
+      ),
+    ).toBe(false);
+  });
+
   it("signs a private S3-compatible GET URL with the configured TTL and response headers", async () => {
     const storage = new S3CompatibleMediaStorage({
       endpoint: "https://objects.example.test",

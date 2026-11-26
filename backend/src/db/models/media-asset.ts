@@ -41,6 +41,12 @@ const mediaAssetSchema = new Schema(
     externalMediaId: { type: String, default: null, select: false },
     durationSeconds: { type: Number, default: null, min: 0 },
     uploadedById: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    paymentProofOrderId: {
+      type: Schema.Types.ObjectId,
+      ref: "Order",
+      default: null,
+      select: false,
+    },
     visibility: {
       type: String,
       enum: ["PUBLIC", "ENROLLED"],

@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import mongoose, { Types } from "mongoose";
 import type { AuditLogFields, OrderFields } from "../../db/models/index.js";
 import {
@@ -44,6 +44,12 @@ import {
   normalizeCouponCode,
 } from "./pricing.js";
 import { DEFAULT_SITE_SETTINGS } from "../site-settings/defaults.js";
+import type {
+  MediaStorageAdapter,
+  MediaResourceType,
+  MediaDeliveryType,
+} from "../learning/media-storage.js";
+import type { PaymentProofUploadIntentInput } from "./schemas.js";
 
 const PAYMENT_CONFIGURATION_UNAVAILABLE = () =>
   new AppError(
@@ -100,6 +106,7 @@ export class CommerceService {
     private readonly vietQr?: VietQrConfig,
     private readonly processOutboxMessage?: OutboxMessageProcessor,
     private readonly retryOutboxMessage?: OutboxMessageRetrier,
+    private readonly mediaStorage?: MediaStorageAdapter,
   ) {}
 
   private async processCommittedEmail(messageId: Types.ObjectId | null) {
@@ -281,7 +288,14 @@ export class CommerceService {
               couponId:
                 pricing.discountSource === "COUPON" ? pricing.couponId : null,
               status: "PENDING",
+              paymentProofRequired: true,
               paymentSubmittedAt: null,
+              paymentProofAssetId: null,
+              paymentProofStorageKey: null,
+              paymentProofMimeType: null,
+              paymentProofFileSize: null,
+              paymentProofUploadedAt: null,
+              paymentProofSubmittedAt: null,
               reviewedById: null,
               reviewedAt: null,
               reviewNote: null,
@@ -405,6 +419,413 @@ export class CommerceService {
     };
   }
 
+  async createPaymentProofUploadIntent(
+    userId: string,
+    orderId: string,
+    input: PaymentProofUploadIntentInput,
+  ) {
+    const storage = this.mediaStorage;
+    if (!storage?.createUpload)
+      throw new AppError(
+        503,
+        "MEDIA_STORAGE_UNAVAILABLE",
+        "Payment proof upload is not configured.",
+      );
+    const userObjectId = new Types.ObjectId(userId);
+    const orderObjectId = new Types.ObjectId(orderId);
+    await this.expirePendingOrder(orderObjectId);
+    const order = await Order.findOne({
+      _id: orderObjectId,
+      userId: userObjectId,
+    }).lean();
+    this.assertProofCanBeEdited(order);
+
+    const provider = storage.provider;
+    if (!provider)
+      throw new AppError(
+        503,
+        "MEDIA_STORAGE_UNAVAILABLE",
+        "Payment proof upload is not configured.",
+      );
+    const uniqueId = `payment-proofs/${randomUUID().replaceAll("-", "")}`;
+    const resourceType = provider === "CLOUDINARY" ? "image" : undefined;
+    const deliveryType =
+      provider === "CLOUDINARY" ? "authenticated" : undefined;
+    const storageKey =
+      storage.createStorageKey?.("IMAGE", uniqueId) ?? `media/${uniqueId}`;
+    let signed;
+    try {
+      signed = await storage.createUpload({
+        storageKey,
+        mimeType: input.mimeType,
+        fileSize: input.fileSize,
+        expiresInSeconds: 600,
+        mediaType: "IMAGE",
+        ...(resourceType ? { resourceType } : {}),
+        ...(deliveryType ? { deliveryType } : {}),
+      });
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw new AppError(
+        503,
+        "MEDIA_STORAGE_UNAVAILABLE",
+        "Payment proof upload is temporarily unavailable.",
+      );
+    }
+
+    // Abandoned upload intents must not accumulate indefinitely. A later
+    // intent for the same order safely retires the previous pending object.
+    const staleAssets = await MediaAsset.find({
+      paymentProofOrderId: order._id,
+      uploadStatus: "PENDING",
+    })
+      .select("+provider +storageKey +resourceType +deliveryType")
+      .lean();
+    const createdAsset = await MediaAsset.create({
+      originalName: safeProofName(input.originalName),
+      mediaType: "IMAGE",
+      mimeType: input.mimeType,
+      fileSize: input.fileSize,
+      provider,
+      storageKey,
+      resourceType: resourceType ?? null,
+      deliveryType: deliveryType ?? null,
+      format:
+        input.mimeType.split("/")[1] === "jpeg"
+          ? "jpg"
+          : (input.mimeType.split("/")[1] ?? null),
+      providerAssetId: null,
+      externalMediaId: null,
+      durationSeconds: null,
+      uploadedById: userObjectId,
+      paymentProofOrderId: order._id,
+      visibility: "ENROLLED",
+      uploadStatus: "PENDING",
+      uploadExpiresAt: signed.expiresAt,
+      deletedAt: null,
+      referenceRevision: 0,
+    });
+    await Promise.all(
+      staleAssets.map((asset) => this.deletePaymentProofAsset(asset)),
+    );
+    return {
+      assetId: createdAsset._id.toString(),
+      provider: signed.provider,
+      uploadUrl: signed.url,
+      uploadMethod: signed.method,
+      uploadHeaders: signed.headers ?? {},
+      uploadFields: signed.fields ?? {},
+      expiresAt: signed.expiresAt.toISOString(),
+    };
+  }
+
+  async completePaymentProof(userId: string, orderId: string, assetId: string) {
+    const storage = this.mediaStorage;
+    if (!storage)
+      throw new AppError(
+        503,
+        "MEDIA_STORAGE_UNAVAILABLE",
+        "Payment proof upload is not configured.",
+      );
+    const userObjectId = new Types.ObjectId(userId);
+    const orderObjectId = new Types.ObjectId(orderId);
+    const assetObjectId = new Types.ObjectId(assetId);
+    await this.expirePendingOrder(orderObjectId);
+    const order = await Order.findOne({
+      _id: orderObjectId,
+      userId: userObjectId,
+    })
+      .select("+paymentProofStorageKey")
+      .lean();
+    this.assertProofCanBeEdited(order);
+    const asset = await MediaAsset.findOne({
+      _id: assetObjectId,
+      paymentProofOrderId: orderObjectId,
+      uploadedById: userObjectId,
+      mediaType: "IMAGE",
+      deletedAt: null,
+      uploadStatus: { $in: ["PENDING", "READY"] },
+    })
+      .select("+provider +storageKey +resourceType +deliveryType")
+      .lean();
+    if (!asset) throw notFound("Payment proof upload not found.");
+    if (
+      asset.uploadStatus === "READY" &&
+      order.paymentProofAssetId?.toString() === asset._id.toString()
+    )
+      return this.getOwnedOrder(userId, orderId);
+    if (!asset.uploadExpiresAt || asset.uploadExpiresAt <= this.now())
+      throw new AppError(
+        409,
+        "UPLOAD_INTENT_EXPIRED",
+        "The payment proof upload intent expired.",
+      );
+    const adapter = resolveMediaStorage(this.mediaStorage, asset.provider);
+    if (!adapter?.verifyUpload || !adapter.verifyImageSignature)
+      throw new AppError(
+        503,
+        "MEDIA_STORAGE_UNAVAILABLE",
+        "Payment proof verification is unavailable.",
+      );
+    let metadata;
+    try {
+      metadata = await adapter.verifyUpload({
+        storageKey: asset.storageKey,
+        mimeType: asset.mimeType,
+        fileSize: asset.fileSize,
+        mediaType: "IMAGE",
+        resourceType: asset.resourceType as MediaResourceType | null,
+        deliveryType: asset.deliveryType as MediaDeliveryType | null,
+      });
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw new AppError(
+        503,
+        "MEDIA_STORAGE_UNAVAILABLE",
+        "Uploaded proof could not be verified.",
+      );
+    }
+    if (
+      !metadata ||
+      metadata.contentLength !== asset.fileSize ||
+      metadata.contentType?.toLowerCase() !== asset.mimeType.toLowerCase()
+    )
+      throw new AppError(
+        422,
+        "UPLOAD_METADATA_MISMATCH",
+        "Uploaded proof size or content type is invalid.",
+      );
+    if (
+      !(await adapter.verifyImageSignature({
+        storageKey: asset.storageKey,
+        mimeType: asset.mimeType,
+        fileSize: asset.fileSize,
+        mediaType: "IMAGE",
+        resourceType: asset.resourceType as MediaResourceType | null,
+        deliveryType: asset.deliveryType as MediaDeliveryType | null,
+      }))
+    )
+      throw new AppError(
+        422,
+        "UPLOAD_SIGNATURE_INVALID",
+        "Uploaded file is not a valid JPG, PNG, or WebP image.",
+      );
+
+    const uploadedAt = this.now();
+    const oldAssetId = order.paymentProofAssetId;
+    const updated = await withTransaction(async (session) => {
+      const cas = await Order.updateOne(
+        {
+          _id: orderObjectId,
+          userId: userObjectId,
+          status: { $in: ["PENDING", "REJECTED"] },
+          paymentSubmittedAt: null,
+          ...(order.status === "PENDING" && order.expiresAt
+            ? { expiresAt: { $gt: uploadedAt } }
+            : {}),
+        },
+        {
+          $set: {
+            paymentProofAssetId: asset._id,
+            paymentProofStorageKey: asset.storageKey,
+            paymentProofMimeType: asset.mimeType,
+            paymentProofFileSize: asset.fileSize,
+            paymentProofUploadedAt: uploadedAt,
+            paymentProofSubmittedAt: null,
+          },
+        },
+        { session },
+      );
+      if (cas.modifiedCount !== 1)
+        throw new AppError(
+          409,
+          "ORDER_STATE_CHANGED",
+          "Order changed before proof upload completed.",
+        );
+      const assetCas = await MediaAsset.updateOne(
+        { _id: asset._id, uploadStatus: "PENDING" },
+        { $set: { uploadStatus: "READY", uploadExpiresAt: null } },
+        { session },
+      );
+      if (assetCas.modifiedCount !== 1)
+        throw new AppError(
+          409,
+          "UPLOAD_ALREADY_COMPLETED",
+          "Payment proof upload was already completed.",
+        );
+      return { oldAssetId };
+    });
+    if (
+      updated.oldAssetId &&
+      updated.oldAssetId.toString() !== asset._id.toString()
+    ) {
+      const old = await MediaAsset.findById(updated.oldAssetId)
+        .select("+provider +storageKey +resourceType +deliveryType")
+        .lean();
+      if (old) await this.deletePaymentProofAsset(old);
+    }
+    return this.getOwnedOrder(userId, orderId);
+  }
+
+  async deletePaymentProof(userId: string, orderId: string) {
+    const userObjectId = new Types.ObjectId(userId);
+    const orderObjectId = new Types.ObjectId(orderId);
+    await this.expirePendingOrder(orderObjectId);
+    const order = await Order.findOne({
+      _id: orderObjectId,
+      userId: userObjectId,
+    })
+      .select("+paymentProofStorageKey")
+      .lean();
+    this.assertProofCanBeEdited(order);
+    if (!order.paymentProofAssetId) return this.getOwnedOrder(userId, orderId);
+    const asset = await MediaAsset.findById(order.paymentProofAssetId)
+      .select("+provider +storageKey +resourceType +deliveryType")
+      .lean();
+    const cas = await Order.updateOne(
+      { _id: orderObjectId, userId: userObjectId, paymentSubmittedAt: null },
+      {
+        $set: {
+          paymentProofAssetId: null,
+          paymentProofStorageKey: null,
+          paymentProofMimeType: null,
+          paymentProofFileSize: null,
+          paymentProofUploadedAt: null,
+          paymentProofSubmittedAt: null,
+        },
+      },
+    );
+    if (cas.modifiedCount !== 1)
+      throw new AppError(
+        409,
+        "ORDER_STATE_CHANGED",
+        "Order changed before proof deletion.",
+      );
+    if (asset) await this.deletePaymentProofAsset(asset);
+    return this.getOwnedOrder(userId, orderId);
+  }
+
+  async getPaymentProofAccess(
+    orderId: string,
+    ownerUserId?: string,
+    historicalAssetId?: string,
+  ) {
+    const order = await Order.findOne({
+      _id: new Types.ObjectId(orderId),
+      ...(ownerUserId ? { userId: new Types.ObjectId(ownerUserId) } : {}),
+    })
+      .select("+paymentProofStorageKey")
+      .lean();
+    if (!order || (!order.paymentProofAssetId && !historicalAssetId))
+      throw notFound("Payment proof not found.");
+    const assetId = historicalAssetId
+      ? new Types.ObjectId(historicalAssetId)
+      : order.paymentProofAssetId;
+    if (!assetId) throw notFound("Payment proof not found.");
+    if (historicalAssetId) {
+      const referenced = await PaymentConfirmation.exists({
+        orderId: order._id,
+        paymentProofAssetId: assetId,
+      });
+      if (!referenced) throw notFound("Payment proof not found.");
+    }
+    const asset = await MediaAsset.findOne({
+      _id: assetId,
+      paymentProofOrderId: order._id,
+      uploadStatus: "READY",
+      deletedAt: null,
+    })
+      .select("+provider +storageKey +resourceType +deliveryType")
+      .lean();
+    if (!asset) throw notFound("Payment proof not found.");
+    const adapter = resolveMediaStorage(this.mediaStorage, asset.provider);
+    if (!adapter)
+      throw new AppError(
+        503,
+        "MEDIA_STORAGE_UNAVAILABLE",
+        "Payment proof viewing is unavailable.",
+      );
+    const signed = await adapter.signRead({
+      storageKey: asset.storageKey,
+      mimeType: asset.mimeType,
+      mediaType: "IMAGE",
+      resourceType: asset.resourceType as MediaResourceType | null,
+      deliveryType: asset.deliveryType as MediaDeliveryType | null,
+      format: asset.format ?? null,
+    });
+    return {
+      url: signed.url,
+      expiresAt: signed.expiresAt.toISOString(),
+      mimeType: asset.mimeType,
+    };
+  }
+
+  private assertProofCanBeEdited(
+    order: (OrderFields & { _id: Types.ObjectId }) | null | undefined,
+  ): asserts order is OrderFields & { _id: Types.ObjectId } {
+    if (!order) throw notFound("Order not found.");
+    if (
+      order.status === "PAID" ||
+      order.status === "CANCELLED" ||
+      order.status === "EXPIRED"
+    )
+      throw new AppError(
+        409,
+        "ORDER_NOT_EDITABLE",
+        "This order cannot receive a payment proof.",
+      );
+    if (order.paymentSubmittedAt)
+      throw new AppError(
+        409,
+        "TRANSFER_ALREADY_SUBMITTED",
+        "Payment proof cannot be changed after submission.",
+      );
+    if (order.status !== "PENDING" && order.status !== "REJECTED")
+      throw new AppError(
+        409,
+        "ORDER_NOT_EDITABLE",
+        "This order cannot receive a payment proof.",
+      );
+    if (
+      order.status === "PENDING" &&
+      order.expiresAt &&
+      order.expiresAt <= this.now()
+    )
+      throw new AppError(
+        409,
+        "ORDER_EXPIRED",
+        "This order has expired. Please create a new order.",
+      );
+  }
+
+  private async deletePaymentProofAsset(asset: Record<string, unknown>) {
+    // A rejected confirmation still forms part of the reconciliation audit
+    // trail. Never remove an object that an immutable attempt references.
+    const referencedInHistory = await PaymentConfirmation.exists({
+      paymentProofAssetId: asset._id as Types.ObjectId,
+    });
+    if (referencedInHistory) return;
+    const adapter = resolveMediaStorage(this.mediaStorage, asset.provider);
+    try {
+      if (adapter?.deleteAsset)
+        await adapter.deleteAsset({
+          storageKey: String(asset.storageKey),
+          mediaType: "IMAGE",
+          resourceType: asset.resourceType as MediaResourceType | null,
+          deliveryType: asset.deliveryType as MediaDeliveryType | null,
+        });
+      await MediaAsset.updateOne(
+        { _id: asset._id },
+        { $set: { uploadStatus: "DELETED", deletedAt: this.now() } },
+      );
+    } catch {
+      await MediaAsset.updateOne(
+        { _id: asset._id },
+        { $set: { uploadStatus: "DELETING" } },
+      );
+    }
+  }
+
   async confirmTransfer(userId: string, orderId: string) {
     const userObjectId = new Types.ObjectId(userId);
     const orderObjectId = new Types.ObjectId(orderId);
@@ -439,6 +860,42 @@ export class CommerceService {
             "ORDER_NOT_RESUBMITTABLE",
             "This order cannot receive another transfer confirmation.",
           );
+
+        let proof: { _id: Types.ObjectId; storageKey: string } | null = null;
+        if (order.paymentProofRequired === true) {
+          if (!order.paymentProofAssetId || !order.paymentProofUploadedAt)
+            throw new AppError(
+              422,
+              "PAYMENT_PROOF_REQUIRED",
+              "Please upload a valid payment proof before requesting payment confirmation.",
+            );
+          proof = await MediaAsset.findOne({
+            _id: order.paymentProofAssetId,
+            paymentProofOrderId: order._id,
+            uploadedById: userObjectId,
+            uploadStatus: "READY",
+            deletedAt: null,
+          })
+            .select("+storageKey")
+            .session(session)
+            .lean();
+          if (!proof)
+            throw new AppError(
+              422,
+              "PAYMENT_PROOF_INVALID",
+              "The payment proof is no longer available. Please upload it again.",
+            );
+          if (
+            order.status === "REJECTED" &&
+            order.reviewedAt &&
+            order.paymentProofUploadedAt <= order.reviewedAt
+          )
+            throw new AppError(
+              422,
+              "PAYMENT_PROOF_REPLACEMENT_REQUIRED",
+              "Please upload a new payment proof after the previous request was rejected.",
+            );
+        }
 
         const pendingConfirmation = await PaymentConfirmation.findOne({
           orderId: order._id,
@@ -487,6 +944,7 @@ export class CommerceService {
             $set: {
               status: "PENDING",
               paymentSubmittedAt: submittedAt,
+              paymentProofSubmittedAt: submittedAt,
               reviewedById: null,
               reviewedAt: null,
               reviewNote: null,
@@ -534,6 +992,8 @@ export class CommerceService {
               reviewedById: null,
               reviewedAt: null,
               rejectionReason: null,
+              paymentProofAssetId: proof?._id ?? null,
+              paymentProofStorageKey: proof?.storageKey ?? null,
             },
           ],
           { session },
@@ -629,9 +1089,19 @@ export class CommerceService {
     orderId: Types.ObjectId,
     now = this.now(),
   ): Promise<{ status: string } | null> {
-    return withTransaction((session) =>
+    const result = await withTransaction((session) =>
       this.expirePendingOrderInTransaction(orderId, session, now),
     );
+    if (result?.status === "EXPIRED") {
+      const expired = await Order.findById(orderId).lean();
+      if (expired?.paymentProofAssetId) {
+        const asset = await MediaAsset.findById(expired.paymentProofAssetId)
+          .select("+provider +storageKey +resourceType +deliveryType")
+          .lean();
+        if (asset) await this.deletePaymentProofAsset(asset);
+      }
+    }
+    return result;
   }
 
   private async expirePendingOrderInTransaction(
@@ -727,6 +1197,7 @@ export class CommerceService {
     const userObjectId = new Types.ObjectId(userId);
     const orderObjectId = new Types.ObjectId(orderId);
     await this.expirePendingOrder(orderObjectId);
+    let proofAssetId: Types.ObjectId | null = null;
     await withTransaction(async (session) => {
       const order = await Order.findOne({
         _id: orderObjectId,
@@ -748,6 +1219,7 @@ export class CommerceService {
           "TRANSFER_ALREADY_SUBMITTED",
           "An order cannot be cancelled after a transfer is reported.",
         );
+      proofAssetId = order.paymentProofAssetId ?? null;
       const now = this.now();
       const update = await Order.updateOne(
         {
@@ -794,6 +1266,12 @@ export class CommerceService {
         { session },
       );
     });
+    if (proofAssetId) {
+      const asset = await MediaAsset.findById(proofAssetId)
+        .select("+provider +storageKey +resourceType +deliveryType")
+        .lean();
+      if (asset) await this.deletePaymentProofAsset(asset);
+    }
     return this.getOwnedOrder(userId, orderObjectId.toString());
   }
 
@@ -810,6 +1288,7 @@ export class CommerceService {
     const adminObjectId = new Types.ObjectId(adminId);
     const orderObjectId = new Types.ObjectId(orderId);
     await this.expirePendingOrder(orderObjectId);
+    let proofAssetId: Types.ObjectId | null = null;
     await withTransaction(async (session) => {
       const order = await Order.findById(orderObjectId).session(session).lean();
       if (!order) throw notFound("Order not found.");
@@ -820,6 +1299,7 @@ export class CommerceService {
           "ORDER_NOT_CANCELLABLE",
           "Only pending orders may be cancelled; paid orders cannot be cancelled.",
         );
+      proofAssetId = order.paymentProofAssetId ?? null;
       const now = this.now();
       const update = await Order.updateOne(
         { _id: order._id, status: "PENDING" },
@@ -889,6 +1369,12 @@ export class CommerceService {
           now,
         );
     });
+    if (proofAssetId) {
+      const asset = await MediaAsset.findById(proofAssetId)
+        .select("+provider +storageKey +resourceType +deliveryType")
+        .lean();
+      if (asset) await this.deletePaymentProofAsset(asset);
+    }
     return this.getAdminOrder(orderObjectId.toString());
   }
 
@@ -923,6 +1409,8 @@ export class CommerceService {
         {
           $set: {
             status: "REJECTED",
+            paymentSubmittedAt: null,
+            paymentProofSubmittedAt: null,
             reviewedById: adminObjectId,
             reviewedAt: now,
             reviewNote: reason,
@@ -1228,6 +1716,8 @@ export class CommerceService {
         attemptNumber: confirmation.attemptNumber,
         submittedAt: toIso(confirmation.submittedAt),
         status: confirmation.status,
+        paymentProofAssetId:
+          confirmation.paymentProofAssetId?.toString() ?? null,
         reviewedById: confirmation.reviewedById?.toString() ?? null,
         reviewedAt: toIso(confirmation.reviewedAt),
         rejectionReason: confirmation.rejectionReason,
@@ -2338,4 +2828,26 @@ function nullableObjectId(value: unknown): string | null {
 
 function nullableText(value: unknown): string | null {
   return typeof value === "string" ? value : null;
+}
+
+function safeProofName(value: string): string {
+  const base = value.replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 240);
+  return base || "payment-proof";
+}
+
+function resolveMediaStorage(
+  storage: MediaStorageAdapter | undefined,
+  providerValue: unknown,
+): MediaStorageAdapter | undefined {
+  if (!storage) return undefined;
+  if (providerValue === "S3_COMPATIBLE" || providerValue === "CLOUDINARY") {
+    return (
+      storage.resolve?.(providerValue) ??
+      (!storage.resolve &&
+      (!storage.provider || storage.provider === providerValue)
+        ? storage
+        : undefined)
+    );
+  }
+  return undefined;
 }

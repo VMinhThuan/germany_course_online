@@ -356,6 +356,15 @@ export interface ApiOrder {
   couponId: string | null
   durationMonthsSnapshot: number
   paymentSubmittedAt: string | null
+  paymentProofRequired: boolean
+  paymentProof: {
+    assetId: string
+    mimeType: string | null
+    fileSize: number | null
+    uploadedAt: string | null
+    submittedAt: string | null
+    needsReplacement: boolean
+  } | null
   paidAt: string | null
   expiresAt: string | null
   cancelledAt: string | null

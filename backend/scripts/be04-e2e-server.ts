@@ -1,4 +1,5 @@
 import argon2 from "argon2";
+import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 import { MongoMemoryReplSet } from "mongodb-memory-server";
 import mongoose from "mongoose";
@@ -21,12 +22,104 @@ import {
 import { createApp } from "../src/application.js";
 import { FakeEmailService } from "../src/modules/auth/email-service.js";
 import { ensureIndexes } from "../src/db/ensure-indexes.js";
+import {
+  matchesImageSignature,
+  type CreateUploadInput,
+  type MediaStorageAdapter,
+  type SignMediaInput,
+  type SignedMediaUrl,
+  type VerifyMediaInput,
+} from "../src/modules/learning/media-storage.js";
 
 const apiPort = 4141;
 const controlPort = 4142;
+const storagePort = 4143;
 const webOrigin = "http://127.0.0.1:4173";
 const controlToken = "BE05-LOCAL-RESET-ONLY-6f3bf983";
 const testPassword = "BE04-Isolated-Test-123!";
+
+class E2ePaymentProofStorage implements MediaStorageAdapter {
+  readonly provider = "S3_COMPATIBLE" as const;
+  private readonly objects = new Map<
+    string,
+    { bytes: Buffer; mimeType: string }
+  >();
+  private readonly readTokens = new Map<
+    string,
+    { key: string; expiresAt: number }
+  >();
+
+  constructor(private readonly baseUrl: string) {}
+
+  createStorageKey(_mediaType: string, uniqueId: string): string {
+    return `e2e-payment-proofs/${uniqueId}`;
+  }
+
+  createUpload(input: CreateUploadInput) {
+    return Promise.resolve({
+      provider: this.provider,
+      method: "PUT" as const,
+      url: `${this.baseUrl}/__e2e-storage/upload/${encodeURIComponent(input.storageKey)}`,
+      headers: { "Content-Type": input.mimeType },
+      expiresAt: new Date(Date.now() + input.expiresInSeconds * 1000),
+    });
+  }
+
+  verifyUpload(input: VerifyMediaInput) {
+    const object = this.objects.get(input.storageKey);
+    if (!object) return Promise.resolve(null);
+    return Promise.resolve({
+      contentLength: object.bytes.byteLength,
+      contentType: object.mimeType,
+    });
+  }
+
+  verifyImageSignature(input: VerifyMediaInput) {
+    const object = this.objects.get(input.storageKey);
+    return Promise.resolve(
+      Boolean(
+        object &&
+        object.bytes.byteLength === input.fileSize &&
+        object.mimeType === input.mimeType &&
+        matchesImageSignature(input.mimeType, object.bytes),
+      ),
+    );
+  }
+
+  signRead(input: SignMediaInput): Promise<SignedMediaUrl> {
+    const token = randomUUID();
+    const expiresAt = new Date(Date.now() + 120_000);
+    this.readTokens.set(token, {
+      key: input.storageKey,
+      expiresAt: expiresAt.getTime(),
+    });
+    return Promise.resolve({
+      url: `${this.baseUrl}/__e2e-storage/read/${encodeURIComponent(input.storageKey)}?token=${token}`,
+      expiresAt,
+    });
+  }
+
+  deleteAsset(input: { storageKey: string }) {
+    this.objects.delete(input.storageKey);
+    return Promise.resolve();
+  }
+
+  acceptUpload(key: string, bytes: Buffer, mimeType: string) {
+    this.objects.set(key, { bytes, mimeType });
+  }
+
+  read(key: string, token: string) {
+    const access = this.readTokens.get(token);
+    if (!access || access.key !== key || access.expiresAt <= Date.now())
+      return null;
+    return this.objects.get(key) ?? null;
+  }
+
+  reset() {
+    this.objects.clear();
+    this.readTokens.clear();
+  }
+}
 const fixtureIds = {
   student: "660000000000000000000001",
   admin: "660000000000000000000002",
@@ -500,8 +593,12 @@ async function main() {
   await connectMongo(config);
   await ensureIndexes();
   await seedFixtures();
+  const paymentProofStorage = new E2ePaymentProofStorage(
+    `http://127.0.0.1:${storagePort}`,
+  );
   const app = createApp(config, {
     emailService: new FakeEmailService(),
+    mediaStorage: paymentProofStorage,
     readiness: () => true,
   });
   const server = await new Promise<import("node:http").Server>(
@@ -526,6 +623,7 @@ async function main() {
       try {
         await mongoose.connection.dropDatabase();
         await ensureIndexes();
+        paymentProofStorage.reset();
         await seedFixtures();
         response.writeHead(204).end();
       } catch (error) {
@@ -538,9 +636,77 @@ async function main() {
       }
     })();
   });
+  const storageServer = createServer((request, response) => {
+    response.setHeader("Access-Control-Allow-Origin", webOrigin);
+    response.setHeader("Access-Control-Allow-Methods", "GET, PUT, OPTIONS");
+    response.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    if (request.method === "OPTIONS") {
+      response.writeHead(204).end();
+      return;
+    }
+    const parsed = new URL(
+      request.url ?? "/",
+      `http://127.0.0.1:${storagePort}`,
+    );
+    const prefix = "/__e2e-storage/";
+    if (!parsed.pathname.startsWith(prefix)) {
+      response.writeHead(404).end();
+      return;
+    }
+    const [action, ...encodedKeyParts] = parsed.pathname
+      .slice(prefix.length)
+      .split("/");
+    const key = decodeURIComponent(encodedKeyParts.join("/"));
+    if (action === "upload" && request.method === "PUT") {
+      const chunks: Buffer[] = [];
+      let length = 0;
+      request.on("data", (chunk: Buffer) => {
+        length += chunk.length;
+        if (length <= 5 * 1024 * 1024) chunks.push(chunk);
+      });
+      request.on("end", () => {
+        if (length > 5 * 1024 * 1024) {
+          response.writeHead(413).end();
+          return;
+        }
+        paymentProofStorage.acceptUpload(
+          key,
+          Buffer.concat(chunks),
+          String(request.headers["content-type"] ?? "").split(";", 1)[0],
+        );
+        response
+          .writeHead(200, { "Content-Type": "application/json" })
+          .end(JSON.stringify({ ok: true }));
+      });
+      return;
+    }
+    if (action === "read" && request.method === "GET") {
+      const object = paymentProofStorage.read(
+        key,
+        parsed.searchParams.get("token") ?? "",
+      );
+      if (!object) {
+        response.writeHead(404).end();
+        return;
+      }
+      response
+        .writeHead(200, {
+          "Cache-Control": "private, no-store",
+          "Content-Type": object.mimeType,
+          "Content-Length": object.bytes.byteLength,
+        })
+        .end(object.bytes);
+      return;
+    }
+    response.writeHead(404).end();
+  });
   await new Promise<void>((resolve, reject) => {
     controlServer.once("error", reject);
     controlServer.listen(controlPort, "127.0.0.1", resolve);
+  });
+  await new Promise<void>((resolve, reject) => {
+    storageServer.once("error", reject);
+    storageServer.listen(storagePort, "127.0.0.1", resolve);
   });
   process.stdout.write(
     `BE-04 isolated API listening at http://127.0.0.1:${apiPort}; MongoDB is an in-memory replica set.\n`,
@@ -555,6 +721,7 @@ async function main() {
     stopping = true;
     await new Promise<void>((resolve) => server.close(() => resolve()));
     await new Promise<void>((resolve) => controlServer.close(() => resolve()));
+    await new Promise<void>((resolve) => storageServer.close(() => resolve()));
     await disconnectMongo().catch(() => undefined);
     await replicaSet.stop();
   }

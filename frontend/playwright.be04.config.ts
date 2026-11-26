@@ -20,7 +20,10 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
-  projects: [{ name: 'chromium-be04-isolated', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    { name: 'chromium-be04-isolated', use: { ...devices['Desktop Chrome'] } },
+    { name: 'mobile-chromium-be04-isolated', use: { ...devices['Pixel 5'] } },
+  ],
   webServer: [
     {
       command: 'npm run e2e:server',

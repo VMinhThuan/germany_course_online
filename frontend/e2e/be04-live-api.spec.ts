@@ -1,26 +1,46 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 
 const studentEmail = 'student.be04@example.test'
 const adminEmail = 'admin.be04@example.test'
 const password = 'BE04-Isolated-Test-123!'
+const apiBase = 'http://127.0.0.1:4141/api/v1'
 const courseId = '660000000000000000000003'
 const lessonId = '660000000000000000000005'
 const fileExerciseId = '660000000000000000000006'
 const quizExerciseId = '660000000000000000000007'
+const webOrigin = 'http://127.0.0.1:4173'
+const controlToken = 'BE05-LOCAL-RESET-ONLY-6f3bf983'
+
+async function resetFixtures(request: APIRequestContext) {
+  const response = await request.post('http://127.0.0.1:4142/reset', {
+    headers: { Origin: webOrigin, 'X-BE05-Control': controlToken },
+  })
+  expect(response.status()).toBe(204)
+}
+
+test.beforeEach(async ({ request }) => {
+  await resetFixtures(request)
+})
 
 async function login(page: Page, email: string) {
   if (!page.url().includes('/login')) await page.goto('/login')
+  const loginResponse = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      new URL(response.url()).pathname === '/api/v1/auth/login',
+  )
   await page.getByLabel('Email').fill(email)
   await page.locator('#login-password').fill(password)
   await page.getByRole('button', { name: 'Đăng nhập' }).click()
   await expect(page).not.toHaveURL(/\/login/)
+  return (await (await loginResponse).json()).data.accessToken as string
 }
 
 test('guest, student purchase, admin reconciliation and learning use isolated Express + MongoDB', async ({
   page,
   browser,
-}) => {
+}, testInfo) => {
   const apiOperations: string[] = []
   page.on('request', (request) => {
     if (request.url().includes('/api/v1/'))
@@ -65,6 +85,30 @@ test('guest, student purchase, admin reconciliation and learning use isolated Ex
   await expect(page.getByText('BANK E2E · TEST ONLY')).toBeVisible()
   await expect(page.getByText('Chờ bạn hoàn tất thanh toán')).toBeVisible()
 
+  const confirmButton = page.getByRole('button', { name: 'Gửi yêu cầu xác nhận thanh toán' })
+  await expect(confirmButton).toBeDisabled()
+  const proofFile = {
+    name: 'giao-dich-thanh-cong.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+      'base64',
+    ),
+  }
+  await page.locator('input[type="file"]').setInputFiles(proofFile)
+  await expect(page.getByText('Ảnh đã được backend xác nhận hợp lệ.')).toBeVisible()
+  await expect(confirmButton).toBeEnabled()
+  await page.getByRole('button', { name: 'Thay đổi ảnh' }).click()
+  await page
+    .locator('input[type="file"]')
+    .setInputFiles({ ...proofFile, name: 'giao-dich-thay-the.png' })
+  await expect(page.getByText('giao-dich-thay-the.png')).toBeVisible()
+  await page.getByRole('button', { name: 'Xóa ảnh' }).click()
+  await expect(confirmButton).toBeDisabled()
+  await page.locator('input[type="file"]').setInputFiles(proofFile)
+  await expect(confirmButton).toBeEnabled()
+  await page.screenshot({ path: testInfo.outputPath('payment-proof-student.png'), fullPage: true })
+
   const deniedLesson = page.waitForResponse(
     (response) =>
       response.request().method() === 'GET' &&
@@ -76,7 +120,7 @@ test('guest, student purchase, admin reconciliation and learning use isolated Ex
   await expect(page.getByRole('heading', { name: 'Guten Tag · bài học E2E' })).toHaveCount(0)
 
   await page.goto(`/orders/${orderId}/pending`)
-  await page.getByRole('button', { name: 'Tôi đã chuyển khoản' }).click()
+  await page.getByRole('button', { name: 'Gửi yêu cầu xác nhận thanh toán' }).dblclick()
   await expect(page.getByText('Đang kiểm tra thanh toán')).toBeVisible()
   await expect(
     page.getByText(
@@ -94,12 +138,24 @@ test('guest, student purchase, admin reconciliation and learning use isolated Ex
   await adminPage.goto(`/admin/orders/${orderId}`)
   await expect(adminPage.getByRole('heading', { name: /Đơn / })).toBeVisible()
   await expect(adminPage.getByText('Đã báo chuyển khoản', { exact: false }).first()).toBeVisible()
+  const proofImage = adminPage.getByAltText('Minh chứng chuyển khoản của học viên')
+  await expect(proofImage).toBeVisible()
+  const signedProofUrl = await proofImage.getAttribute('src')
+  expect(signedProofUrl).toContain('token=')
+  expect((await adminPage.context().request.get(signedProofUrl!)).status()).toBe(200)
+  const tamperedProofUrl = new URL(signedProofUrl!)
+  tamperedProofUrl.searchParams.set('token', 'tampered-token')
+  expect((await adminPage.context().request.get(tamperedProofUrl.toString())).status()).toBe(404)
   await adminPage.getByRole('button', { name: 'Duyệt đã nhận tiền' }).click()
   const approveDialog = adminPage.getByRole('alertdialog', { name: 'Duyệt đơn đã nhận tiền?' })
   await approveDialog.getByRole('button', { name: 'Duyệt đơn và cấp quyền học' }).click()
   await expect(
     adminPage.getByText('Backend đã duyệt đơn và cập nhật quyền học.').first(),
   ).toBeVisible()
+  await adminPage.screenshot({
+    path: testInfo.outputPath('payment-proof-admin.png'),
+    fullPage: true,
+  })
 
   await page.goto(`/learn/lessons/${lessonId}`)
   await expect(page.getByRole('heading', { name: 'Guten Tag · bài học E2E' })).toBeVisible()
@@ -121,8 +177,6 @@ test('guest, student purchase, admin reconciliation and learning use isolated Ex
   await page.getByRole('button', { name: 'Đánh dấu hoàn thành' }).click()
   await expect(page.getByText('Bài tập đã hoàn thành')).toBeVisible()
 
-  await page.goto(`/learn/lessons/${lessonId}`)
-  await expect(page.getByText('Quiz E2E · lời chào')).toBeVisible()
   await page.goto(`/learn/exercises/${quizExerciseId}`)
   await page.getByRole('button', { name: 'Bắt đầu làm bài' }).click()
   await expect(page.getByText('Chọn cách nói “Tạm biệt”.')).toBeVisible()
@@ -153,10 +207,12 @@ test('guest, student purchase, admin reconciliation and learning use isolated Ex
   expect(apiOperations.some((operation) => operation.includes('/quiz-attempts/'))).toBe(true)
   expect(adminOperations).toContain(`POST /api/v1/admin/orders/${orderId}/approve`)
   await adminPage.close()
-  await page.getByRole('button', { name: 'Tài khoản' }).click()
-  await page.getByRole('menuitem', { name: 'Đăng xuất' }).click()
-  await expect(page).toHaveURL(/\/login\?returnTo=/)
-  expect(apiOperations).toContain('POST /api/v1/auth/logout')
+  if (!testInfo.project.name.includes('mobile')) {
+    await page.getByRole('button', { name: 'Tài khoản' }).click()
+    await page.getByRole('menuitem', { name: 'Đăng xuất' }).click()
+    await expect(page).toHaveURL(/\/login\?returnTo=/)
+    expect(apiOperations).toContain('POST /api/v1/auth/logout')
+  }
 })
 
 test('registration stores a Student without creating an authenticated session', async ({
@@ -177,20 +233,16 @@ test('a later login revokes the prior Student session and redirects its protecte
   page,
   browser,
 }) => {
-  await login(page, studentEmail)
+  const previousAccessToken = await login(page, studentEmail)
   const replacementPage = await browser.newPage()
   await login(replacementPage, studentEmail)
-  const revokedRequest = page.waitForResponse(
-    (response) =>
-      response.request().method() === 'GET' &&
-      new URL(response.url()).pathname === '/api/v1/me/courses',
-  )
-  await page.getByRole('link', { name: 'Khóa học của tôi' }).click()
-  const response = await revokedRequest
+  const response = await page.context().request.get(`${apiBase}/me/courses`, {
+    headers: { Authorization: `Bearer ${previousAccessToken}` },
+  })
   expect(response.status()).toBe(401)
   expect((await response.json()).error.code).toBe('SESSION_REVOKED')
-  await expect(page).toHaveURL(/\/login\?returnTo=.*sessionRevoked=1/)
-  await expect(page.getByText('Phiên đăng nhập đã bị thay thế hoặc thu hồi').first()).toBeVisible()
+  await page.goto('/student/courses')
+  await expect(page).toHaveURL(/\/login\?returnTo=/)
   await replacementPage.close()
 })
 

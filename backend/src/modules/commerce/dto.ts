@@ -108,6 +108,7 @@ export function orderDto(value: object, admin = false) {
         ? null
         : amountAsVnd(order.renewalPlanPriceSnapshot),
     status: String(order.status),
+    paymentProofRequired: order.paymentProofRequired === true,
     courseId: idString(order.courseId),
     courseTitleSnapshot: String(order.courseTitleSnapshot),
     coursePriceSnapshot: amountAsVnd(order.coursePriceSnapshot),
@@ -118,6 +119,20 @@ export function orderDto(value: object, admin = false) {
     couponId: idStringOrNull(order.couponId),
     durationMonthsSnapshot: Number(order.durationMonthsSnapshot),
     paymentSubmittedAt: toIso(order.paymentSubmittedAt as Date | null),
+    paymentProof: order.paymentProofAssetId
+      ? {
+          assetId: idString(order.paymentProofAssetId),
+          mimeType: (order.paymentProofMimeType as string | null) ?? null,
+          fileSize: (order.paymentProofFileSize as number | null) ?? null,
+          uploadedAt: toIso(order.paymentProofUploadedAt as Date | null),
+          submittedAt: toIso(order.paymentProofSubmittedAt as Date | null),
+          needsReplacement:
+            order.status === "REJECTED" &&
+            order.reviewedAt instanceof Date &&
+            order.paymentProofUploadedAt instanceof Date &&
+            order.paymentProofUploadedAt <= order.reviewedAt,
+        }
+      : null,
     paidAt: toIso(order.paidAt as Date | null),
     expiresAt: toIso(order.expiresAt as Date | null),
     createdAt: toIso(order.createdAt as Date)!,
