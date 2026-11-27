@@ -108,6 +108,24 @@ async function selectAdminOption(page: Page, label: string, optionName: string |
   await page.getByRole('option', { name: optionName }).click()
 }
 
+const validPaymentProofPng = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  'base64',
+)
+
+async function submitPaymentProof(page: Page) {
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'transfer-proof.png',
+    mimeType: 'image/png',
+    buffer: validPaymentProofPng,
+  })
+  await expect(page.getByText('Ảnh đã được backend xác nhận hợp lệ.')).toBeVisible()
+  const submit = page.getByRole('button', { name: 'Gửi yêu cầu xác nhận thanh toán' })
+  await expect(submit).toBeEnabled()
+  await submit.click()
+  await expect(page.getByText('Đang kiểm tra thanh toán')).toBeVisible()
+}
+
 test.beforeEach(async ({ request }) => {
   await resetFixtures(request)
 })
@@ -199,8 +217,7 @@ test('purchase pricing, coupon reservation, cancellation and Admin reconciliatio
   await page.getByRole('button', { name: 'Tiếp tục thanh toán' }).click()
   await expect(page).toHaveURL(/\/orders\/[^/]+\/pending$/)
   const paidOrderId = new URL(page.url()).pathname.split('/')[2]!
-  await page.getByRole('button', { name: 'Tôi đã chuyển khoản' }).click()
-  await expect(page.getByText('Đang kiểm tra thanh toán')).toBeVisible()
+  await submitPaymentProof(page)
   await expect(page.getByRole('button', { name: 'Hủy đơn' })).toHaveCount(0)
   const afterReportCancellation = await apiPost(
     request,
@@ -287,7 +304,7 @@ test('purchase pricing, coupon reservation, cancellation and Admin reconciliatio
   await page.getByRole('button', { name: 'Tiếp tục thanh toán' }).click()
   await expect(page).toHaveURL(/\/orders\/[^/]+\/pending$/)
   const adminCancellationOrderId = new URL(page.url()).pathname.split('/')[2]!
-  await page.getByRole('button', { name: 'Tôi đã chuyển khoản' }).click()
+  await submitPaymentProof(page)
   await admin.goto(`/admin/orders/${adminCancellationOrderId}`)
   const adminCancel = admin.getByRole('button', { name: 'Hủy đơn sau đối soát' })
   await expect(adminCancel).toBeDisabled()
@@ -369,7 +386,7 @@ test('renewal supports active and expired enrollments, reuses the existing recor
   await expect(page).toHaveURL(/\/orders\/[^/]+\/pending$/)
   const orderId = new URL(page.url()).pathname.split('/')[2]!
   await expect(page.getByText('Chờ bạn hoàn tất thanh toán')).toBeVisible()
-  await page.getByRole('button', { name: 'Tôi đã chuyển khoản' }).click()
+  await submitPaymentProof(page)
 
   const admin = await adminPage(browser)
   await admin.goto(`/admin/orders/${orderId}`)

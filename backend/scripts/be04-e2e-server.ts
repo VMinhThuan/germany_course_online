@@ -24,6 +24,7 @@ import { FakeEmailService } from "../src/modules/auth/email-service.js";
 import { ensureIndexes } from "../src/db/ensure-indexes.js";
 import {
   matchesImageSignature,
+  PAYMENT_PROOF_FOLDER,
   type CreateUploadInput,
   type MediaStorageAdapter,
   type SignMediaInput,
@@ -39,7 +40,7 @@ const controlToken = "BE05-LOCAL-RESET-ONLY-6f3bf983";
 const testPassword = "BE04-Isolated-Test-123!";
 
 class E2ePaymentProofStorage implements MediaStorageAdapter {
-  readonly provider = "S3_COMPATIBLE" as const;
+  readonly provider = "CLOUDINARY" as const;
   private readonly objects = new Map<
     string,
     { bytes: Buffer; mimeType: string }
@@ -51,8 +52,12 @@ class E2ePaymentProofStorage implements MediaStorageAdapter {
 
   constructor(private readonly baseUrl: string) {}
 
-  createStorageKey(_mediaType: string, uniqueId: string): string {
-    return `e2e-payment-proofs/${uniqueId}`;
+  createStorageKey(
+    _mediaType: string,
+    uniqueId: string,
+    assetFolder?: string,
+  ): string {
+    return `${assetFolder ?? PAYMENT_PROOF_FOLDER}/${uniqueId}`;
   }
 
   createUpload(input: CreateUploadInput) {

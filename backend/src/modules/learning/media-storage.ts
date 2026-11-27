@@ -18,10 +18,14 @@ export type SignedMediaUrl = {
 export type MediaResourceType = "image" | "video" | "raw";
 export type MediaDeliveryType = "upload" | "private" | "authenticated";
 
+/** Internal Cloudinary namespace reserved exclusively for payment proofs. */
+export const PAYMENT_PROOF_FOLDER = "payment-proofs";
+
 export type SignMediaInput = {
   storageKey: string;
   mimeType: string;
   mediaType?: string;
+  assetFolder?: string;
   resourceType?: MediaResourceType | null;
   deliveryType?: MediaDeliveryType | null;
   format?: string | null;
@@ -52,6 +56,7 @@ export type VerifyMediaInput = {
   mimeType: string;
   fileSize: number;
   mediaType: string;
+  assetFolder?: string;
   resourceType?: MediaResourceType | null;
   deliveryType?: MediaDeliveryType | null;
 };
@@ -271,7 +276,11 @@ export class CloudinaryMediaStorage implements MediaStorageAdapter {
     const format = rawGenericFile
       ? ""
       : (input.format ?? formatForMime(input.mimeType) ?? "");
-    const folders = foldersForMedia(this.config, input.mediaType);
+    const folders = foldersForInput(
+      this.config,
+      input.mediaType,
+      input.assetFolder,
+    );
     if (
       !resourceType ||
       (!format && !rawGenericFile) ||
@@ -343,7 +352,11 @@ export class CloudinaryMediaStorage implements MediaStorageAdapter {
       input.resourceType ??
       resourceTypeForMedia(input.mediaType, input.mimeType);
     const rawGenericFile = input.mediaType === "FILE" && resourceType === "raw";
-    const configuredFolders = foldersForMedia(this.config, input.mediaType);
+    const configuredFolders = foldersForInput(
+      this.config,
+      input.mediaType,
+      input.assetFolder,
+    );
     const folder = input.assetFolder ?? configuredFolders[0];
     if (
       !resourceType ||
@@ -436,7 +449,7 @@ export class CloudinaryMediaStorage implements MediaStorageAdapter {
     uniqueId: string,
     assetFolder?: string,
   ): string {
-    const rootFolders = foldersForMedia(this.config, mediaType);
+    const rootFolders = foldersForInput(this.config, mediaType, assetFolder);
     const folder = assetFolder ?? rootFolders[0];
     if (
       !rootFolders.length ||
@@ -473,7 +486,7 @@ export class CloudinaryMediaStorage implements MediaStorageAdapter {
       resourceType !== resourceTypeForMedia(input.mediaType, input.mimeType) ||
       !isValidCloudinaryPublicId(
         input.storageKey,
-        foldersForMedia(this.config, input.mediaType),
+        foldersForInput(this.config, input.mediaType, input.assetFolder),
         rawGenericFile,
       ) ||
       input.deliveryType !== "authenticated"
@@ -507,6 +520,7 @@ export class CloudinaryMediaStorage implements MediaStorageAdapter {
       storageKey: input.storageKey,
       mimeType: input.mimeType,
       mediaType: input.mediaType,
+      ...(input.assetFolder ? { assetFolder: input.assetFolder } : {}),
       resourceType: input.resourceType ?? null,
       deliveryType: input.deliveryType ?? null,
       format: formatForMime(input.mimeType) ?? null,
@@ -585,7 +599,8 @@ export class CloudinaryMediaStorage implements MediaStorageAdapter {
       ) ||
       foldersForMedia(this.config, "IMAGE").some((folder) =>
         storageKey.startsWith(`${folder}/`),
-      )
+      ) ||
+      storageKey.startsWith(`${PAYMENT_PROOF_FOLDER}/`)
     )
       return "image";
     if (
@@ -740,6 +755,16 @@ function foldersForMedia(
     return [...new Set([config.audioFolder, config.lessonAudioFolder])];
   if (mediaType === "FILE") return [config.webContentFolder ?? "web-content"];
   return [];
+}
+
+function foldersForInput(
+  config: NonNullable<AppConfig["cloudinaryMedia"]>,
+  mediaType?: string,
+  assetFolder?: string,
+): string[] {
+  if (assetFolder === PAYMENT_PROOF_FOLDER && mediaType === "IMAGE")
+    return [PAYMENT_PROOF_FOLDER];
+  return foldersForMedia(config, mediaType);
 }
 
 function formatForMime(mimeType: string): string | undefined {

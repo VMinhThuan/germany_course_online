@@ -12147,7 +12147,7 @@ components:
           type: object
           properties:
             assetId: { type: string, pattern: "^[a-fA-F0-9]{24}$" }
-            provider: { type: string, enum: [S3_COMPATIBLE, CLOUDINARY] }
+            provider: { type: string, enum: [CLOUDINARY] }
             uploadUrl: { type: string, format: uri }
             uploadMethod: { type: string, enum: [PUT, POST] }
             uploadHeaders: { type: object, additionalProperties: { type: string } }

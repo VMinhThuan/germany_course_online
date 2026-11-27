@@ -49,6 +49,7 @@ import type {
   MediaResourceType,
   MediaDeliveryType,
 } from "../learning/media-storage.js";
+import { PAYMENT_PROOF_FOLDER } from "../learning/media-storage.js";
 import type { PaymentProofUploadIntentInput } from "./schemas.js";
 
 const PAYMENT_CONFIGURATION_UNAVAILABLE = () =>
@@ -424,7 +425,7 @@ export class CommerceService {
     orderId: string,
     input: PaymentProofUploadIntentInput,
   ) {
-    const storage = this.mediaStorage;
+    const storage = resolveCloudinaryStorage(this.mediaStorage);
     if (!storage?.createUpload)
       throw new AppError(
         503,
@@ -440,19 +441,19 @@ export class CommerceService {
     }).lean();
     this.assertProofCanBeEdited(order);
 
-    const provider = storage.provider;
-    if (!provider)
+    const provider = "CLOUDINARY" as const;
+    const uniqueId = randomUUID().replaceAll("-", "");
+    const resourceType = "image" as const;
+    const deliveryType = "authenticated" as const;
+    const storageKey =
+      storage.createStorageKey?.("IMAGE", uniqueId, PAYMENT_PROOF_FOLDER) ??
+      `${PAYMENT_PROOF_FOLDER}/${uniqueId}`;
+    if (!storageKey.startsWith(`${PAYMENT_PROOF_FOLDER}/`))
       throw new AppError(
         503,
         "MEDIA_STORAGE_UNAVAILABLE",
-        "Payment proof upload is not configured.",
+        "Cloudinary payment proof storage is not configured correctly.",
       );
-    const uniqueId = `payment-proofs/${randomUUID().replaceAll("-", "")}`;
-    const resourceType = provider === "CLOUDINARY" ? "image" : undefined;
-    const deliveryType =
-      provider === "CLOUDINARY" ? "authenticated" : undefined;
-    const storageKey =
-      storage.createStorageKey?.("IMAGE", uniqueId) ?? `media/${uniqueId}`;
     let signed;
     try {
       signed = await storage.createUpload({
@@ -461,8 +462,9 @@ export class CommerceService {
         fileSize: input.fileSize,
         expiresInSeconds: 600,
         mediaType: "IMAGE",
-        ...(resourceType ? { resourceType } : {}),
-        ...(deliveryType ? { deliveryType } : {}),
+        resourceType,
+        deliveryType,
+        assetFolder: PAYMENT_PROOF_FOLDER,
       });
     } catch (error) {
       if (error instanceof AppError) throw error;
@@ -472,6 +474,12 @@ export class CommerceService {
         "Payment proof upload is temporarily unavailable.",
       );
     }
+    if (signed.provider !== "CLOUDINARY")
+      throw new AppError(
+        503,
+        "MEDIA_STORAGE_UNAVAILABLE",
+        "Payment proof uploads must use Cloudinary.",
+      );
 
     // Abandoned upload intents must not accumulate indefinitely. A later
     // intent for the same order safely retires the previous pending object.
@@ -520,7 +528,7 @@ export class CommerceService {
   }
 
   async completePaymentProof(userId: string, orderId: string, assetId: string) {
-    const storage = this.mediaStorage;
+    const storage = resolveCloudinaryStorage(this.mediaStorage);
     if (!storage)
       throw new AppError(
         503,
@@ -543,6 +551,8 @@ export class CommerceService {
       paymentProofOrderId: orderObjectId,
       uploadedById: userObjectId,
       mediaType: "IMAGE",
+      provider: "CLOUDINARY",
+      storageKey: { $regex: `^${PAYMENT_PROOF_FOLDER}/` },
       deletedAt: null,
       uploadStatus: { $in: ["PENDING", "READY"] },
     })
@@ -560,7 +570,7 @@ export class CommerceService {
         "UPLOAD_INTENT_EXPIRED",
         "The payment proof upload intent expired.",
       );
-    const adapter = resolveMediaStorage(this.mediaStorage, asset.provider);
+    const adapter = resolveCloudinaryStorage(this.mediaStorage);
     if (!adapter?.verifyUpload || !adapter.verifyImageSignature)
       throw new AppError(
         503,
@@ -574,6 +584,7 @@ export class CommerceService {
         mimeType: asset.mimeType,
         fileSize: asset.fileSize,
         mediaType: "IMAGE",
+        assetFolder: PAYMENT_PROOF_FOLDER,
         resourceType: asset.resourceType as MediaResourceType | null,
         deliveryType: asset.deliveryType as MediaDeliveryType | null,
       });
@@ -732,13 +743,15 @@ export class CommerceService {
     const asset = await MediaAsset.findOne({
       _id: assetId,
       paymentProofOrderId: order._id,
+      provider: "CLOUDINARY",
+      storageKey: { $regex: `^${PAYMENT_PROOF_FOLDER}/` },
       uploadStatus: "READY",
       deletedAt: null,
     })
       .select("+provider +storageKey +resourceType +deliveryType")
       .lean();
     if (!asset) throw notFound("Payment proof not found.");
-    const adapter = resolveMediaStorage(this.mediaStorage, asset.provider);
+    const adapter = resolveCloudinaryStorage(this.mediaStorage);
     if (!adapter)
       throw new AppError(
         503,
@@ -749,6 +762,7 @@ export class CommerceService {
       storageKey: asset.storageKey,
       mimeType: asset.mimeType,
       mediaType: "IMAGE",
+      assetFolder: PAYMENT_PROOF_FOLDER,
       resourceType: asset.resourceType as MediaResourceType | null,
       deliveryType: asset.deliveryType as MediaDeliveryType | null,
       format: asset.format ?? null,
@@ -805,15 +819,26 @@ export class CommerceService {
       paymentProofAssetId: asset._id as Types.ObjectId,
     });
     if (referencedInHistory) return;
-    const adapter = resolveMediaStorage(this.mediaStorage, asset.provider);
+    if (
+      asset.provider !== "CLOUDINARY" ||
+      !String(asset.storageKey).startsWith(`${PAYMENT_PROOF_FOLDER}/`)
+    )
+      return;
+    const adapter = resolveCloudinaryStorage(this.mediaStorage);
+    if (!adapter?.deleteAsset) {
+      await MediaAsset.updateOne(
+        { _id: asset._id },
+        { $set: { uploadStatus: "DELETING" } },
+      );
+      return;
+    }
     try {
-      if (adapter?.deleteAsset)
-        await adapter.deleteAsset({
-          storageKey: String(asset.storageKey),
-          mediaType: "IMAGE",
-          resourceType: asset.resourceType as MediaResourceType | null,
-          deliveryType: asset.deliveryType as MediaDeliveryType | null,
-        });
+      await adapter.deleteAsset({
+        storageKey: String(asset.storageKey),
+        mediaType: "IMAGE",
+        resourceType: asset.resourceType as MediaResourceType | null,
+        deliveryType: asset.deliveryType as MediaDeliveryType | null,
+      });
       await MediaAsset.updateOne(
         { _id: asset._id },
         { $set: { uploadStatus: "DELETED", deletedAt: this.now() } },
@@ -2835,19 +2860,14 @@ function safeProofName(value: string): string {
   return base || "payment-proof";
 }
 
-function resolveMediaStorage(
+function resolveCloudinaryStorage(
   storage: MediaStorageAdapter | undefined,
-  providerValue: unknown,
 ): MediaStorageAdapter | undefined {
   if (!storage) return undefined;
-  if (providerValue === "S3_COMPATIBLE" || providerValue === "CLOUDINARY") {
-    return (
-      storage.resolve?.(providerValue) ??
-      (!storage.resolve &&
-      (!storage.provider || storage.provider === providerValue)
-        ? storage
-        : undefined)
-    );
-  }
-  return undefined;
+  const resolved = storage.resolve?.("CLOUDINARY");
+  if (resolved)
+    return resolved.provider === "CLOUDINARY" ? resolved : undefined;
+  return !storage.resolve && storage.provider === "CLOUDINARY"
+    ? storage
+    : undefined;
 }

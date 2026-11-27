@@ -166,6 +166,48 @@ describe("learning media storage adapters", () => {
     );
   });
 
+  it("keeps payment proofs in the dedicated authenticated Cloudinary folder", async () => {
+    const now = new Date("2026-11-04T00:00:00.500Z");
+    const storage = new CloudinaryMediaStorage(cloudinaryTestConfig, () => now);
+    const storageKey = storage.createStorageKey(
+      "IMAGE",
+      "proof-123",
+      "payment-proofs",
+    );
+    expect(storageKey).toBe("payment-proofs/proof-123");
+
+    const intent = await storage.createUpload({
+      storageKey,
+      mimeType: "image/png",
+      fileSize: 5 * 1024 * 1024,
+      expiresInSeconds: 600,
+      mediaType: "IMAGE",
+      resourceType: "image",
+      deliveryType: "authenticated",
+      assetFolder: "payment-proofs",
+    });
+    expect(intent).toMatchObject({ provider: "CLOUDINARY", method: "POST" });
+    expect(intent.fields).toMatchObject({
+      public_id: storageKey,
+      asset_folder: "payment-proofs",
+      type: "authenticated",
+    });
+
+    const signed = await storage.signRead({
+      storageKey,
+      mimeType: "image/png",
+      mediaType: "IMAGE",
+      assetFolder: "payment-proofs",
+      resourceType: "image",
+      deliveryType: "authenticated",
+      format: "png",
+    });
+    expect(new URL(signed.url).hostname).toBe("api.cloudinary.com");
+    expect(new URL(signed.url).searchParams.get("expires_at")).toBe(
+      String(Math.floor(signed.expiresAt.getTime() / 1000)),
+    );
+  });
+
   it("lists configured Cloudinary folders and keeps selected destinations inside their root", async () => {
     const storage = new CloudinaryMediaStorage(cloudinaryTestConfig);
     const folders = vi.spyOn(cloudinary.api, "sub_folders").mockResolvedValue({

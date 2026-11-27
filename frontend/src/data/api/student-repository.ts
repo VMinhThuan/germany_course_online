@@ -815,7 +815,7 @@ const commerce: StudentCommerceRepository & {
   async uploadPaymentProof(_sessionId, orderId, file, onProgress) {
     const intent = await apiRequest<{
       assetId: string
-      provider: 'S3_COMPATIBLE' | 'CLOUDINARY'
+      provider: 'CLOUDINARY'
       uploadUrl: string
       uploadMethod: 'PUT' | 'POST'
       uploadHeaders: Record<string, string>
